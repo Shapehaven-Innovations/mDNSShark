@@ -143,7 +143,7 @@
 			mainGroup = 9A1C9E802D443D5300643122;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				9A048D892D45AB47000B42BF /* XCLocalSwiftPackageReference "SwiftPing" */,
+				9A048D892D45AB47000B42BF /* XCLocalSwiftPackageReference "../SwiftPing" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9A1C9E8A2D443D5300643122 /* Products */;
@@ -407,7 +407,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		9A048D892D45AB47000B42BF /* XCLocalSwiftPackageReference "SwiftPing" */ = {
+		9A048D892D45AB47000B42BF /* XCLocalSwiftPackageReference "../SwiftPing" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../SwiftPing;
 		};

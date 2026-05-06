@@ -57,7 +57,7 @@ struct TopologyView: View {
     }
 
     var body: some View {
-        // Evaluate once per render pass — avoids triple-computation and cross-call drift
+        // Evaluate once per render pass - avoids triple-computation and cross-call drift
         let nodes = visibleNodes
         NavigationView {
             ScrollView {
@@ -67,7 +67,7 @@ struct TopologyView: View {
                     } else {
                         CardView {
                             VStack(alignment: .leading, spacing: 0) {
-                                // Title — never covered by nodes
+                                // Title - never covered by nodes
                                 HStack {
                                     Label("Network Topology", systemImage: "wifi")
                                         .font(.headline)
@@ -81,11 +81,11 @@ struct TopologyView: View {
                                 }
                                 .padding(.bottom, 10)
 
-                                // Filters — never covered by nodes
+                                // Filters - never covered by nodes
                                 filterChipBar
                                     .padding(.bottom, 10)
 
-                                // Canvas — nodes are strictly within this frame
+                                // Canvas - nodes are strictly within this frame
                                 GeometryReader { geo in
                                     let count     = max(1, nodes.count - 1)
                                     let radius    = CGFloat(max(110, min(180, count * 14)))

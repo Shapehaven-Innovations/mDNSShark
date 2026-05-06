@@ -15,7 +15,7 @@ struct OnboardingBannerView: View {
                         Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
                     }
                 }
-                Text("mDNSShark uses **Bonjour** — Apple's implementation of zero-configuration networking (mDNS + DNS-SD) — to automatically discover devices and services on your local network using industry-standard IP protocols. All scanning and security assessment runs entirely on your device. No data is sent to external servers.")
+                Text("mDNSShark uses **Bonjour** - Apple's implementation of zero-configuration networking (mDNS + DNS-SD) - to automatically discover devices and services on your local network using industry-standard IP protocols. All scanning and security assessment runs entirely on your device. No data is sent to external servers.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

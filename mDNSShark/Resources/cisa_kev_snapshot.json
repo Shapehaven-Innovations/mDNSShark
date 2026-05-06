@@ -1,5 +1,5 @@
 {
-  "title": "CISA KEV Snapshot — mDNSShark bundled subset",
+  "title": "CISA KEV Snapshot - mDNSShark bundled subset",
   "vulnerabilities": [
     {
       "cveID": "CVE-2020-10188",
@@ -54,7 +54,7 @@
       "cveID": "CVE-2014-9222",
       "vendorProject": "AllegroSoft",
       "product": "RomPager",
-      "vulnerabilityName": "Misfortune Cookie — RomPager Cookie Parsing RCE",
+      "vulnerabilityName": "Misfortune Cookie - RomPager Cookie Parsing RCE",
       "shortDescription": "RomPager embedded HTTP server, used in millions of home routers, allows RCE via a crafted cookie."
     },
     {
