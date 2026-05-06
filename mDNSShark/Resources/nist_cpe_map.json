@@ -1,0 +1,54 @@
+{
+  "serviceTypes": {
+    "_telnet._tcp": {
+      "cves": ["CVE-2020-10188"],
+      "description": "Telnet transmits all data including credentials in cleartext and has known RCE vulnerabilities."
+    },
+    "_rfb._tcp": {
+      "cves": ["CVE-2019-15681", "CVE-2006-2369"],
+      "description": "VNC (RFB protocol) remote desktop has known authentication bypass and RCE vulnerabilities."
+    },
+    "_vnc._tcp": {
+      "cves": ["CVE-2019-15681", "CVE-2006-2369"],
+      "description": "VNC remote desktop has known authentication bypass and RCE vulnerabilities."
+    },
+    "_ftp._tcp": {
+      "cves": ["CVE-2011-2523", "CVE-2020-9054"],
+      "description": "FTP transmits credentials in cleartext. Multiple FTP servers have critical known vulnerabilities."
+    },
+    "_ssh._tcp": {
+      "cves": [],
+      "description": "SSH provides encrypted remote shell access. Ensure key-based authentication is enforced."
+    },
+    "_remotemanagement._tcp": {
+      "cves": [],
+      "description": "Apple Remote Desktop management allows full screen sharing and remote control."
+    },
+    "_smb._tcp": {
+      "cves": [],
+      "description": "SMB file sharing has a history of critical vulnerabilities. Keep firmware and OS updated."
+    },
+    "_http._tcp": {
+      "cves": [],
+      "description": "Unencrypted HTTP service. Local network traffic can be intercepted."
+    }
+  },
+  "manufacturers": {
+    "ASUS": {
+      "cves": ["CVE-2023-39238"],
+      "description": "ASUS router firmware has known critical RCE vulnerabilities in recent versions."
+    },
+    "Cisco": {
+      "cves": ["CVE-2023-20198"],
+      "description": "Cisco IOS XE has a critical privilege escalation vulnerability in the web management UI."
+    },
+    "D-Link": {
+      "cves": ["CVE-2023-44415"],
+      "description": "D-Link router firmware has known RCE vulnerabilities."
+    },
+    "Netgear": {
+      "cves": ["CVE-2021-45514"],
+      "description": "Netgear routers have authentication bypass vulnerabilities in certain firmware versions."
+    }
+  }
+}

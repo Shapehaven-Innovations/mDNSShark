@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3173238BF83DA8A145886A53 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F0ABF2194E516D286205B0E3 /* NetworkExtension.framework */; };
 		9A40CE772D5EC623000379E7 /* MIT.license in Resources */ = {isa = PBXBuildFile; fileRef = 9A40CE762D5EC61A000379E7 /* MIT.license */; };
 		9A8F66FF2D4F069100A033B5 /* ScanX-Bridging-Header.m in Sources */ = {isa = PBXBuildFile; fileRef = 9A8F66FE2D4F069100A033B5 /* ScanX-Bridging-Header.m */; };
 		9AC2AB6C2D4F1F3B004A9F66 /* libmdns.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 9AC2AB6B2D4F1F3B004A9F66 /* libmdns.tbd */; };
@@ -23,6 +24,7 @@
 		9AC2AB6B2D4F1F3B004A9F66 /* libmdns.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libmdns.tbd; path = usr/lib/libmdns.tbd; sourceTree = SDKROOT; };
 		9AC2AB7E2D4F2024004A9F66 /* CFNetwork.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CFNetwork.framework; path = System/Library/Frameworks/CFNetwork.framework; sourceTree = SDKROOT; };
 		9AFD8F6A2D5E89C80034B804 /* readme.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = readme.md; sourceTree = "<group>"; };
+		F0ABF2194E516D286205B0E3 /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -53,6 +55,7 @@
 			files = (
 				9AC2AB802D4F2285004A9F66 /* CFNetwork.framework in Frameworks */,
 				9AC2AB6C2D4F1F3B004A9F66 /* libmdns.tbd in Frameworks */,
+				3173238BF83DA8A145886A53 /* NetworkExtension.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -86,6 +89,7 @@
 				9A8F66CE2D4EEF4B00A033B5 /* libdns_services.tbd */,
 				9A8F66FE2D4F069100A033B5 /* ScanX-Bridging-Header.m */,
 				9A8F67042D4F076500A033B5 /* ScanX-Bridging-Header.h */,
+				F0ABF2194E516D286205B0E3 /* NetworkExtension.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -109,8 +113,6 @@
 				9A1C9E8B2D443D5300643122 /* mDNSShark */,
 			);
 			name = mDNSShark;
-			packageProductDependencies = (
-			);
 			productName = ScanX;
 			productReference = 9A1C9E892D443D5300643122 /* mDNSShark.app */;
 			productType = "com.apple.product-type.application";
@@ -141,7 +143,7 @@
 			mainGroup = 9A1C9E802D443D5300643122;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				9A048D892D45AB47000B42BF /* XCLocalSwiftPackageReference "../SwiftPing" */,
+				9A048D892D45AB47000B42BF /* XCLocalSwiftPackageReference "SwiftPing" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9A1C9E8A2D443D5300643122 /* Products */;
@@ -405,7 +407,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		9A048D892D45AB47000B42BF /* XCLocalSwiftPackageReference "../SwiftPing" */ = {
+		9A048D892D45AB47000B42BF /* XCLocalSwiftPackageReference "SwiftPing" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../SwiftPing;
 		};

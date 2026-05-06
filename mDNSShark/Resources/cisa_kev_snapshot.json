@@ -1,0 +1,75 @@
+{
+  "title": "CISA KEV Snapshot — mDNSShark bundled subset",
+  "vulnerabilities": [
+    {
+      "cveID": "CVE-2020-10188",
+      "vendorProject": "GNU",
+      "product": "Telnet",
+      "vulnerabilityName": "GNU Telnet Remote Code Execution Vulnerability",
+      "shortDescription": "GNU telnetd contains a buffer overflow allowing unauthenticated remote code execution."
+    },
+    {
+      "cveID": "CVE-2019-15681",
+      "vendorProject": "LibVNC",
+      "product": "LibVNCServer",
+      "vulnerabilityName": "LibVNC Memory Leak Leading to RCE",
+      "shortDescription": "LibVNCServer contains a use-after-free vulnerability that can lead to remote code execution."
+    },
+    {
+      "cveID": "CVE-2006-2369",
+      "vendorProject": "RealVNC",
+      "product": "VNC",
+      "vulnerabilityName": "RealVNC Authentication Bypass",
+      "shortDescription": "RealVNC allows remote attackers to bypass authentication via a request with None security type."
+    },
+    {
+      "cveID": "CVE-2011-2523",
+      "vendorProject": "GNU",
+      "product": "vsftpd",
+      "vulnerabilityName": "vsftpd Backdoor Command Execution",
+      "shortDescription": "vsftpd 2.3.4 contains a backdoor allowing unauthenticated remote command execution."
+    },
+    {
+      "cveID": "CVE-2020-9054",
+      "vendorProject": "Zyxel",
+      "product": "NAS",
+      "vulnerabilityName": "Zyxel NAS OS Command Injection via FTP",
+      "shortDescription": "Zyxel NAS devices allow unauthenticated OS command injection through the FTP service."
+    },
+    {
+      "cveID": "CVE-2023-39238",
+      "vendorProject": "ASUS",
+      "product": "Router Firmware",
+      "vulnerabilityName": "ASUS Router Remote Code Execution",
+      "shortDescription": "Multiple ASUS routers allow unauthenticated remote code execution via crafted network requests."
+    },
+    {
+      "cveID": "CVE-2023-20198",
+      "vendorProject": "Cisco",
+      "product": "IOS XE",
+      "vulnerabilityName": "Cisco IOS XE Web UI Privilege Escalation",
+      "shortDescription": "Cisco IOS XE web management interface allows unauthenticated privilege escalation to level 15."
+    },
+    {
+      "cveID": "CVE-2014-9222",
+      "vendorProject": "AllegroSoft",
+      "product": "RomPager",
+      "vulnerabilityName": "Misfortune Cookie — RomPager Cookie Parsing RCE",
+      "shortDescription": "RomPager embedded HTTP server, used in millions of home routers, allows RCE via a crafted cookie."
+    },
+    {
+      "cveID": "CVE-2021-45514",
+      "vendorProject": "Netgear",
+      "product": "Router",
+      "vulnerabilityName": "Netgear Router Authentication Bypass",
+      "shortDescription": "Netgear routers allow authentication bypass via crafted HTTP requests."
+    },
+    {
+      "cveID": "CVE-2023-44415",
+      "vendorProject": "D-Link",
+      "product": "Router Firmware",
+      "vulnerabilityName": "D-Link Router Remote Code Execution",
+      "shortDescription": "D-Link routers contain a stack buffer overflow allowing unauthenticated remote code execution."
+    }
+  ]
+}
