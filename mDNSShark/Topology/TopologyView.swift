@@ -59,7 +59,7 @@ struct TopologyView: View {
     var body: some View {
         // Evaluate once per render pass - avoids triple-computation and cross-call drift
         let nodes = visibleNodes
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
                     if coordinator.networkScanViewModel.devices.isEmpty {
@@ -151,16 +151,11 @@ struct TopologyView: View {
                     }
                 }
                 .padding(.top, 8)
-                .background(
-                    NavigationLink(
-                        destination: Group {
-                            if let device = selectedDevice { DeviceDetailView(device: device) }
-                        },
-                        isActive: $navigateToDetail
-                    ) { EmptyView() }
-                )
             }
             .navigationBarHidden(true)
+            .navigationDestination(isPresented: $navigateToDetail) {
+                if let device = selectedDevice { DeviceDetailView(device: device) }
+            }
         }
     }
 
