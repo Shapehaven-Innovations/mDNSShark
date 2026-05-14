@@ -8,12 +8,12 @@ final class PacketCaptureManager: ObservableObject {
     @Published var packets: [PacketModel] = []
     @Published var isCapturing: Bool = false
 
-    private let vpnManager = NEVPNManager.shared()
+    private var tunnelManager: NETunnelProviderManager?
     private var fileReadTimer: Timer?
 
     private let sharedFileURL: URL = {
         let appGroup = FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: "group.com.yourcompany.mDNSShark")
+            .containerURL(forSecurityApplicationGroupIdentifier: "group.org.shapehaveninnovations.mDNSShark")
         let base = appGroup ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         return base.appendingPathComponent("packets.log")
     }()
@@ -23,7 +23,7 @@ final class PacketCaptureManager: ObservableObject {
             guard let self else { return }
             if let error { print("VPN config error: \(error)"); return }
             do {
-                try self.vpnManager.connection.startVPNTunnel()
+                try self.tunnelManager?.connection.startVPNTunnel()
                 Task { @MainActor in
                     self.isCapturing = true
                     self.startPolling()
@@ -33,23 +33,30 @@ final class PacketCaptureManager: ObservableObject {
     }
 
     func stopCapture() {
-        vpnManager.connection.stopVPNTunnel()
+        tunnelManager?.connection.stopVPNTunnel()
         isCapturing = false
         stopPolling()
     }
 
     private func configureVPN(completion: @escaping (Error?) -> Void) {
-        vpnManager.loadFromPreferences { [weak self] error in
+        NETunnelProviderManager.loadAllFromPreferences { [weak self] managers, error in
             if let error { completion(error); return }
+            let manager = managers?.first ?? NETunnelProviderManager()
             let proto = NETunnelProviderProtocol()
-            proto.providerBundleIdentifier = "com.yourcompany.PacketTunnel"
+            proto.providerBundleIdentifier = "beta.mDNSShark.PacketTunnel"
             proto.serverAddress = "127.0.0.1"
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.vpnManager.protocolConfiguration = proto
-                self.vpnManager.localizedDescription = "Packet Capture Tunnel"
-                self.vpnManager.isEnabled = true
-                self.vpnManager.saveToPreferences { completion($0) }
+            manager.protocolConfiguration = proto
+            manager.localizedDescription = "Packet Capture Tunnel"
+            manager.isEnabled = true
+            manager.saveToPreferences { error in
+                if let error { completion(error); return }
+                // Reload required before the connection object becomes usable
+                manager.loadFromPreferences { error in
+                    Task { @MainActor [weak self] in
+                        self?.tunnelManager = manager
+                        completion(error)
+                    }
+                }
             }
         }
     }

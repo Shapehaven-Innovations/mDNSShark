@@ -8,12 +8,12 @@
 		<dict>
 			<key>1.1.1.1</key>
 			<dict>
-				<key>NSIncludesSubdomains</key>
-				<true/>
-				<key>NSExceptionRequiresForwardSecrecy</key>
-				<false/>
 				<key>NSExceptionMinimumTLSVersion </key>
 				<string>TLSv1.0</string>
+				<key>NSExceptionRequiresForwardSecrecy</key>
+				<false/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
 				<key>NSTemporaryExceptionAllowsInsecureHTTPLoads</key>
 				<true/>
 			</dict>
@@ -23,69 +23,69 @@
 	<array>
 		<string>_http._tcp
     // Common services
-    &quot;_http._tcp&quot;,
-    &quot;_https._tcp&quot;,
-    &quot;_ftp._tcp&quot;,
-    &quot;_ssh._tcp&quot;,
-    &quot;_telnet._tcp&quot;,
-    &quot;_smb._tcp&quot;,
-    &quot;_afpovertcp._tcp&quot;,
-    &quot;_nfs._tcp&quot;,
-    &quot;_workstation._tcp&quot;,
+    "_http._tcp",
+    "_https._tcp",
+    "_ftp._tcp",
+    "_ssh._tcp",
+    "_telnet._tcp",
+    "_smb._tcp",
+    "_afpovertcp._tcp",
+    "_nfs._tcp",
+    "_workstation._tcp",
 
     // Apple / macOS / iOS services
-    &quot;_airdrop._tcp&quot;,
-    &quot;_airplay._tcp&quot;,
-    &quot;_apple-mobdev2._tcp&quot;,
-    &quot;_adisk._tcp&quot;,
-    &quot;_time-machine._tcp&quot;,
-    &quot;_airport._tcp&quot;,       // AirPort base station 
-    &quot;_afpovertcp._tcp&quot;,    // Apple Filing Protocol
-    &quot;_device-info._tcp&quot;,
-    &quot;_services._dns-sd._udp&quot;, // DNS-SD meta-service
+    "_airdrop._tcp",
+    "_airplay._tcp",
+    "_apple-mobdev2._tcp",
+    "_adisk._tcp",
+    "_time-machine._tcp",
+    "_airport._tcp",       // AirPort base station 
+    "_afpovertcp._tcp",    // Apple Filing Protocol
+    "_device-info._tcp",
+    "_services._dns-sd._udp", // DNS-SD meta-service
 
     // Printing &amp; Scanning
-    &quot;_ipp._tcp&quot;,           // Internet Printing Protocol
-    &quot;_ipps._tcp&quot;,          // Secure IPP
-    &quot;_printer._tcp&quot;,
-    &quot;_pdl-datastream._tcp&quot;,// HP Printer PDL
-    &quot;_scanner._tcp&quot;,
+    "_ipp._tcp",           // Internet Printing Protocol
+    "_ipps._tcp",          // Secure IPP
+    "_printer._tcp",
+    "_pdl-datastream._tcp",// HP Printer PDL
+    "_scanner._tcp",
 
     // Media &amp; Streaming
-    &quot;_raop._tcp&quot;,          // AirPlay audio streaming
-    &quot;_daap._tcp&quot;,          // iTunes DAAP
-    &quot;_dacp._tcp&quot;,          // iTunes/Apple TV remote control
-    &quot;_spotify-connect._tcp&quot;,
-    &quot;_googlecast._tcp&quot;,
+    "_raop._tcp",          // AirPlay audio streaming
+    "_daap._tcp",          // iTunes DAAP
+    "_dacp._tcp",          // iTunes/Apple TV remote control
+    "_spotify-connect._tcp",
+    "_googlecast._tcp",
 
     // File sharing &amp; sync
-    &quot;_bluetoothd2._tcp&quot;,
-    &quot;_btsync._tcp&quot;,        // Resilio/BitTorrent Sync
-    &quot;_workstation._tcp&quot;,   // SMB workstation
-    &quot;_distcc._tcp&quot;,        // Distributed C/C++ compiler
-    &quot;_webdav._tcp&quot;,
+    "_bluetoothd2._tcp",
+    "_btsync._tcp",        // Resilio/BitTorrent Sync
+    "_workstation._tcp",   // SMB workstation
+    "_distcc._tcp",        // Distributed C/C++ compiler
+    "_webdav._tcp",
 
     // Remote screen / management
-    &quot;_rfb._tcp&quot;,           // VNC Remote Frame Buffer
-    &quot;_remotemanagement._tcp&quot;,
+    "_rfb._tcp",           // VNC Remote Frame Buffer
+    "_remotemanagement._tcp",
 
     // IoT / HomeKit / Presence
-    &quot;_hap._tcp&quot;,           // HomeKit Accessory Protocol
-    &quot;_presence._tcp&quot;,
-    &quot;_mqtt._tcp&quot;,          // MQTT broker/client
-    &quot;_coap._udp&quot;,          // Constrained Application Protocol
-    &quot;_peertalk._tcp&quot;,
+    "_hap._tcp",           // HomeKit Accessory Protocol
+    "_presence._tcp",
+    "_mqtt._tcp",          // MQTT broker/client
+    "_coap._udp",          // Constrained Application Protocol
+    "_peertalk._tcp",
 
     // Security &amp; Other
-    &quot;_services._dns-sd._udp&quot;,
-    &quot;_time._udp&quot;,
-    &quot;_timedate._udp&quot;,
-    &quot;_ssh._tcp&quot;,           // (Listed again if you want to group separately)
-    &quot;_tcpchat._tcp&quot;,       // Example custom chat
-    &quot;_raop._tcp&quot;,          // (Duplicate if you prefer grouping)
-    &quot;_acp-sync._tcp&quot;       // Example for Apple Config / sync
+    "_services._dns-sd._udp",
+    "_time._udp",
+    "_timedate._udp",
+    "_ssh._tcp",           // (Listed again if you want to group separately)
+    "_tcpchat._tcp",       // Example custom chat
+    "_raop._tcp",          // (Duplicate if you prefer grouping)
+    "_acp-sync._tcp"       // Example for Apple Config / sync
 ]
-_http._tcp&quot;</string>
+_http._tcp"</string>
 		<string>_https._tcp</string>
 		<string>_ftp._tcp</string>
 		<string>_ssh._tcp</string>

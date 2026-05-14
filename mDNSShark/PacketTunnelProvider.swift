@@ -6,7 +6,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     private var counter: UInt = 1
     private let sharedFileURL: URL = {
         FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: "group.com.yourcompany.mDNSShark")!
+            .containerURL(forSecurityApplicationGroupIdentifier: "group.org.shapehaveninnovations.mDNSShark")!
             .appendingPathComponent("packets.log")
     }()
 
