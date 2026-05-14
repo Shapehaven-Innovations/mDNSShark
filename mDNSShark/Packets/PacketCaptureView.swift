@@ -11,7 +11,7 @@ struct PacketCaptureView: View {
         switch selectedProtocol {
         case "All":   return all
         case "TCP":   return all.filter { ["TCP","HTTP","HTTPS"].contains($0.protocolName) }
-        case "UDP":   return all.filter { ["UDP","DNS","mDNS"].contains($0.protocolName) }
+        case "UDP":   return all.filter { $0.protocolName == "UDP" }
         case "Other":
             let known: Set<String> = ["TCP","UDP","DNS","mDNS","HTTPS","HTTP","ICMP"]
             return all.filter { !known.contains($0.protocolName) }

@@ -62,6 +62,10 @@ final class AppCoordinator: ObservableObject {
             .sink { [weak self] in self?.objectWillChange.send() }
             .store(in: &cancellables)
 
+        analysisViewModel.objectWillChange
+            .sink { [weak self] in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+
         packetCaptureManager.$packets
             .sink { [weak self] packets in
                 self?.analysisViewModel.ingest(packets: packets)

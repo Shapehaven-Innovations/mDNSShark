@@ -14,17 +14,13 @@ struct SecurityRecommendation: Identifiable {
 
 @MainActor
 final class AnalysisViewModel: ObservableObject {
-    @Published var inboundMBps: Double = 0
-    @Published var outboundMBps: Double = 0
+    @Published var inboundKB: Double = 0
+    @Published var outboundKB: Double = 0
     @Published var totalPackets: Int = 0
     @Published var protocolDistribution: [String: Double] = [:]
     @Published var recommendations: [SecurityRecommendation] = []
 
-    private let localIP: String
-
-    init(localIP: String = LocalDeviceScanner().getWiFiAddress() ?? "") {
-        self.localIP = localIP
-    }
+    init() {}
 
     func ingest(packets: [PacketModel]) {
         totalPackets = packets.count
@@ -62,10 +58,18 @@ final class AnalysisViewModel: ObservableObject {
     }
 
     private func updateTraffic(packets: [PacketModel]) {
-        let inbound  = packets.filter { $0.destinationIP == localIP }.reduce(0) { $0 + $1.length }
-        let outbound = packets.filter { $0.sourceIP      == localIP }.reduce(0) { $0 + $1.length }
-        inboundMBps  = Double(inbound)  / 1_048_576.0
-        outboundMBps = Double(outbound) / 1_048_576.0
+        let wifiIP = LocalDeviceScanner().getWiFiAddress() ?? ""
+        let inbound  = packets.filter { isLocalIP($0.destinationIP, wifiIP: wifiIP) }.reduce(0) { $0 + $1.length }
+        let outbound = packets.filter { isLocalIP($0.sourceIP,      wifiIP: wifiIP) }.reduce(0) { $0 + $1.length }
+        inboundKB  = Double(inbound)  / 1024.0
+        outboundKB = Double(outbound) / 1024.0
+    }
+
+    // Matches the device's WiFi IP and the tunnel interface IP (192.168.100.x assigned in PacketTunnelProvider).
+    private func isLocalIP(_ ip: String, wifiIP: String) -> Bool {
+        guard !ip.isEmpty else { return false }
+        if !wifiIP.isEmpty && ip == wifiIP { return true }
+        return ip.hasPrefix("192.168.100.")
     }
 
     private func updateDistribution(packets: [PacketModel]) {
