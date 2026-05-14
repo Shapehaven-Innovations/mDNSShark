@@ -31,13 +31,12 @@ class LocalDeviceScanner: ObservableObject {
         let group = DispatchGroup()
         var results = [String]()
         let tcpParameters: NWParameters = .tcp
-        
+
+        // Always include the gateway so it appears as the router node even if port 80 is closed
+        if let gw = defaultGatewayIP { results.append(gw) }
+
         for i in 1...254 {
             let ip = "\(localPrefix)\(i)"
-            if let defaultGatewayIP = defaultGatewayIP, ip == defaultGatewayIP {
-                logger.debug("Skipping default gateway IP: \(ip)")
-                continue
-            }
             
             group.enter()
             scanSingleIP(ip: ip, port: port, parameters: tcpParameters, timeout: timeout) { success in

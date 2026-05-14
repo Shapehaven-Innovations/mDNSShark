@@ -13,8 +13,8 @@ struct AnalysisView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Network Traffic").font(.headline)
                                 Divider()
-                                trafficRow("Inbound",  coordinator.analysisViewModel.inboundMBps,  AppColors.secure, "MB/s")
-                                trafficRow("Outbound", coordinator.analysisViewModel.outboundMBps, AppColors.info,   "MB/s")
+                                trafficRow("Inbound",  coordinator.analysisViewModel.inboundMBps,  AppColors.secure, "MB")
+                                trafficRow("Outbound", coordinator.analysisViewModel.outboundMBps, AppColors.info,   "MB")
                                 HStack {
                                     Text("Total Packets").font(.subheadline).foregroundColor(.secondary)
                                     Spacer()

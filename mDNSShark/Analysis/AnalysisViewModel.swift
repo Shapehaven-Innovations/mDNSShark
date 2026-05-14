@@ -62,10 +62,8 @@ final class AnalysisViewModel: ObservableObject {
     }
 
     private func updateTraffic(packets: [PacketModel]) {
-        let now = Date()
-        let window = packets.filter { now.timeIntervalSince($0.timestamp) <= 1.0 }
-        let inbound  = window.filter { $0.destinationIP == localIP }.reduce(0) { $0 + $1.length }
-        let outbound = window.filter { $0.sourceIP      == localIP }.reduce(0) { $0 + $1.length }
+        let inbound  = packets.filter { $0.destinationIP == localIP }.reduce(0) { $0 + $1.length }
+        let outbound = packets.filter { $0.sourceIP      == localIP }.reduce(0) { $0 + $1.length }
         inboundMBps  = Double(inbound)  / 1_048_576.0
         outboundMBps = Double(outbound) / 1_048_576.0
     }

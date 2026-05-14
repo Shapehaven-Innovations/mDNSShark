@@ -13,8 +13,10 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     override func startTunnel(options: [String: NSObject]?,
                               completionHandler: @escaping (Error?) -> Void) {
         let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "127.0.0.1")
-        settings.ipv4Settings = NEIPv4Settings(addresses: ["192.168.100.1"],
-                                               subnetMasks: ["255.255.255.0"])
+        let ipv4 = NEIPv4Settings(addresses: ["192.168.100.1"], subnetMasks: ["255.255.255.0"])
+        ipv4.includedRoutes = [NEIPv4Route.default()]
+        settings.ipv4Settings = ipv4
+        settings.dnsSettings = NEDNSSettings(servers: ["8.8.8.8", "8.8.4.4"])
         settings.mtu = 1500
         setTunnelNetworkSettings(settings) { [weak self] error in
             if let error { completionHandler(error); return }
