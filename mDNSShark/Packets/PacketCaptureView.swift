@@ -4,6 +4,8 @@ import SwiftUI
 struct PacketCaptureView: View {
     @EnvironmentObject var coordinator: AppCoordinator
     @State private var selectedProtocol = "All"
+    @State private var showWarning = false
+    @State private var showExportError = false
     private let protocols = ["All", "TCP", "UDP", "DNS", "mDNS", "Other"]
 
     private var filtered: [PacketModel] {
@@ -60,6 +62,14 @@ struct PacketCaptureView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if coordinator.packetCaptureManager.hasCapture &&
+                       !coordinator.packetCaptureManager.isCapturing {
+                        Button { exportPCAP() } label: {
+                            Label("Export", systemImage: "square.and.arrow.up")
+                        }
+                    }
+                }
                 ToolbarItem(placement: .principal) {
                     Text("Packet Capture").font(.headline)
                 }
@@ -68,13 +78,51 @@ struct PacketCaptureView: View {
                         if coordinator.packetCaptureManager.isCapturing {
                             coordinator.packetCaptureManager.stopCapture()
                         } else {
-                            coordinator.packetCaptureManager.startCapture()
+                            showWarning = true
                         }
                     }
-                    .foregroundColor(coordinator.packetCaptureManager.isCapturing ? AppColors.critical : AppColors.info)
+                    .foregroundColor(coordinator.packetCaptureManager.isCapturing
+                                     ? AppColors.critical : AppColors.info)
                     .font(.subheadline.weight(.semibold))
                 }
             }
+            .sheet(isPresented: $showWarning) {
+                CaptureWarningSheet(
+                    onConfirm: { coordinator.packetCaptureManager.startCapture() },
+                    isPresented: $showWarning
+                )
+                .presentationDetents([PresentationDetent.medium])
+            }
+            .alert("Export Failed", isPresented: $showExportError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("No capture file found. Run a capture session first.")
+            }
+        }
+    }
+
+    private func exportPCAP() {
+        guard let urls = coordinator.packetCaptureManager.exportURLs() else {
+            showExportError = true
+            return
+        }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd-HHmmss"
+        let name = "mDNSShark-\(formatter.string(from: Date())).pcap"
+
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        try? FileManager.default.removeItem(at: tmp)
+        try? FileManager.default.copyItem(at: urls.pcap, to: tmp)
+
+        var items: [Any] = [tmp]
+        if FileManager.default.fileExists(atPath: urls.meta.path) {
+            items.append(urls.meta)
+        }
+
+        let ac = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let root = scene.windows.first?.rootViewController {
+            root.present(ac, animated: true)
         }
     }
 }

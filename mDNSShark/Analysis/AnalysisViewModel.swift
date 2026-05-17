@@ -58,18 +58,10 @@ final class AnalysisViewModel: ObservableObject {
     }
 
     private func updateTraffic(packets: [PacketModel]) {
-        let wifiIP = LocalDeviceScanner().getWiFiAddress() ?? ""
-        let inbound  = packets.filter { isLocalIP($0.destinationIP, wifiIP: wifiIP) }.reduce(0) { $0 + $1.length }
-        let outbound = packets.filter { isLocalIP($0.sourceIP,      wifiIP: wifiIP) }.reduce(0) { $0 + $1.length }
+        let inbound  = packets.filter { $0.direction == .inbound  }.reduce(0) { $0 + $1.length }
+        let outbound = packets.filter { $0.direction == .outbound }.reduce(0) { $0 + $1.length }
         inboundKB  = Double(inbound)  / 1024.0
         outboundKB = Double(outbound) / 1024.0
-    }
-
-    // Matches the device's WiFi IP and the tunnel interface IP (192.168.100.x assigned in PacketTunnelProvider).
-    private func isLocalIP(_ ip: String, wifiIP: String) -> Bool {
-        guard !ip.isEmpty else { return false }
-        if !wifiIP.isEmpty && ip == wifiIP { return true }
-        return ip.hasPrefix("192.168.100.")
     }
 
     private func updateDistribution(packets: [PacketModel]) {

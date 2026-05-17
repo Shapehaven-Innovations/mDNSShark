@@ -23,6 +23,19 @@ struct PacketDetailView: View {
                         row("Protocol",    packet.protocolName)
                         row("Length",      "\(packet.length) bytes")
                         if !packet.info.isEmpty { row("Info", packet.info) }
+                        if packet.isReconstructed {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Label("Reconstructed Inbound", systemImage: "info.circle")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundColor(.orange)
+                                Text("Inbound TCP payload is accurate. Sequence numbers and window size are approximate (stream-proxied, not wire-captured).")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(10)
+                            .background(Color.orange.opacity(0.08))
+                            .cornerRadius(8)
+                        }
                     }
                 }
                 CardView {

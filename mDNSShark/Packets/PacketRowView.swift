@@ -14,8 +14,18 @@ struct PacketRowView: View {
                     Text("\(packet.sourceIP) → \(packet.destinationIP)")
                         .font(.subheadline.weight(.semibold)).lineLimit(1)
                     Spacer()
-                    AppBadge(text: packet.protocolName,
-                             color: AppColors.PacketProtocol.color(for: packet.protocolName))
+                    HStack(spacing: 4) {
+                        AppBadge(text: packet.protocolName,
+                                 color: AppColors.PacketProtocol.color(for: packet.protocolName))
+                        if packet.isReconstructed {
+                            Text("reconstructed")
+                                .font(.caption2)
+                                .padding(.horizontal, 4).padding(.vertical, 2)
+                                .background(Color.orange.opacity(0.12))
+                                .foregroundColor(.orange)
+                                .cornerRadius(4)
+                        }
+                    }
                 }
                 HStack {
                     Text(packet.formattedTimestamp)
