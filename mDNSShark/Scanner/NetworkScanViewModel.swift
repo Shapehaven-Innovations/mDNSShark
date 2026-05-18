@@ -12,6 +12,7 @@ final class NetworkScanViewModel: ObservableObject {
     private let localUtil   = LocalDeviceScanner()
     private let ouiDB       = OUIDatabase.shared
     private var cancellables = Set<AnyCancellable>()
+    private var knownIDs: [String: UUID] = [:]
     private let logger      = Logger(subsystem: "com.mDNSShark", category: "NetworkScanViewModel")
 
     init() {
@@ -65,7 +66,10 @@ final class NetworkScanViewModel: ObservableObject {
                     txtRecords: device.txtRecords ?? [:]
                 )
                 let os = inferOS(serviceType: device.serviceType, manufacturer: mfr)
+                let stableID = knownIDs[ip] ?? UUID()
+                knownIDs[ip] = stableID
                 byIP[ip] = DiscoveredDevice(
+                    id:              stableID,
                     hostname:        device.identifier,
                     ipAddress:       ip,
                     macAddress:      mac,

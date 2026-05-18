@@ -31,9 +31,10 @@ struct TopologyView: View {
             let worst = findings.filter { $0.deviceID == device.id }.map(\.severity).max()
             let secStatus: SecurityStatus
             switch worst {
-            case .some(.critical): secStatus = .critical
-            case .some(.warning):  secStatus = .warning
-            default:               secStatus = .secure
+            case .some(.critical):      secStatus = .critical
+            case .some(.warning):       secStatus = .warning
+            case .some(.informational): secStatus = .informational
+            default:                    secStatus = .secure
             }
             let secOK  = securityFilters.isEmpty || securityFilters.contains(secStatus)
             let typeOK = typeFilters.isEmpty     || typeFilters.contains(device.deviceType)
@@ -133,6 +134,7 @@ struct TopologyView: View {
                                 // Legend — never covered by nodes
                                 HStack(spacing: 20) {
                                     legendDot(AppColors.secure,   "Secure")
+                                    legendDot(AppColors.info,     "Info")
                                     legendDot(AppColors.warning,  "Warning")
                                     legendDot(AppColors.critical, "Critical")
                                 }
@@ -165,10 +167,11 @@ struct TopologyView: View {
         VStack(alignment: .leading, spacing: 6) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    secChip(nil,       "All")
-                    secChip(.secure,   "Secure")
-                    secChip(.warning,  "Warning")
-                    secChip(.critical, "Critical")
+                    secChip(nil,             "All")
+                    secChip(.secure,         "Secure")
+                    secChip(.informational,  "Info")
+                    secChip(.warning,        "Warning")
+                    secChip(.critical,       "Critical")
                 }
                 .padding(.horizontal, 2)
             }
@@ -191,10 +194,11 @@ struct TopologyView: View {
         let active: Bool = status == nil ? securityFilters.isEmpty : securityFilters.contains(status!)
         let color: Color = {
             switch status {
-            case .none:     return AppColors.info
-            case .secure:   return AppColors.secure
-            case .warning:  return AppColors.warning
-            case .critical: return AppColors.critical
+            case .none:             return AppColors.info
+            case .secure:           return AppColors.secure
+            case .informational:    return AppColors.info
+            case .warning:          return AppColors.warning
+            case .critical:         return AppColors.critical
             }
         }()
         return Button {

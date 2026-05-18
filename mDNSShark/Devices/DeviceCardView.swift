@@ -4,6 +4,7 @@ import SwiftUI
 struct DeviceCardView: View {
     let device: DiscoveredDevice
     let issueCount: Int
+    let badgeColor: Color
 
     var body: some View {
         CardView {
@@ -16,7 +17,7 @@ struct DeviceCardView: View {
                     }
                     Spacer()
                     AppBadge(text: issueCount == 0 ? "0 issues" : "\(issueCount) issues",
-                             color: issueCount == 0 ? AppColors.secure : AppColors.critical)
+                             color: badgeColor)
                 }
                 Divider()
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {

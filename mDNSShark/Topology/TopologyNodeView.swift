@@ -6,9 +6,10 @@ struct TopologyNodeView: View {
 
     private var borderColor: Color {
         switch node.securityStatus {
-        case .secure:   return AppColors.secure
-        case .warning:  return AppColors.warning
-        case .critical: return AppColors.critical
+        case .secure:        return AppColors.secure
+        case .informational: return AppColors.info
+        case .warning:       return AppColors.warning
+        case .critical:      return AppColors.critical
         }
     }
 

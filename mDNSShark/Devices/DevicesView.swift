@@ -16,9 +16,15 @@ struct DevicesView: View {
                     } else {
                         ForEach(coordinator.networkScanViewModel.devices) { device in
                             let findings = coordinator.securityViewModel.findings.filter { $0.deviceID == device.id }
-                            let issueCount = findings.filter { $0.severity >= .warning }.count
+                            let issueCount = findings.count
+                            let badgeColor: Color = {
+                                if findings.contains(where: { $0.severity == .critical }) { return AppColors.critical }
+                                if findings.contains(where: { $0.severity == .warning })  { return AppColors.warning }
+                                if !findings.isEmpty { return AppColors.info }
+                                return AppColors.secure
+                            }()
                             NavigationLink(destination: DeviceDetailView(device: enriched(device, findings))) {
-                                DeviceCardView(device: device, issueCount: issueCount)
+                                DeviceCardView(device: device, issueCount: issueCount, badgeColor: badgeColor)
                             }
                             .buttonStyle(.plain)
                         }

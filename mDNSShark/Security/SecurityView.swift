@@ -5,6 +5,7 @@ struct SecurityView: View {
     @EnvironmentObject var coordinator: AppCoordinator
     @State private var criticalExpanded = true
     @State private var warningExpanded  = true
+    @State private var infoExpanded     = false
     @State private var sharePresented   = false
 
     private var vm: SecurityViewModel { coordinator.securityViewModel }
@@ -99,6 +100,14 @@ struct SecurityView: View {
                                color: AppColors.warning,
                                findings: vm.warningFindings,
                                expanded: $warningExpanded,
+                               showDeviceName: true)
+            }
+            if !vm.informationalFindings.isEmpty {
+                findingSection(title: "Informational Notices",
+                               icon: "info.circle.fill",
+                               color: AppColors.info,
+                               findings: vm.informationalFindings,
+                               expanded: $infoExpanded,
                                showDeviceName: true)
             }
         }

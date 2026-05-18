@@ -88,7 +88,7 @@ final class SecurityViewModel: ObservableObject {
     var informationalFindings: [SecurityFinding] { findings.filter { $0.severity == .informational } }
 
     var vulnerableDeviceCount: Int {
-        Set(findings.filter { $0.severity >= .warning }.map { $0.deviceID }).count
+        Set(findings.map { $0.deviceID }).count
     }
 
     var allFindingsSorted: [SecurityFinding] {

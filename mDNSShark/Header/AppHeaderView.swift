@@ -56,9 +56,8 @@ struct AppHeaderView: View {
     }
 
     private var secureCount: Int {
-        let vulnerable = Set(coordinator.securityViewModel.findings
-            .filter { $0.severity >= .warning }.map { $0.deviceID })
-        return coordinator.networkScanViewModel.devices.filter { !vulnerable.contains($0.id) }.count
+        let withFindings = Set(coordinator.securityViewModel.findings.map { $0.deviceID })
+        return coordinator.networkScanViewModel.devices.filter { !withFindings.contains($0.id) }.count
     }
 
     private var colorSchemeIcon: String {

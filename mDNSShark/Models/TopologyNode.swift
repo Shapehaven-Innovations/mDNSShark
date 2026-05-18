@@ -2,7 +2,7 @@
 import Foundation
 import CoreGraphics
 
-enum SecurityStatus: Hashable { case secure, warning, critical }
+enum SecurityStatus: Hashable { case secure, informational, warning, critical }
 
 struct TopologyNode: Identifiable {
     let id: UUID
@@ -14,9 +14,10 @@ struct TopologyNode: Identifiable {
         self.id = device.id; self.device = device; self.position = position
         let max = device.securityFindings.map { $0.severity }.max()
         switch max {
-        case .critical: self.securityStatus = .critical
-        case .warning:  self.securityStatus = .warning
-        default:        self.securityStatus = .secure
+        case .critical:      self.securityStatus = .critical
+        case .warning:       self.securityStatus = .warning
+        case .informational: self.securityStatus = .informational
+        default:             self.securityStatus = .secure
         }
     }
 }
