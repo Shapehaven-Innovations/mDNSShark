@@ -9,9 +9,10 @@ struct AppHeaderView: View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 HStack(spacing: 8) {
-                    Image(systemName: "antenna.radiowaves.left.and.right")
-                        .foregroundColor(AppColors.warning)
-                        .font(.title2.weight(.bold))
+                    Image("SharkIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 52)
                     VStack(alignment: .leading, spacing: 0) {
                         Text("mDNSShark").font(.headline.bold())
                         Text("Network Security Scanner").font(.caption).foregroundColor(.secondary)

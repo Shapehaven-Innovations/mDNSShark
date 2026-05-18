@@ -141,12 +141,7 @@ _http._tcp"</string>
 		<string>_xbmc-jsonrpc._tcp</string>
 		<string>_plexmediasvr._tcp</string>
 	</array>
-	<key>UILaunchScreen</key>
-	<dict>
-		<key>UIImageName</key>
-		<string>launchscreen</string>
-		<key>UILaunchScreen</key>
-		<dict/>
-	</dict>
+	<key>UILaunchStoryboardName</key>
+	<string>Launch Screen</string>
 </dict>
 </plist>

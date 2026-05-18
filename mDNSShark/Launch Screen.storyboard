@@ -7,7 +7,6 @@
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <scenes>
-        <!--View Controller-->
         <scene sceneID="EHf-IW-A2E">
             <objects>
                 <viewController id="01J-lp-oVM" sceneMemberID="viewController">
@@ -15,30 +14,18 @@
                         <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" minimumFontSize="9" translatesAutoresizingMaskIntoConstraints="NO" id="obG-Y5-kRd">
-                                <rect key="frame" x="0.0" y="832" width="393" height="0.0"/>
-                                <fontDescription key="fontDescription" type="system" pointSize="17"/>
-                                <color key="textColor" red="0.0" green="0.0" blue="0.0" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="mDNSShark" textAlignment="center" lineBreakMode="middleTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="LS-lbl-001">
+                                <rect key="frame" x="136.5" y="412" width="120" height="29"/>
+                                <fontDescription key="fontDescription" type="system" pointSize="24"/>
+                                <color key="textColor" systemColor="labelColor"/>
                                 <nil key="highlightedColor"/>
                             </label>
-                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleToFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="launchscreen" translatesAutoresizingMaskIntoConstraints="NO" id="O8G-Ub-YkZ">
-                                <rect key="frame" x="0.0" y="59" width="393" height="759"/>
-                            </imageView>
                         </subviews>
                         <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
-                        <color key="backgroundColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <color key="backgroundColor" systemColor="systemBackgroundColor"/>
                         <constraints>
-                            <constraint firstItem="Bcu-3y-fUS" firstAttribute="centerX" secondItem="obG-Y5-kRd" secondAttribute="centerX" id="5cz-MP-9tL"/>
-                            <constraint firstItem="O8G-Ub-YkZ" firstAttribute="leading" secondItem="Bcu-3y-fUS" secondAttribute="leading" id="Fxk-s5-Fhn"/>
-                            <constraint firstItem="Bcu-3y-fUS" firstAttribute="bottom" secondItem="O8G-Ub-YkZ" secondAttribute="bottom" id="LMz-AQ-nmm"/>
-                            <constraint firstItem="obG-Y5-kRd" firstAttribute="leading" secondItem="Bcu-3y-fUS" secondAttribute="leading" symbolic="YES" id="SfN-ll-jLj"/>
-                            <constraint firstItem="O8G-Ub-YkZ" firstAttribute="top" secondItem="Bcu-3y-fUS" secondAttribute="top" id="Su7-ga-gI0"/>
-                            <constraint firstItem="O8G-Ub-YkZ" firstAttribute="bottom" secondItem="Bcu-3y-fUS" secondAttribute="bottom" id="Vbw-D7-W2s"/>
-                            <constraint firstItem="O8G-Ub-YkZ" firstAttribute="top" secondItem="Bcu-3y-fUS" secondAttribute="top" id="WAb-th-0ga"/>
-                            <constraint firstAttribute="bottom" secondItem="obG-Y5-kRd" secondAttribute="bottom" constant="20" id="Y44-ml-fuU"/>
-                            <constraint firstItem="Bcu-3y-fUS" firstAttribute="trailing" secondItem="O8G-Ub-YkZ" secondAttribute="trailing" id="aXh-R9-Xkc"/>
-                            <constraint firstItem="O8G-Ub-YkZ" firstAttribute="trailing" secondItem="Bcu-3y-fUS" secondAttribute="trailing" id="heX-7W-fkW"/>
-                            <constraint firstItem="O8G-Ub-YkZ" firstAttribute="leading" secondItem="Bcu-3y-fUS" secondAttribute="leading" id="xyn-zc-hj0"/>
+                            <constraint firstItem="LS-lbl-001" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="LS-c-05"/>
+                            <constraint firstItem="LS-lbl-001" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="LS-c-07"/>
                         </constraints>
                     </view>
                 </viewController>
@@ -47,7 +34,6 @@
             <point key="canvasLocation" x="-1298.4732824427481" y="264.08450704225356"/>
         </scene>
     </scenes>
-    <resources>
-        <image name="launchscreen" width="360" height="640"/>
-    </resources>
+    <resources/>
+
 </document>
