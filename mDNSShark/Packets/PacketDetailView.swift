@@ -58,7 +58,7 @@ struct PacketDetailView: View {
                         Divider()
                         if packet.protocolName == "HTTPS" {
                             VStack(alignment: .leading, spacing: 4) {
-                                Label("TLS payload is encrypted — hex shows ciphertext.", systemImage: "lock.fill")
+                                Label("TLS payload is encrypted - hex shows ciphertext.", systemImage: "lock.fill")
                                     .font(.caption.weight(.semibold))
                                     .foregroundColor(.secondary)
                                 Text("Full plaintext capture requires a custom CA certificate. This can be configured in a future Settings option.")

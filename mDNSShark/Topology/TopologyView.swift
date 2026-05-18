@@ -131,7 +131,7 @@ struct TopologyView: View {
                                 }
                                 .frame(height: 280)
 
-                                // Legend — never covered by nodes
+                                // Legend - never covered by nodes
                                 HStack(spacing: 20) {
                                     legendDot(AppColors.secure,   "Secure")
                                     legendDot(AppColors.info,     "Info")

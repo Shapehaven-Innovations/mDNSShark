@@ -65,7 +65,7 @@ final class PCAPWriter {
 
     private func globalHeader() -> Data {
         var d = Data()
-        d.appendUInt32LE(0xa1b2c3d4)  // magic — standard pcap, microsecond timestamps
+        d.appendUInt32LE(0xa1b2c3d4)  // magic - standard pcap, microsecond timestamps
         d.appendUInt16LE(2)            // version major
         d.appendUInt16LE(4)            // version minor
         d.appendInt32LE(0)             // thiszone (UTC)

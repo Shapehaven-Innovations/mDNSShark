@@ -34,7 +34,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         let ipv4 = NEIPv4Settings(addresses: ["192.168.100.1"], subnetMasks: ["255.255.255.0"])
         ipv4.includedRoutes = [NEIPv4Route.default()]
         settings.ipv4Settings = ipv4
-        settings.dnsSettings = NEDNSSettings(servers: ["8.8.8.8", "8.8.4.4"])
+        settings.dnsSettings = NEDNSSettings(servers: [SharedSettings.dnsPrimary, SharedSettings.dnsSecondary])
         settings.mtu = 1500
 
         setTunnelNetworkSettings(settings) { [weak self] error in
@@ -48,12 +48,18 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             do {
                 try self.pcapWriter.startCapture()
             } catch {
-                // PCAP unavailable (disk full, permissions) — tunnel still runs, export will fail
+                // PCAP unavailable (disk full, permissions) - tunnel still runs, export will fail
             }
 
-            let fwd = PacketForwarder(flow: self.packetFlow) { [weak self] rawIP, direction, isReconstructed in
-                self?.handle(rawIP: rawIP, direction: direction, isReconstructed: isReconstructed)
-            }
+            let fwd = PacketForwarder(
+                flow: self.packetFlow,
+                onDecryptedHTTPS: { [weak self] payload, domain in
+                    self?.handleDecryptedHTTPS(payload: payload, domain: domain)
+                },
+                onPacket: { [weak self] rawIP, direction, isReconstructed in
+                    self?.handle(rawIP: rawIP, direction: direction, isReconstructed: isReconstructed)
+                }
+            )
             fwd.start()
             self.forwarder = fwd
             self.running = true
@@ -75,8 +81,35 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         logQueue.async { [weak self] in
             guard let self else { return }
             let packet = self.parse(rawIP, direction: direction, isReconstructed: isReconstructed)
+            guard SharedSettings.captureFilterProtocols.contains(packet.protocolName) else { return }
             self.writeJSON(packet)
             self.pcapWriter.appendPacket(rawIP, at: packet.timestamp, isReconstructed: isReconstructed)
+        }
+    }
+
+    private func handleDecryptedHTTPS(payload: Data, domain: String) {
+        logQueue.async { [weak self] in
+            guard let self else { return }
+            let text = String(data: payload, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let text, !text.isEmpty else { return }
+            let packet = PacketModel(
+                frameNumber: Int(self.counter),
+                timestamp: Date(),
+                sourceIP: "device",
+                destinationIP: domain,
+                sourcePort: nil,
+                destinationPort: 443,
+                protocolName: "HTTPS",
+                length: payload.count,
+                info: "TLS-decrypted",
+                hexDump: payload.map { String(format: "%02x", $0) }.joined(separator: " "),
+                payloadText: text,
+                direction: .outbound,
+                isReconstructed: true
+            )
+            self.writeJSON(packet)
+            self.counter += 1
         }
     }
 
@@ -193,7 +226,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         return m
     }
 
-    // Called on logQueue — uses the persistent logHandle for atomic append.
+    // Called on logQueue - uses the persistent logHandle for atomic append.
     private func writeJSON(_ packet: PacketModel) {
         guard let fh = logHandle else { return }
         let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601

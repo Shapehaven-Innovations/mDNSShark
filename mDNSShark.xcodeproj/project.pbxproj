@@ -63,6 +63,13 @@
 			);
 			target = 9A1C9E882D443D5300643122 /* mDNSShark */;
 		};
+		9A1D2E3F2FABF80F00D8F38C /* Exceptions for "PacketTunnel" folder in "mDNSShark" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				PacketDirection.swift,
+			);
+			target = 9A1C9E882D443D5300643122 /* mDNSShark */;
+		};
 		9AEA1A3A2FABF80F00D8F38C /* Exceptions for "PacketTunnel" folder in "PacketTunnel" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -75,15 +82,11 @@
 			membershipExceptions = (
 				Models/PacketModel.swift,
 				PacketTunnelProvider.swift,
+				Shared/KeychainStore.swift,
+				Shared/SharedSettings.swift,
+				Shared/X509CertBuilder.swift,
 			);
 			target = 9AEA1A2B2FABF80F00D8F38C /* PacketTunnel */;
-		};
-		9A1D2E3F2FABF80F00D8F38C /* Exceptions for "PacketTunnel" folder in "mDNSShark" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				PacketDirection.swift,
-			);
-			target = 9A1C9E882D443D5300643122 /* mDNSShark */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -100,8 +103,8 @@
 		9AEA1A2E2FABF80F00D8F38C /* PacketTunnel */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				9AEA1A3A2FABF80F00D8F38C /* Exceptions for "PacketTunnel" folder in "PacketTunnel" target */,
 				9A1D2E3F2FABF80F00D8F38C /* Exceptions for "PacketTunnel" folder in "mDNSShark" target */,
+				9AEA1A3A2FABF80F00D8F38C /* Exceptions for "PacketTunnel" folder in "PacketTunnel" target */,
 			);
 			path = PacketTunnel;
 			sourceTree = "<group>";

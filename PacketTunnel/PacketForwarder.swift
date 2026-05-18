@@ -16,20 +16,33 @@ final class PacketForwarder {
     private let queue = DispatchQueue(label: "com.mDNSShark.forwarder")
     private var cleanupTimer: DispatchSourceTimer?
     private var running = false
+    private var tlsInterceptor: TLSInterceptor?
+    private var dnsCache: [String: String] = [:]   // [destIP: hostname] from observed DNS responses
+    private var onDecryptedHTTPS: ((Data, String) -> Void)?
 
-    init(flow: NEPacketTunnelFlow, onPacket: @escaping PacketHandler) {
+    init(flow: NEPacketTunnelFlow,
+         onDecryptedHTTPS: ((Data, String) -> Void)? = nil,
+         onPacket: @escaping PacketHandler) {
         self.flow = flow
+        self.onDecryptedHTTPS = onDecryptedHTTPS
         self.onPacket = onPacket
     }
 
     func start() {
         running = true
+        if SharedSettings.tlsInspectionEnabled && KeychainStore.loadCAKey() != nil {
+            tlsInterceptor = TLSInterceptor()
+        } else if SharedSettings.tlsInspectionEnabled {
+            SharedSettings.tlsInterceptorLastError = "TLS inspection is off — CA key not found in keychain"
+        }
         scheduleCleanup()
     }
 
     func stop() {
         running = false
         cleanupTimer?.cancel()
+        tlsInterceptor?.stop()
+        tlsInterceptor = nil
         queue.sync {
             sessions.values.forEach { $0.connection.cancel() }
             sessions.removeAll()
@@ -106,6 +119,10 @@ final class PacketForwarder {
             )
             self.flow.writePackets([responsePacket], withProtocols: [NSNumber(value: AF_INET)])
             self.onPacket(responsePacket, .inbound, false)
+            // Cache IP→hostname mappings from DNS responses for TLS bypass list
+            if key.dstPort == 53 || key.srcPort == 53 {
+                self.cacheDNSResponse(payload)
+            }
             self.queue.async { self.sessions[key]?.lastActivity = Date() }
             // recurse to keep receiving
             self.receiveUDP(conn: conn, key: key, srcIP: srcIP, srcPort: srcPort)
@@ -137,6 +154,16 @@ final class PacketForwarder {
             let isRST = tcpFlags & 0x04 != 0
             let isSYN = tcpFlags & 0x02 != 0
 
+            // If this session is owned by TLSInterceptor, deliver data there.
+            if let interceptor = self.tlsInterceptor, interceptor.hasSession(for: key) {
+                if isFIN || isRST {
+                    interceptor.closeSession(for: key)
+                } else if !payload.isEmpty {
+                    interceptor.deliver(payload, for: key)
+                }
+                return
+            }
+
             if isFIN || isRST {
                 self.sessions[key]?.connection.cancel()
                 self.sessions.removeValue(forKey: key)
@@ -144,6 +171,9 @@ final class PacketForwarder {
             }
 
             if isSYN && self.sessions[key] == nil {
+                if self.dstPort443Intercepted(key: key, srcIP: srcIP, bytes: bytes, ipPacket: ipPacket) {
+                    return
+                }
                 self.createTCPSession(key: key, srcIP: srcIP, srcPort: srcPort)
             }
 
@@ -151,6 +181,26 @@ final class PacketForwarder {
             session.lastActivity = Date()
             session.connection.send(content: payload, completion: .idempotent)
         }
+    }
+
+    private func dstPort443Intercepted(key: SessionKey, srcIP: String,
+                                        bytes: [UInt8], ipPacket: Data) -> Bool {
+        guard key.dstPort == 443, let interceptor = tlsInterceptor else { return false }
+        // IP-level bypass: check if we've seen this IP resolve to a bypassed hostname
+        if let hostname = dnsCache[key.dstIP],
+           SharedSettings.tlsBypassList.contains(where: { hostname.hasSuffix($0) }) {
+            return false
+        }
+        // Extract client ISN from the SYN packet (sequence number field in TCP header)
+        let ihl = Int(bytes[0] & 0x0F) * 4
+        let clientISN = UInt32(bytes[ihl+4]) << 24 | UInt32(bytes[ihl+5]) << 16
+                      | UInt32(bytes[ihl+6]) << 8  | UInt32(bytes[ihl+7])
+        interceptor.openSession(
+            key: key, srcIP: srcIP, dstIP: key.dstIP,
+            clientISN: clientISN, flow: flow,
+            onDecryptedRequest: onDecryptedHTTPS ?? { _, _ in }
+        )
+        return true
     }
 
     private func createTCPSession(key: SessionKey, srcIP: String, srcPort: UInt16) {
@@ -254,6 +304,47 @@ final class PacketForwarder {
         p.appendBE16(0x0000)               // urgent pointer
         p.append(payload)
         return p
+    }
+
+    private func cacheDNSResponse(_ udpPayload: Data) {
+        guard udpPayload.count > 8 else { return }
+        let dns = [UInt8](udpPayload.dropFirst(8))
+        guard dns.count > 12 else { return }
+        let qdCount = Int(dns[4]) << 8 | Int(dns[5])
+        let anCount = Int(dns[6]) << 8 | Int(dns[7])
+        guard anCount > 0 else { return }
+        var i = 12
+        for _ in 0..<qdCount {
+            while i < dns.count { let len = Int(dns[i]); i += 1; if len == 0 { break }; i += len }
+            i += 4
+        }
+        for _ in 0..<anCount {
+            guard i < dns.count else { break }
+            let hostname = parseDNSName(dns, at: &i)
+            guard i + 10 <= dns.count else { break }
+            let rtype = Int(dns[i]) << 8 | Int(dns[i+1])
+            let rdLen = Int(dns[i+8]) << 8 | Int(dns[i+9])
+            i += 10
+            if rtype == 1 && rdLen == 4 && i + 4 <= dns.count {
+                let ip = "\(dns[i]).\(dns[i+1]).\(dns[i+2]).\(dns[i+3])"
+                dnsCache[ip] = hostname
+            }
+            i += rdLen
+        }
+    }
+
+    private func parseDNSName(_ dns: [UInt8], at i: inout Int) -> String {
+        var labels = [String]()
+        while i < dns.count {
+            let len = Int(dns[i])
+            if len == 0 { i += 1; break }
+            if len & 0xC0 == 0xC0 { i += 2; break }
+            i += 1
+            guard i + len <= dns.count else { break }
+            labels.append(String(bytes: dns[i..<i+len], encoding: .utf8) ?? "")
+            i += len
+        }
+        return labels.joined(separator: ".")
     }
 
     // MARK: - Cleanup

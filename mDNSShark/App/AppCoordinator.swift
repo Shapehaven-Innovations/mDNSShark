@@ -8,6 +8,7 @@ enum AppTab: String, CaseIterable {
     case security = "Security"
     case packets  = "Packets"
     case analysis = "Analysis"
+    case settings = "Settings"
 
     var icon: String {
         switch self {
@@ -16,6 +17,7 @@ enum AppTab: String, CaseIterable {
         case .security: return "shield"
         case .packets:  return "waveform"
         case .analysis: return "chart.bar"
+        case .settings: return "gearshape.fill"
         }
     }
 }
