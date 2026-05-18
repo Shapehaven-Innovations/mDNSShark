@@ -123,6 +123,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         let payload = Array(bytes.dropFirst(ihl))
 
         var proto = "Other"; var sPort: Int?; var dPort: Int?; var info = ""
+        var payloadText: String? = nil
 
         switch ipProto {
         case 6:
@@ -132,6 +133,16 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
                 info  = decodeTCPFlags(payload[13])
                 proto = dPort == 443 || sPort == 443 ? "HTTPS"
                       : dPort == 80  || sPort == 80  ? "HTTP" : "TCP"
+                if proto == "HTTP" {
+                    let tcpHeaderLen = Int((payload[12] >> 4)) * 4
+                    if payload.count > tcpHeaderLen {
+                        let httpBytes = Array(payload.dropFirst(tcpHeaderLen))
+                        let text = String(bytes: httpBytes, encoding: .utf8)
+                        if let t = text, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            payloadText = t
+                        }
+                    }
+                }
             } else { proto = "TCP" }
         case 17:
             if payload.count >= 4 {
@@ -162,7 +173,8 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             sourcePort: sPort, destinationPort: dPort,
             protocolName: proto, length: data.count,
             info: info.isEmpty ? "\(proto) packet" : info,
-            hexDump: hex, direction: direction, isReconstructed: isReconstructed
+            hexDump: hex, payloadText: payloadText,
+            direction: direction, isReconstructed: isReconstructed
         )
         counter += 1
         return m

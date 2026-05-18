@@ -13,6 +13,7 @@ struct PacketModel: Identifiable, Codable {
     let length: Int
     let info: String
     let hexDump: String
+    let payloadText: String?
     let direction: PacketDirection
     let isReconstructed: Bool
 
@@ -28,6 +29,7 @@ struct PacketModel: Identifiable, Codable {
         length: Int,
         info: String,
         hexDump: String,
+        payloadText: String? = nil,
         direction: PacketDirection = .outbound,
         isReconstructed: Bool = false
     ) {
@@ -35,7 +37,7 @@ struct PacketModel: Identifiable, Codable {
         self.sourceIP = sourceIP; self.destinationIP = destinationIP
         self.sourcePort = sourcePort; self.destinationPort = destinationPort
         self.protocolName = protocolName; self.length = length
-        self.info = info; self.hexDump = hexDump
+        self.info = info; self.hexDump = hexDump; self.payloadText = payloadText
         self.direction = direction; self.isReconstructed = isReconstructed
     }
 
@@ -53,6 +55,7 @@ struct PacketModel: Identifiable, Codable {
         length          = try c.decode(Int.self,    forKey: .length)
         info            = try c.decode(String.self, forKey: .info)
         hexDump         = try c.decode(String.self, forKey: .hexDump)
+        payloadText     = try c.decodeIfPresent(String.self, forKey: .payloadText)
         direction       = try c.decodeIfPresent(PacketDirection.self, forKey: .direction) ?? .outbound
         isReconstructed = try c.decodeIfPresent(Bool.self, forKey: .isReconstructed) ?? false
     }
