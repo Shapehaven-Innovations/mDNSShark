@@ -99,7 +99,7 @@ final class PacketCaptureManager: ObservableObject {
             if let error { completion(error); return }
             let manager = managers?.first ?? NETunnelProviderManager()
             let proto = NETunnelProviderProtocol()
-            proto.providerBundleIdentifier = "org.ShapehavenInnovations.mDNSShark.PacketTunnel"
+            proto.providerBundleIdentifier = "beta.mDNSShark.PacketTunnel"
             proto.serverAddress = "127.0.0.1"
             manager.protocolConfiguration = proto
             manager.localizedDescription = "Packet Capture Tunnel"
