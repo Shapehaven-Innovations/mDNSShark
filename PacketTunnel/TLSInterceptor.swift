@@ -327,8 +327,7 @@ final class TLSSession {
         )
         upstream = upstreamConn
         let upstreamSem = DispatchSemaphore(value: 0)
-        upstreamConn.stateUpdateHandler = { [weak self] state in
-            guard let self else { return }
+        upstreamConn.stateUpdateHandler = { state in
             switch state {
             case .ready, .failed: upstreamSem.signal()
             default: break
