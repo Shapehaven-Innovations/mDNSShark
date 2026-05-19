@@ -1,13 +1,17 @@
 // mDNSShark/Shared/SharedSettings.swift
 // Add to both mDNSShark and PacketTunnel targets via Xcode Target Membership.
 import Foundation
+import os.log
 
 enum SharedSettings {
     static let suiteName = "group.org.shapehaveninnovations.mDNSShark"
-    static let suite: UserDefaults = UserDefaults(suiteName: suiteName) ?? {
-        assertionFailure("SharedSettings: App Group '\(suiteName)' unavailable — falling back to standard UserDefaults")
+    static let suite: UserDefaults = {
+        if let s = UserDefaults(suiteName: suiteName) { return s }
+        os_log(.fault, "SharedSettings: App Group '%{public}@' unavailable - TLS inspection disabled", suiteName)
         return .standard
     }()
+
+    private static let dropCountLock = NSLock()
 
     static var tlsInspectionEnabled: Bool {
         get { suite.bool(forKey: "tlsInspectionEnabled") }
@@ -59,5 +63,11 @@ enum SharedSettings {
     static var tlsInterceptorDropCount: Int {
         get { suite.integer(forKey: "tlsInterceptorDropCount") }
         set { suite.set(newValue, forKey: "tlsInterceptorDropCount") }
+    }
+
+    static func incrementDropCount() {
+        dropCountLock.lock()
+        suite.set(suite.integer(forKey: "tlsInterceptorDropCount") + 1, forKey: "tlsInterceptorDropCount")
+        dropCountLock.unlock()
     }
 }

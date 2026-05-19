@@ -454,7 +454,7 @@ private struct TLSWarningSheet: View {
                     .font(.body)
                     .multilineTextAlignment(.center)
                     .padding()
-                Button("I understand — Enable", action: onEnable)
+                Button("I understand - Enable", action: onEnable)
                     .buttonStyle(.borderedProminent)
                     .tint(AppColors.warning)
                 Button("Cancel", role: .cancel, action: onCancel)

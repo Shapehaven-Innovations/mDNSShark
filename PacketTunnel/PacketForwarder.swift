@@ -33,7 +33,7 @@ final class PacketForwarder {
         if SharedSettings.tlsInspectionEnabled && KeychainStore.loadCAKey() != nil {
             tlsInterceptor = TLSInterceptor()
         } else if SharedSettings.tlsInspectionEnabled {
-            SharedSettings.tlsInterceptorLastError = "TLS inspection is off — CA key not found in keychain"
+            SharedSettings.tlsInterceptorLastError = "TLS inspection is off - CA key not found in keychain"
         }
         scheduleCleanup()
     }

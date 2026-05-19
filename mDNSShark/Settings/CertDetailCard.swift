@@ -59,7 +59,7 @@ struct CertDetailCard: View {
         derSkip(der, at: &i)                                       // signature AlgorithmIdentifier
         derSkip(der, at: &i)                                       // issuer
         guard derEnter(der, at: &i) else { return nil }           // Validity SEQUENCE
-        derSkip(der, at: &i)                                       // notBefore — skip
+        derSkip(der, at: &i)                                       // notBefore - skip
         return derReadTime(der, at: &i)                            // notAfter
     }
 

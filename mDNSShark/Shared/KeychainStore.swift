@@ -119,7 +119,7 @@ enum KeychainStore {
     }
 
     static func loadLeafIdentity(domain: String) -> SecIdentity? {
-        // Step 1: load the cert by its label (reliable — we set this explicitly).
+        // Step 1: load the cert by its label (reliable - we set this explicitly).
         let certQuery: [String: Any] = [
             kSecClass as String:           kSecClassCertificate,
             kSecAttrLabel as String:       leafLabel(domain),

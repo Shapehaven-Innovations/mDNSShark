@@ -159,7 +159,7 @@ enum CertError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .cannotExtractPublicKey: return "Cannot extract public key from private key"
-        case .invalidPEM:            return "Invalid PEM — expected CERTIFICATE and PRIVATE KEY blocks"
+        case .invalidPEM:            return "Invalid PEM - expected CERTIFICATE and PRIVATE KEY blocks"
         case .missingPrivateKey:     return "No private key found in the imported data"
         }
     }

@@ -41,7 +41,9 @@ func parseSNI(from buffer: Data) -> String? {
 // MARK: - LeafCertCache
 
 final class LeafCertCache {
+    private static let maxSize = 200
     private var cache: [String: SecIdentity] = [:]
+    private var insertionOrder: [String] = []
     private let lock = NSLock()
 
     func identity(for domain: String) throws -> SecIdentity {
@@ -49,6 +51,12 @@ final class LeafCertCache {
         if let id = cache[domain] { return id }
         let id = try makeIdentity(domain: domain)
         cache[domain] = id
+        insertionOrder.append(domain)
+        if insertionOrder.count > Self.maxSize {
+            let evicted = insertionOrder.removeFirst()
+            cache.removeValue(forKey: evicted)
+            KeychainStore.deleteAllLeafItems(domains: [evicted])
+        }
         return id
     }
 
@@ -93,6 +101,7 @@ final class LeafCertCache {
         lock.lock()
         let domains = Array(cache.keys)
         cache.removeAll()
+        insertionOrder.removeAll()
         lock.unlock()
         KeychainStore.deleteAllLeafItems(domains: domains)
     }
@@ -219,19 +228,19 @@ final class TLSSession {
 
         let sni = parseSNI(from: snapshot) ?? dstIP
 
-        if SharedSettings.tlsBypassList.contains(where: { sni.hasSuffix($0) }) {
+        if SharedSettings.tlsBypassList.contains(where: { sni == $0 || sni.hasSuffix(".\($0)") }) {
             close(); return
         }
 
         guard let identity = try? certCache.identity(for: sni) else {
-            SharedSettings.tlsInterceptorDropCount += 1
+            SharedSettings.incrementDropCount()
             close(); return
         }
 
         // Build NWListener with the per-domain leaf identity
         let tlsOpts = NWProtocolTLS.Options()
         guard let secIdent = sec_identity_create(identity) else {
-            SharedSettings.tlsInterceptorDropCount += 1
+            SharedSettings.incrementDropCount()
             close(); return
         }
         sec_protocol_options_set_local_identity(tlsOpts.securityProtocolOptions, secIdent)
@@ -242,7 +251,7 @@ final class TLSSession {
 
         let lst: NWListener
         do { lst = try NWListener(using: listenerParams) } catch {
-            SharedSettings.tlsInterceptorDropCount += 1
+            SharedSettings.incrementDropCount()
             close(); return
         }
         tlsListener = lst
@@ -274,14 +283,14 @@ final class TLSSession {
         listenerSem.wait()
 
         guard listenerPort > 0, !sessionClosed else {
-            SharedSettings.tlsInterceptorDropCount += 1
+            SharedSettings.incrementDropCount()
             close(); return
         }
 
-        // POSIX socket — connects to NWListener on loopback, bridging raw bytes to TLS
+        // POSIX socket - connects to NWListener on loopback, bridging raw bytes to TLS
         let fd = socket(AF_INET, SOCK_STREAM, 0)
         guard fd >= 0 else {
-            SharedSettings.tlsInterceptorDropCount += 1
+            SharedSettings.incrementDropCount()
             close(); return
         }
 
@@ -298,7 +307,7 @@ final class TLSSession {
 
         guard connectOK else {
             Darwin.close(fd)
-            SharedSettings.tlsInterceptorDropCount += 1
+            SharedSettings.incrementDropCount()
             close(); return
         }
         proxyFD = fd
@@ -306,7 +315,7 @@ final class TLSSession {
         // Wait for NWListener to accept our POSIX connection
         acceptSem.wait()
         guard let tlsConn = acceptedConn, !sessionClosed else {
-            SharedSettings.tlsInterceptorDropCount += 1
+            SharedSettings.incrementDropCount()
             close(); return
         }
 
@@ -329,7 +338,7 @@ final class TLSSession {
         upstreamSem.wait()
 
         guard case .ready = upstreamConn.state else {
-            SharedSettings.tlsInterceptorDropCount += 1
+            SharedSettings.incrementDropCount()
             close(); return
         }
 
