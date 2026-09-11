@@ -4,7 +4,7 @@ import Foundation
 import os.log
 
 enum SharedSettings {
-    static let suiteName = "group.org.shapehaveninnovations.mDNSShark"
+    static let suiteName = "group.beta.mDNSShark"
     static let suite: UserDefaults = {
         if let s = UserDefaults(suiteName: suiteName) { return s }
         os_log(.fault, "SharedSettings: App Group '%{public}@' unavailable - TLS inspection disabled", suiteName)

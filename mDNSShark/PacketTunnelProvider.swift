@@ -12,19 +12,19 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
 
     private let sharedFileURL: URL = {
         FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: "group.org.shapehaveninnovations.mDNSShark")!
+            .containerURL(forSecurityApplicationGroupIdentifier: "group.beta.mDNSShark")!
             .appendingPathComponent("packets.log")
     }()
 
     private let pcapFileURL: URL = {
         FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: "group.org.shapehaveninnovations.mDNSShark")!
+            .containerURL(forSecurityApplicationGroupIdentifier: "group.beta.mDNSShark")!
             .appendingPathComponent("capture.pcap")
     }()
 
     private let metaFileURL: URL = {
         FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: "group.org.shapehaveninnovations.mDNSShark")!
+            .containerURL(forSecurityApplicationGroupIdentifier: "group.beta.mDNSShark")!
             .appendingPathComponent("capture-meta.json")
     }()
 

@@ -16,21 +16,21 @@ final class PacketCaptureManager: ObservableObject {
 
     private let sharedFileURL: URL = {
         let base = FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: "group.org.shapehaveninnovations.mDNSShark")
+            .containerURL(forSecurityApplicationGroupIdentifier: "group.beta.mDNSShark")
             ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         return base.appendingPathComponent("packets.log")
     }()
 
     private let pcapFileURL: URL = {
         let base = FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: "group.org.shapehaveninnovations.mDNSShark")
+            .containerURL(forSecurityApplicationGroupIdentifier: "group.beta.mDNSShark")
             ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         return base.appendingPathComponent("capture.pcap")
     }()
 
     private let metaFileURL: URL = {
         let base = FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: "group.org.shapehaveninnovations.mDNSShark")
+            .containerURL(forSecurityApplicationGroupIdentifier: "group.beta.mDNSShark")
             ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         return base.appendingPathComponent("capture-meta.json")
     }()
@@ -94,21 +94,56 @@ final class PacketCaptureManager: ObservableObject {
 
     // MARK: - VPN configuration
 
+    // Bundle ID churned across recent builds (org.ShapehavenInnovations.* -> beta.mDNSShark.*).
+    // Devices that installed a build from that window have a stale NETunnelProviderManager
+    // saved in Settings pointing at a providerBundleIdentifier that no longer exists on disk,
+    // which iOS surfaces as "must be updated by the developer". Detect and replace it instead
+    // of reusing it.
+    private nonisolated static let expectedProviderBundleIdentifier = "beta.mDNSShark.PacketTunnel"
+
     private func configureVPN(completion: @escaping (Error?) -> Void) {
         NETunnelProviderManager.loadAllFromPreferences { [weak self] managers, error in
             if let error { completion(error); return }
-            let manager = managers?.first ?? NETunnelProviderManager()
-            let proto = NETunnelProviderProtocol()
-            proto.providerBundleIdentifier = "beta.mDNSShark.PacketTunnel"
-            proto.serverAddress = "127.0.0.1"
-            manager.protocolConfiguration = proto
-            manager.localizedDescription = "Packet Capture Tunnel"
-            manager.isEnabled = true
-            manager.saveToPreferences { error in
+
+            func saveFreshManager() {
+                let manager = NETunnelProviderManager()
+                let proto = NETunnelProviderProtocol()
+                proto.providerBundleIdentifier = Self.expectedProviderBundleIdentifier
+                proto.serverAddress = "127.0.0.1"
+                manager.protocolConfiguration = proto
+                manager.localizedDescription = "Packet Capture Tunnel"
+                manager.isEnabled = true
+                manager.saveToPreferences { error in
+                    if let error { completion(error); return }
+                    manager.loadFromPreferences { error in
+                        Task { @MainActor [weak self] in
+                            self?.tunnelManager = manager
+                            completion(error)
+                        }
+                    }
+                }
+            }
+
+            guard let existing = managers?.first else {
+                saveFreshManager()
+                return
+            }
+
+            let existingProto = existing.protocolConfiguration as? NETunnelProviderProtocol
+            guard existingProto?.providerBundleIdentifier == Self.expectedProviderBundleIdentifier else {
+                existing.removeFromPreferences { _ in
+                    // Proceed with a fresh manager even if removal failed.
+                    saveFreshManager()
+                }
+                return
+            }
+
+            existing.isEnabled = true
+            existing.saveToPreferences { error in
                 if let error { completion(error); return }
-                manager.loadFromPreferences { error in
+                existing.loadFromPreferences { error in
                     Task { @MainActor [weak self] in
-                        self?.tunnelManager = manager
+                        self?.tunnelManager = existing
                         completion(error)
                     }
                 }

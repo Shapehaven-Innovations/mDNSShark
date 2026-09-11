@@ -4,7 +4,7 @@ import Security
 import Foundation
 
 enum KeychainStore {
-    static let accessGroup = "group.org.shapehaveninnovations.mDNSShark"
+    static let accessGroup = "group.beta.mDNSShark"
     private static let certLabel = "mDNSShark.caCert"
     private static let keyLabel  = "mDNSShark.caKey"
 
