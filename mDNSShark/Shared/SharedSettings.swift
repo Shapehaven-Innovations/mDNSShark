@@ -18,6 +18,21 @@ enum SharedSettings {
         set { suite.set(newValue, forKey: "tlsInspectionEnabled") }
     }
 
+    // Set by PurchaseManager (main app process) whenever it refreshes StoreKit
+    // entitlements. The PacketTunnel extension reads this instead of talking to
+    // StoreKit itself, since it has no purchase UI of its own.
+    static var tlsInspectionUnlocked: Bool {
+        get { suite.bool(forKey: "tlsInspectionUnlocked") }
+        set { suite.set(newValue, forKey: "tlsInspectionUnlocked") }
+    }
+
+    // Cached alongside tlsInspectionUnlocked so PurchaseManager can seed an accurate
+    // TrialState (with days-remaining) on launch, before Transaction.currentEntitlements resolves.
+    static var tlsTrialStartDate: Date? {
+        get { suite.object(forKey: "tlsTrialStartDate") as? Date }
+        set { suite.set(newValue, forKey: "tlsTrialStartDate") }
+    }
+
     static var tlsBypassList: [String] {
         get {
             guard let data = suite.data(forKey: "tlsBypassList"),

@@ -1,0 +1,45 @@
+{
+  "identifier" : "8F3A6C1E-2B4D-4E5F-9A1C-6D7E8F901234",
+  "nonRenewingSubscriptions" : [],
+  "products" : [
+    {
+      "displayPrice" : "0.00",
+      "familyShareable" : false,
+      "internalID" : "A1B2C3D4-1111-4A2B-8C3D-4E5F60718293",
+      "localizations" : [
+        {
+          "description" : "3 days of full TLS Inspection access, on the house.",
+          "displayName" : "TLS Inspection - 3-Day Trial",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "beta.mDNSShark.tlsInspection.trial",
+      "referenceName" : "TLS Inspection 3-Day Trial",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "B2C3D4E5-2222-4B3C-9D4E-5F6071829304",
+      "localizations" : [
+        {
+          "description" : "Unlocks TLS Inspection permanently on this Apple ID.",
+          "displayName" : "TLS Inspection Unlock",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "beta.mDNSShark.tlsInspection.unlock",
+      "referenceName" : "TLS Inspection Unlock",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_askToBuyEnabled" : false,
+    "_billingIssuesEnabled" : false
+  },
+  "subscriptionGroups" : [],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

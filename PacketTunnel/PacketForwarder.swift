@@ -30,7 +30,9 @@ final class PacketForwarder {
 
     func start() {
         running = true
-        if SharedSettings.tlsInspectionEnabled && KeychainStore.loadCAKey() != nil {
+        if SharedSettings.tlsInspectionEnabled && !SharedSettings.tlsInspectionUnlocked {
+            SharedSettings.tlsInterceptorLastError = "TLS inspection is off - unlock it in Settings"
+        } else if SharedSettings.tlsInspectionEnabled && KeychainStore.loadCAKey() != nil {
             tlsInterceptor = TLSInterceptor()
         } else if SharedSettings.tlsInspectionEnabled {
             SharedSettings.tlsInterceptorLastError = "TLS inspection is off - CA key not found in keychain"
@@ -352,9 +354,28 @@ final class PacketForwarder {
     private func scheduleCleanup() {
         let t = DispatchSource.makeTimerSource(queue: queue)
         t.schedule(deadline: .now() + 60, repeating: 60)
-        t.setEventHandler { [weak self] in self?.removeIdleSessions() }
+        t.setEventHandler { [weak self] in
+            self?.removeIdleSessions()
+            self?.reevaluateTLSAccess()
+        }
         t.resume()
         cleanupTimer = t
+    }
+
+    // Entitlement can be revoked (trial expiry, refund) while the tunnel keeps
+    // running for hours/days, so re-check alongside the existing 60s cleanup tick
+    // instead of trusting the one-time check in start().
+    private func reevaluateTLSAccess() {
+        guard SharedSettings.tlsInspectionEnabled else { return }
+        if !SharedSettings.tlsInspectionUnlocked {
+            if tlsInterceptor != nil {
+                tlsInterceptor?.stop()
+                tlsInterceptor = nil
+                SharedSettings.tlsInterceptorLastError = "TLS inspection is off - unlock it in Settings"
+            }
+        } else if tlsInterceptor == nil && KeychainStore.loadCAKey() != nil {
+            tlsInterceptor = TLSInterceptor()
+        }
     }
 
     private func removeIdleSessions() {

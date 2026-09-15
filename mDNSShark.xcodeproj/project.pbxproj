@@ -47,6 +47,7 @@
 		9A8F66CE2D4EEF4B00A033B5 /* libdns_services.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libdns_services.tbd; path = usr/lib/libdns_services.tbd; sourceTree = SDKROOT; };
 		9A8F66FE2D4F069100A033B5 /* ScanX-Bridging-Header.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "ScanX-Bridging-Header.m"; sourceTree = "<group>"; };
 		9A8F67042D4F076500A033B5 /* ScanX-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "ScanX-Bridging-Header.h"; sourceTree = "<group>"; };
+		9AAE4AF33058B7B30047E703 /* Configuration.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Configuration.storekit; sourceTree = "<group>"; };
 		9AC2AB6B2D4F1F3B004A9F66 /* libmdns.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libmdns.tbd; path = usr/lib/libmdns.tbd; sourceTree = SDKROOT; };
 		9AC2AB7E2D4F2024004A9F66 /* CFNetwork.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CFNetwork.framework; path = System/Library/Frameworks/CFNetwork.framework; sourceTree = SDKROOT; };
 		9AEA1A2C2FABF80F00D8F38C /* PacketTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PacketTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -136,6 +137,7 @@
 		9A1C9E802D443D5300643122 = {
 			isa = PBXGroup;
 			children = (
+				9AAE4AF33058B7B30047E703 /* Configuration.storekit */,
 				9A40CE762D5EC61A000379E7 /* MIT.license */,
 				9A1C9E8B2D443D5300643122 /* mDNSShark */,
 				9AEA1A2E2FABF80F00D8F38C /* PacketTunnel */,

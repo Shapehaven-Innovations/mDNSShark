@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 import UIKit
 
 struct SettingsView: View {
+    @StateObject private var purchase = PurchaseManager.shared
+
     // Appearance
     @AppStorage("preferredColorScheme") private var colorSchemeRaw: Int = 0
 
@@ -13,11 +15,12 @@ struct SettingsView: View {
     @State private var showImportError: String? = nil
 
     // TLS sheet / warning state
-    @State private var showImportPicker = false
-    @State private var showPastePEM = false
-    @State private var showGenerateCA = false
-    @State private var showTLSWarning = false
+    // A single item-driven sheet instead of four chained .sheet(isPresented:) modifiers
+    // on the same view — that pattern flashes and auto-dismisses the first presentation
+    // on iOS (SwiftUI only reliably tracks one presentation per view identity).
+    @State private var activeSheet: TLSSheet?
     @AppStorage("hasSeenTLSWarning") private var hasSeenTLSWarning = false
+    @State private var purchaseInFlight = false
     @State private var dropCount: Int = SharedSettings.tlsInterceptorDropCount
 
     // Bypass list
@@ -43,6 +46,27 @@ struct SettingsView: View {
             .listStyle(.insetGrouped)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
+            // Presentation modifiers (.sheet/.alert) must live on the List, not on a
+            // Section inside it — List's row machinery (_VariadicView) enumerates a
+            // Section's children and reapplies ambient modifiers to each one, so a
+            // .sheet attached to a Section opens one PresentationHostingController per
+            // row simultaneously. Only the first succeeds; the rest fail with "already
+            // presenting" and SwiftUI's recovery resets the bound item back to nil,
+            // which reads as the sheet flashing up then immediately back down.
+            .sheet(item: $activeSheet) { sheet in
+                switch sheet {
+                case .importPicker: importPickerSheet
+                case .pastePEM:     pastePEMSheet
+                case .generateCA:   generateCASheet
+                case .tlsWarning:   tlsWarningSheet
+                }
+            }
+            .alert("Import Error", isPresented: .constant(showImportError != nil),
+                   actions: { Button("OK") { showImportError = nil } },
+                   message: { Text(showImportError ?? "") })
+            .alert("Store Error", isPresented: .constant(purchase.lastError != nil),
+                   actions: { Button("OK") { purchase.lastError = nil } },
+                   message: { Text(purchase.lastError ?? "") })
         }
     }
 
@@ -63,62 +87,112 @@ struct SettingsView: View {
 
     private var tlsSection: some View {
         Section {
-            Toggle("Enable TLS Inspection", isOn: Binding(
-                get: { tlsEnabled },
-                set: { val in
-                    if val && !hasSeenTLSWarning {
-                        showTLSWarning = true
-                    } else {
-                        tlsEnabled = val
-                        SharedSettings.tlsInspectionEnabled = val
+            if purchase.hasAccess {
+                Toggle("Enable TLS Inspection", isOn: Binding(
+                    get: { tlsEnabled },
+                    set: { val in
+                        if val && !hasSeenTLSWarning {
+                            activeSheet = .tlsWarning
+                        } else {
+                            tlsEnabled = val
+                            SharedSettings.tlsInspectionEnabled = val
+                        }
+                    }
+                ))
+                .tint(AppColors.info)
+
+                if let cert = installedCert {
+                    CertDetailCard(cert: cert).listRowInsets(EdgeInsets())
+                } else {
+                    Text("No certificate installed")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Button("Import from Files…") { activeSheet = .importPicker }
+                Button("Paste PEM / P12…")   { activeSheet = .pastePEM }
+                Button("Generate CA…")       { activeSheet = .generateCA }
+
+                if installedCert != nil {
+                    Button("Remove Certificate", role: .destructive) {
+                        KeychainStore.deleteCAItems()
+                        installedCert = nil
+                        tlsEnabled = false
+                        SharedSettings.tlsInspectionEnabled = false
                     }
                 }
-            ))
-            .tint(AppColors.info)
 
-            if let cert = installedCert {
-                CertDetailCard(cert: cert).listRowInsets(EdgeInsets())
-            } else {
-                Text("No certificate installed")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Button("Import from Files…") { showImportPicker = true }
-            Button("Paste PEM / P12…")   { showPastePEM = true }
-            Button("Generate CA…")       { showGenerateCA = true }
-
-            if installedCert != nil {
-                Button("Remove Certificate", role: .destructive) {
-                    KeychainStore.deleteCAItems()
-                    installedCert = nil
-                    tlsEnabled = false
-                    SharedSettings.tlsInspectionEnabled = false
+                if !purchase.isUnlocked, case .active(let daysRemaining) = purchase.trialState {
+                    Text(daysRemaining == 1 ? "1 day left in your free trial" : "\(daysRemaining) days left in your free trial")
+                        .font(.caption)
+                        .foregroundColor(AppColors.warning)
                 }
+
+                if dropCount > 0 {
+                    Text("\(dropCount) connection(s) dropped during TLS inspection")
+                        .font(.caption)
+                        .foregroundColor(AppColors.warning)
+                }
+            } else {
+                tlsGateView
             }
 
             Link("How to configure →",
                  destination: URL(string: "https://github.com/Shapehaven-Innovations/mDNSShark")!)
                 .font(.subheadline)
-
-            if dropCount > 0 {
-                Text("\(dropCount) connection(s) dropped during TLS inspection")
-                    .font(.caption)
-                    .foregroundColor(AppColors.warning)
-            }
         } header: {
             Text("TLS Inspection")
         } footer: {
             Text("Install a trusted CA certificate on this device before enabling. See the README for steps.")
                 .font(.caption)
         }
-        .sheet(isPresented: $showImportPicker) { importPickerSheet }
-        .sheet(isPresented: $showPastePEM)    { pastePEMSheet }
-        .sheet(isPresented: $showGenerateCA)  { generateCASheet }
-        .sheet(isPresented: $showTLSWarning)  { tlsWarningSheet }
-        .alert("Import Error", isPresented: .constant(showImportError != nil),
-               actions: { Button("OK") { showImportError = nil } },
-               message: { Text(showImportError ?? "") })
+    }
+
+    @ViewBuilder
+    private var tlsGateView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("TLS Inspection decrypts HTTPS traffic on this device so you can see what your apps are actually sending.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+
+            if case .notStarted = purchase.trialState {
+                Button("Start 3-Day Free Trial") {
+                    guard !purchaseInFlight else { return }
+                    purchaseInFlight = true
+                    Task {
+                        await purchase.startTrial()
+                        purchaseInFlight = false
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(purchaseInFlight)
+            } else {
+                Text("Your free trial has ended.")
+                    .font(.caption)
+                    .foregroundColor(AppColors.warning)
+                Button("Unlock TLS Inspection — \(purchase.unlockPrice)") {
+                    guard !purchaseInFlight else { return }
+                    purchaseInFlight = true
+                    Task {
+                        await purchase.purchaseUnlock()
+                        purchaseInFlight = false
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(purchaseInFlight)
+                Button("Restore Purchases") {
+                    guard !purchaseInFlight else { return }
+                    purchaseInFlight = true
+                    Task {
+                        await purchase.restore()
+                        purchaseInFlight = false
+                    }
+                }
+                .font(.footnote)
+                .disabled(purchaseInFlight)
+            }
+        }
+        .padding(.vertical, 4)
     }
 
     // MARK: - Sheets
@@ -131,7 +205,7 @@ struct SettingsView: View {
                 let data = try Data(contentsOf: url)
                 try handleImport(data: data, ext: url.pathExtension.lowercased())
             } catch { showImportError = error.localizedDescription }
-            showImportPicker = false
+            activeSheet = nil
         }
     }
 
@@ -139,13 +213,13 @@ struct SettingsView: View {
         PastePEMSheet { text, password in
             do { try handlePastedPEM(text: text, password: password) }
             catch { showImportError = error.localizedDescription }
-            showPastePEM = false
+            activeSheet = nil
         }
     }
 
     private var generateCASheet: some View {
         GenerateCASheet { confirmed in
-            showGenerateCA = false
+            activeSheet = nil
             guard confirmed else { return }
             do { try generateCA() }
             catch { showImportError = error.localizedDescription }
@@ -157,9 +231,9 @@ struct SettingsView: View {
             hasSeenTLSWarning = true
             tlsEnabled = true
             SharedSettings.tlsInspectionEnabled = true
-            showTLSWarning = false
+            activeSheet = nil
         } onCancel: {
-            showTLSWarning = false
+            activeSheet = nil
         }
     }
 
@@ -357,6 +431,13 @@ struct SettingsView: View {
             }
         }
     }
+}
+
+// MARK: - TLS sheet routing
+
+private enum TLSSheet: Identifiable, Hashable {
+    case importPicker, pastePEM, generateCA, tlsWarning
+    var id: Self { self }
 }
 
 // MARK: - Companion sheets
