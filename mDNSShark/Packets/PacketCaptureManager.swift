@@ -101,6 +101,22 @@ final class PacketCaptureManager: ObservableObject {
     // of reusing it.
     private nonisolated static let expectedProviderBundleIdentifier = "beta.mDNSShark.PacketTunnel"
 
+    // Called once at app launch (see AppCoordinator.init) so the stale-config case above
+    // doesn't require the user to ever open the Packets tab to get fixed. Deliberately
+    // remove-only: removeFromPreferences doesn't prompt the user, but saveToPreferences
+    // does ("Allow 'mDNSShark' to add VPN configurations"), so this never calls save and
+    // never creates a config for a device that doesn't have one yet - that stays gated
+    // behind the user tapping Start Capture in configureVPN below.
+    func healStaleVPNConfigIfNeeded() {
+        NETunnelProviderManager.loadAllFromPreferences { managers, _ in
+            for manager in managers ?? [] {
+                let proto = manager.protocolConfiguration as? NETunnelProviderProtocol
+                guard proto?.providerBundleIdentifier != Self.expectedProviderBundleIdentifier else { continue }
+                manager.removeFromPreferences { _ in }
+            }
+        }
+    }
+
     private func configureVPN(completion: @escaping (Error?) -> Void) {
         NETunnelProviderManager.loadAllFromPreferences { [weak self] managers, error in
             if let error { completion(error); return }

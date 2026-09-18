@@ -41,6 +41,7 @@ final class AppCoordinator: ObservableObject {
         analysisViewModel     = AnalysisViewModel()
         wire()
         Task { networkScanViewModel.startScan() }
+        packetCaptureManager.healStaleVPNConfigIfNeeded()
     }
 
     private func wire() {
