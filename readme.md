@@ -20,12 +20,16 @@ mDNSShark is still **in active development**, with regular updates that refine p
 - **SSDP**: Finds devices that speak UPnP, such as smart TVs or internet gateways.
 - **Local Subnet Scans**: Optionally scans the /24 subnet to uncover common TCP-based services, even if they aren't broadcasting via Bonjour or SSDP.
 - **OUI Lookups**: Matches a device's MAC-like address to manufacturers, giving quick hardware insights.
-- **TLS Inspection**: Acts as a local HTTPS proxy via a PacketTunnel extension to decrypt and log HTTPS traffic for analysis.
+- **TLS Inspection**: Acts as a local HTTPS proxy via a PacketTunnel extension to decrypt and log HTTPS traffic for analysis. Free for a 3-day trial, then a one-time unlock supports continued development.
 - **Minimalist Interface**: Straight to the point - run a scan, view your devices, dig into details as needed.
 
 ## TLS Inspection
 
 TLS Inspection lets mDNSShark act as a local man-in-the-middle proxy for HTTPS traffic flowing through the device. It is powered by a `PacketTunnel` Network Extension and runs entirely on-device - no traffic leaves to external servers.
+
+### Pricing
+
+The rest of mDNSShark - discovery, subnet scans, OUI lookups - is free, full stop. TLS Inspection is the one feature behind a paywall: it starts with a **free 3-day trial**, and after that a **one-time unlock** ($4.99) keeps it enabled. This isn't about locking away the app - it's the mechanism that funds the ongoing work of maintaining a certificate-generating MITM proxy safely on-device. If you'd rather support the project by contributing code instead of paying, see [Contribute and Collaborate](#contribute-and-collaborate) below - PRs are always welcome regardless of trial or unlock status.
 
 ### How It Works
 
@@ -116,6 +120,9 @@ We're always eager for fresh ideas and extra sets of eyes on the code:
 - **Open Issues**: Let us know if you spot bugs or would like a new feature.
 - **Pull Requests**: Share your improvements or experiments with the community.
 - **Discussions**: Suggest changes, ask questions, or explore new scanning methods.
+- **Code Comments**: Reading through a feature and found a rough edge, a clever trick worth explaining, or a "why is this here" moment? Drop a comment on the PR or open an issue - annotating existing code is a great low-friction way to contribute even before you touch a single line.
+
+Every feature in this app - TLS Inspection included - started as someone's idea in an issue or a PR. You don't need to be a Swift expert to contribute: reporting a confusing UI flow, testing on a device we don't have, or just asking "why does this work this way?" all move the project forward.
 
 mDNSShark is grounded in the principle that local network exploration doesn't have to be intimidating - or invasive. We're building a community-driven tool that emphasizes clarity, privacy, and inclusivity, so anyone can understand and troubleshoot what's happening on their own network. Whether you're an experienced developer or just love tinkering, mDNSShark can use your passion and expertise.
 
