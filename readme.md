@@ -29,7 +29,7 @@ TLS Inspection lets mDNSShark act as a local man-in-the-middle proxy for HTTPS t
 
 ### Pricing
 
-The rest of mDNSShark - discovery, subnet scans, OUI lookups - is free, full stop. TLS Inspection is the one feature behind a paywall: it starts with a **free 3-day trial**, and after that a **one-time unlock** ($4.99) keeps it enabled. This isn't about locking away the app - it's the mechanism that funds the ongoing work of maintaining a certificate-generating MITM proxy safely on-device. If you'd rather support the project by contributing code instead of paying, see [Contribute and Collaborate](#contribute-and-collaborate) below - PRs are always welcome regardless of trial or unlock status.
+The rest of mDNSShark - discovery, subnet scans, OUI lookups - is free, full stop. TLS Inspection is the one feature behind a paywall: it starts with a **free 3-day trial**, and after that a **one-time unlock** (currently $4.99, set in App Store Connect and shown live in Settings) keeps it enabled. This isn't about locking away the app - it's the mechanism that funds the ongoing work of maintaining a certificate-generating MITM proxy safely on-device. If you'd rather support the project by contributing code instead of paying, see [Contribute and Collaborate](#contribute-and-collaborate) below - PRs are always welcome regardless of trial or unlock status.
 
 ### How It Works
 
@@ -82,20 +82,25 @@ The **Capture Filters** section in Settings lets you choose which protocol famil
 
 ### Shared Settings (App Group)
 
-All TLS settings are stored in a shared `UserDefaults` suite (`group.org.shapehaveninnovations.mDNSShark`) so the main app and the PacketTunnel extension read the same configuration without IPC overhead. The relevant keys are:
+All TLS settings are stored in a shared `UserDefaults` suite (`group.beta.mDNSShark`) so the main app and the PacketTunnel extension read the same configuration without IPC overhead. The relevant keys are:
 
 | Key                       | Type            | Default       |
 | ------------------------- | --------------- | ------------- |
 | `tlsInspectionEnabled`    | Bool            | `false`       |
+| `tlsInspectionUnlocked`   | Bool            | `false`       |
+| `tlsTrialStartDate`       | Date?           | `nil`         |
 | `tlsBypassList`           | JSON `[String]` | `[]`          |
 | `dnsPrimary`              | String          | `8.8.8.8`     |
 | `dnsSecondary`            | String          | `8.8.4.4`     |
 | `captureFilterProtocols`  | JSON `[String]` | all protocols |
 | `tlsInterceptorDropCount` | Int             | `0`           |
+| `tlsInterceptorLastError` | String          | `""`          |
+
+`tlsInspectionUnlocked` and `tlsTrialStartDate` are written by `PurchaseManager` (main app process, backed by StoreKit) and read by the PacketTunnel extension, which has no StoreKit access of its own.
 
 ### Certificate Storage
 
-CA and leaf certificate material is stored in the iOS Keychain under the shared access group `group.org.shapehaveninnovations.mDNSShark`:
+CA and leaf certificate material is stored in the iOS Keychain under the shared access group `group.beta.mDNSShark`:
 
 | Item                              | Keychain class                            |
 | --------------------------------- | ----------------------------------------- |
@@ -109,9 +114,9 @@ Tapping **Remove Certificate** in Settings purges all CA items and disables insp
 ## System Requirements
 
 1. **Device**: iPhone only.
-2. **iOS Version**: **iOS 16 or later** for `NWListener`, `Network.framework` TLS APIs, and SwiftUI features used in the Settings and packet views.
+2. **iOS Version**: **iOS 18.2 or later**, for both the main app and TLS Inspection's `PacketTunnel` extension.
 3. **Network**: A reliable Wi-Fi connection is recommended for full scanning capabilities.
-4. **Development (Optional)**: To build or modify the code, you'll need **Xcode 15 or above** and Swift 5.9 or later.
+4. **Development (Optional)**: To build or modify the code, you'll need a recent **Xcode** (verified with Xcode 26.5).
 
 ## Contribute and Collaborate
 
