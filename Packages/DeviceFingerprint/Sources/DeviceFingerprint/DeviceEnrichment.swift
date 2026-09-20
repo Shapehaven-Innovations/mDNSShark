@@ -2,6 +2,7 @@
 /// when two sources disagree. Never shown to the user directly.
 public enum EnrichmentSource: Int, Comparable {
     case ubiquitiDiscovery   // ground truth: the device told us
+    case asusDiscovery       // ground truth: the device told us (ASUS infosvr)
     case ouiLookup           // mDNS-TXT MAC resolved through the OUI table
     case ssdpDescription     // UPnP device-description XML
     case portBanner          // TCP banner-grab guess
@@ -9,6 +10,22 @@ public enum EnrichmentSource: Int, Comparable {
 
     public static func < (lhs: EnrichmentSource, rhs: EnrichmentSource) -> Bool {
         lhs.rawValue < rhs.rawValue
+    }
+
+    /// True for sources where the device directly told us about itself via
+    /// its own vendor discovery protocol (as opposed to an OUI table
+    /// lookup, a UPnP description fetch, a banner-grab guess, or a TTL
+    /// heuristic). `merge()` lets any ground-truth source unconditionally
+    /// win mac/manufacturer/inferredOS over whatever `existing` already
+    /// holds, picking the strongest ground-truth source when more than one
+    /// answered. Add new vendor-discovery sources here (e.g. HNAP/JNAP,
+    /// Google Wifi's `/api/v1/status`) instead of hardcoding another
+    /// `$0.source == .someCase` check in `merge()`.
+    public var isGroundTruth: Bool {
+        switch self {
+        case .ubiquitiDiscovery, .asusDiscovery: return true
+        case .ouiLookup, .ssdpDescription, .portBanner, .ttlGuess: return false
+        }
     }
 }
 
@@ -42,17 +59,19 @@ public struct EnrichedFields {
 }
 
 /// Folds a batch of probe results into the fields already known for a
-/// device. Ubiquiti discovery replies are ground truth and win outright for
-/// mac/manufacturer/inferredOS; otherwise the lowest-`rawValue` (strongest)
-/// source with a non-nil answer wins per field, independently. `openPorts`
-/// is always a union, never overwritten.
+/// device. Ground-truth discovery replies (see `EnrichmentSource.isGroundTruth`
+/// — currently Ubiquiti and ASUS) win outright for mac/manufacturer/inferredOS,
+/// using the strongest ground-truth source when more than one answered;
+/// otherwise the lowest-`rawValue` (strongest) source with a non-nil answer
+/// wins per field, independently. `openPorts` is always a union, never
+/// overwritten.
 public func merge(existing: EnrichedFields, incoming: [DeviceEnrichment]) -> EnrichedFields {
     var result = existing
 
-    if let ubnt = incoming.first(where: { $0.source == .ubiquitiDiscovery }) {
-        result.mac = ubnt.mac ?? result.mac
-        result.manufacturer = ubnt.manufacturer ?? result.manufacturer
-        result.inferredOS = ubnt.inferredOS ?? result.inferredOS
+    if let groundTruth = incoming.filter({ $0.source.isGroundTruth }).min(by: { $0.source < $1.source }) {
+        result.mac = groundTruth.mac ?? result.mac
+        result.manufacturer = groundTruth.manufacturer ?? result.manufacturer
+        result.inferredOS = groundTruth.inferredOS ?? result.inferredOS
     }
 
     let byStrength = incoming.sorted { $0.source < $1.source }

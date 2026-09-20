@@ -115,14 +115,22 @@ final class NetworkScanViewModel: ObservableObject {
                 dispatchDescriptionFetchIfNeeded(ip: ip, locationURL: device.locationURL)
             } else {
                 let mac = device.txtRecords?["mac"]
-                let mfr = mac.flatMap { ouiDB.manufacturer(for: String($0.prefix(8))) }
+                var mfr = mac.flatMap { ouiDB.manufacturer(for: String($0.prefix(8))) }
+                if mfr == nil, device.serviceType == "_googlecast._tcp",
+                   let model = device.txtRecords?["md"], !model.isEmpty {
+                    mfr = "Google"
+                }
+                if mfr == nil, device.serviceType == "_hap._tcp",
+                   let model = device.txtRecords?["md"], model.localizedCaseInsensitiveContains("eero") {
+                    mfr = "eero"
+                }
                 let svc = BonjourService(
                     serviceType: device.serviceType,
                     serviceName: device.serviceName,
                     port: device.port ?? 0,
                     txtRecords: device.txtRecords ?? [:]
                 )
-                let os = inferOS(serviceType: device.serviceType, manufacturer: mfr)
+                let os = inferOS(serviceType: device.serviceType, manufacturer: mfr, txtRecords: device.txtRecords)
                 let stableID = knownIDs[ip] ?? UUID()
                 knownIDs[ip] = stableID
                 var newDevice = DiscoveredDevice(
@@ -172,12 +180,25 @@ final class NetworkScanViewModel: ObservableObject {
         enrichmentCoordinator.enrichDescription(ip: ip, locationURL: locationURL)
     }
 
-    private func inferOS(serviceType: String, manufacturer: String?) -> String? {
+    private func inferOS(serviceType: String, manufacturer: String?, txtRecords: [String: String]? = nil) -> String? {
         let appleServices: Set<String> = [
             "_apple-mobdev2._tcp", "_airdrop._tcp", "_airplay._tcp",
             "_raop._tcp", "_device-info._tcp", "_daap._tcp"
         ]
         if appleServices.contains(serviceType) { return "Apple" }
+        if serviceType == "_googlecast._tcp",
+           let model = txtRecords?["md"], !model.isEmpty,
+           model.contains("Nest Wifi") || model.contains("Google Wifi") {
+            return model
+        }
+        // HomeKit alone is too generic a signal to imply "eero" (HomeKit
+        // covers thousands of unrelated smart-home products); only treat it
+        // as an eero hint when the HAP TXT record's "md" (model name, a
+        // required HAP TXT key) corroborates it.
+        if serviceType == "_hap._tcp",
+           let model = txtRecords?["md"], model.localizedCaseInsensitiveContains("eero") {
+            return "eero"
+        }
         if let mfr = manufacturer {
             if mfr.contains("Apple")     { return "Apple" }
             if mfr.contains("Microsoft") { return "Windows" }

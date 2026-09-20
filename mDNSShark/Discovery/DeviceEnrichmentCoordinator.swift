@@ -4,7 +4,7 @@ import Combine
 import DeviceFingerprint
 import os
 
-/// Fans the five active probes out per discovered IP, each gated by one
+/// Fans the six active probes out per discovered IP, each gated by one
 /// shared ProbeConcurrencyLimiter (global cap across every probe type and
 /// every IP — never per-IP) and, for the UDP probes, one shared
 /// UDPSendPacer (minimum spacing between sends). Publishes each IP's
@@ -29,6 +29,7 @@ final class DeviceEnrichmentCoordinator {
     private let udpPacer = UDPSendPacer(minimumSpacing: .milliseconds(15))
 
     private let ubiquitiProbe = UbiquitiDiscoveryProbe()
+    private let asusProbe = ASUSDiscoveryProbe()
     private let netBIOSProbe = NetBIOSProbe()
     private let ttlProbe = TTLProbe()
     private let ssdpFetcher = SSDPDescriptionFetcher()
@@ -46,7 +47,7 @@ final class DeviceEnrichmentCoordinator {
     /// race or deliver results into the new scan's state.
     private var activeTasks: [UUID: Task<Void, Never>] = [:]
 
-    /// Fire all five probes for one IP concurrently and publish the combined
+    /// Fire all six probes for one IP concurrently and publish the combined
     /// results once every probe has either answered or timed out. Safe to
     /// call many times concurrently for different IPs — the shared limiter
     /// is what keeps total outbound traffic bounded, not caller discipline.
@@ -54,7 +55,7 @@ final class DeviceEnrichmentCoordinator {
     /// Guarded at the top by the same LAN-local check `SSDPDescriptionFetcher`
     /// applies to its own fetch: `ip` here can originate from an
     /// attacker-controlled SSDP LOCATION header or an mDNS-resolved hostname,
-    /// and every one of the five probes below (including PortScanner's
+    /// and every one of the six probes below (including PortScanner's
     /// NWConnection, which accepts a hostname and would trigger a DNS
     /// lookup) must never fire against an address outside the
     /// private/link-local/loopback ranges — this is the single choke point
@@ -67,6 +68,7 @@ final class DeviceEnrichmentCoordinator {
         let taskID = UUID()
         let task = Task {
             async let ubiquiti = limitedUbiquitiProbe(ip: ip)
+            async let asus = limitedASUSProbe(ip: ip)
             async let netbios = limitedNetBIOSProbe(ip: ip)
             async let ttl = limitedTTLProbe(ip: ip)
             async let ssdp = limitedSSDPFetch(locationURL: locationURL)
@@ -77,6 +79,11 @@ final class DeviceEnrichmentCoordinator {
                 enrichments.append(DeviceEnrichment(mac: r.mac, manufacturer: "Ubiquiti Networks Inc.",
                                                      inferredOS: r.model.map { "UniFi (\($0))" } ?? "UniFi OS",
                                                      openPorts: [], source: .ubiquitiDiscovery))
+            }
+            if let r = await asus {
+                enrichments.append(DeviceEnrichment(mac: r.mac, manufacturer: "ASUS",
+                                                     inferredOS: r.model.map { "ASUS (\($0))" },
+                                                     openPorts: [], source: .asusDiscovery))
             }
             if let r = await netbios, let mac = r.mac {
                 enrichments.append(DeviceEnrichment(mac: mac, manufacturer: OUIDatabase.shared.manufacturer(for: mac), inferredOS: nil,
@@ -150,6 +157,12 @@ final class DeviceEnrichmentCoordinator {
         await limiter.acquire()
         defer { Task { await limiter.release() } }
         return await ubiquitiProbe.probe(ip: ip, pacer: udpPacer, timeout: probeTimeout)
+    }
+
+    private func limitedASUSProbe(ip: String) async -> ASUSDiscoveryReply? {
+        await limiter.acquire()
+        defer { Task { await limiter.release() } }
+        return await asusProbe.probe(ip: ip, pacer: udpPacer, timeout: probeTimeout)
     }
 
     private func limitedNetBIOSProbe(ip: String) async -> NetBIOSReply? {

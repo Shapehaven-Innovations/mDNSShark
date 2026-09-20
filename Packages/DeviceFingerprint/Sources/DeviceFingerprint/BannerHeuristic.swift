@@ -27,6 +27,27 @@ public func guessFromBanner(_ banner: String) -> BannerGuess {
         manufacturer = "Ubiquiti"
     } else if lower.contains("mikrotik") || lower.contains("routeros") {
         manufacturer = "MikroTik"
+    } else if lower.contains("linksys") {
+        manufacturer = "Linksys"
+    } else if lower.contains("tp-link") || lower.contains("tplink") {
+        manufacturer = "TP-Link"
+    } else if lower.contains("gl.inet") || lower.contains("gl-inet") {
+        manufacturer = "GL.iNet"
+    } else if lower.contains("netgear") {
+        manufacturer = "Netgear"
+    } else if lower.contains("asus") {
+        // Specific-before-generic: "asus" alone can false-positive on words
+        // like "pegasus" (same accepted risk class as "unifi"/"unified"
+        // above), so it's checked last, after all more specific vendor
+        // strings that can't collide this way.
+        manufacturer = "ASUS"
+    }
+
+    // LuCI is OpenWrt's stock web UI, used by GL.iNet and many other
+    // OpenWrt-based vendors generically - it's a real OS-family signal even
+    // when it doesn't identify a specific manufacturer on its own.
+    if os == nil, lower.contains("luci") {
+        os = "Linux (OpenWrt, likely)"
     }
 
     return BannerGuess(manufacturer: manufacturer, os: os)

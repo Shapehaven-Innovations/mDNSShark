@@ -55,9 +55,10 @@ final class DeviceEnrichmentTests: XCTestCase {
     }
 
     func test_strengthSort_betweenNonUbiquitiSources_reverseOrderInArray() {
-        // Test that when two non-Ubiquiti sources both answer the same field,
-        // the stronger source wins even if listed in reverse strength order in the array.
-        // ouiLookup (rawValue 1) is stronger than portBanner (rawValue 3).
+        // Test that when two non-ground-truth sources both answer the same
+        // field, the stronger source wins even if listed in reverse
+        // strength order in the array. ouiLookup (rawValue 2) is stronger
+        // than portBanner (rawValue 4).
         let existing = EnrichedFields(mac: nil, manufacturer: nil, inferredOS: nil, openPorts: [])
         let incoming = [
             DeviceEnrichment(mac: nil, manufacturer: "Wrong Guess", inferredOS: nil,
@@ -68,5 +69,54 @@ final class DeviceEnrichmentTests: XCTestCase {
         let result = merge(existing: existing, incoming: incoming)
         // ouiLookup should win despite being listed second, because it's stronger
         XCTAssertEqual(result.manufacturer, "Correct OUI")
+    }
+
+    func test_asusSource_winsOverEverythingElse_forManufacturerMacOS() {
+        // Mirrors test_ubiquitiSource_winsOverEverythingElse_forManufacturerMacOS:
+        // asusDiscovery is an equally-strong ground-truth tier, so it must
+        // unconditionally override existing (possibly stale/weaker) fields
+        // the same way ubiquitiDiscovery does, not merely win the general
+        // strength-sorted fallback for still-nil fields.
+        let existing = EnrichedFields(mac: "aa:bb:cc:dd:ee:ff", manufacturer: "Some OUI Guess",
+                                       inferredOS: "Linux (likely)", openPorts: [80])
+        let incoming = [
+            DeviceEnrichment(mac: "11:22:33:44:55:66", manufacturer: "ASUS",
+                              inferredOS: "ASUS (RT-AC68U)", openPorts: [], source: .asusDiscovery),
+            DeviceEnrichment(mac: nil, manufacturer: "Wrong Guess", inferredOS: "Windows (likely)",
+                              openPorts: [22], source: .ttlGuess)
+        ]
+        let result = merge(existing: existing, incoming: incoming)
+        XCTAssertEqual(result.mac, "11:22:33:44:55:66")
+        XCTAssertEqual(result.manufacturer, "ASUS")
+        XCTAssertEqual(result.inferredOS, "ASUS (RT-AC68U)")
+    }
+
+    func test_bothGroundTruthSourcesPresent_strongestWins() {
+        // ubiquitiDiscovery (rawValue 0) is declared before asusDiscovery
+        // (rawValue 1), so it's the stronger of the two ground-truth
+        // sources when both somehow answered for the same device.
+        let existing = EnrichedFields(mac: nil, manufacturer: nil, inferredOS: nil, openPorts: [])
+        let incoming = [
+            DeviceEnrichment(mac: "aa:aa:aa:aa:aa:aa", manufacturer: "ASUS", inferredOS: "ASUS (RT-AC68U)",
+                              openPorts: [], source: .asusDiscovery),
+            DeviceEnrichment(mac: "bb:bb:bb:bb:bb:bb", manufacturer: "Ubiquiti Networks Inc.", inferredOS: "UniFi OS",
+                              openPorts: [], source: .ubiquitiDiscovery)
+        ]
+        let result = merge(existing: existing, incoming: incoming)
+        XCTAssertEqual(result.manufacturer, "Ubiquiti Networks Inc.")
+    }
+
+    func test_enrichmentSource_currentRawValueOrdering() {
+        // Documents the actual declaration order (and therefore precedence)
+        // as of this file's writing — catches an accidental reordering that
+        // would silently change precedence without any other test noticing.
+        XCTAssertEqual(EnrichmentSource.ubiquitiDiscovery.rawValue, 0)
+        XCTAssertEqual(EnrichmentSource.asusDiscovery.rawValue, 1)
+        XCTAssertEqual(EnrichmentSource.ouiLookup.rawValue, 2)
+        XCTAssertEqual(EnrichmentSource.ssdpDescription.rawValue, 3)
+        XCTAssertEqual(EnrichmentSource.portBanner.rawValue, 4)
+        XCTAssertEqual(EnrichmentSource.ttlGuess.rawValue, 5)
+        XCTAssertTrue(EnrichmentSource.asusDiscovery.isGroundTruth)
+        XCTAssertTrue(EnrichmentSource.asusDiscovery < EnrichmentSource.ouiLookup)
     }
 }
