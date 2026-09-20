@@ -84,13 +84,13 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
     ]
     
     // Dedicated queue for Bonjour browser tasks.
-    private let bonjourQueue = DispatchQueue(label: "com.example.ScanX.bonjourQueue")
+    private let bonjourQueue = DispatchQueue(label: "com.mDNSShark.bonjourQueue")
     
     private var bonjourBrowsers: [NWBrowser] = []
     private var serviceToDeviceId: [ObjectIdentifier: UUID] = [:]
     
     // Logger
-    private let logger = Logger(subsystem: "com.example.ScanX", category: "NetworkScanner")
+    private let logger = Logger(subsystem: "com.mDNSShark", category: "NetworkScanner")
     
     // Instance of the local subnet scanner.
     private let localScanner = LocalDeviceScanner()
@@ -108,6 +108,7 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         @Published var model: String? = nil
         @Published var port: Int? = nil
         @Published var txtRecords: [String: String]? = nil
+        @Published var locationURL: URL? = nil
         
         var identifier: String { friendlyName ?? serviceName }
         
@@ -315,6 +316,7 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
                 if let url = URL(string: location), let host = url.host {
                     device.resolvedIPAddress = host
                     device.port = url.port ?? 80
+                    device.locationURL = url
                 }
                 self.devices.append(device)
                 self.logger.info("SSDP discovered device: \(usn) at \(location)")

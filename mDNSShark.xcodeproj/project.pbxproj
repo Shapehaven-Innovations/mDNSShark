@@ -190,6 +190,9 @@
 				9A1C9E8B2D443D5300643122 /* mDNSShark */,
 			);
 			name = mDNSShark;
+			packageProductDependencies = (
+				2C183D20A8B0785BAA01DD06 /* DeviceFingerprint */,
+			);
 			productName = ScanX;
 			productReference = 9A1C9E892D443D5300643122 /* mDNSShark.app */;
 			productType = "com.apple.product-type.application";
@@ -245,6 +248,7 @@
 			mainGroup = 9A1C9E802D443D5300643122;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				CA37C4E49D3D42CAACBB3CA9 /* XCLocalSwiftPackageReference "Packages/DeviceFingerprint" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9A1C9E8A2D443D5300643122 /* Products */;
@@ -600,6 +604,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		CA37C4E49D3D42CAACBB3CA9 /* XCLocalSwiftPackageReference "Packages/DeviceFingerprint" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/DeviceFingerprint;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		2C183D20A8B0785BAA01DD06 /* DeviceFingerprint */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DeviceFingerprint;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 9A1C9E812D443D5300643122 /* Project object */;
 }

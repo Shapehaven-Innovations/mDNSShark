@@ -7,7 +7,7 @@ import Darwin
 
 class LocalDeviceScanner: ObservableObject {
     @Published var discoveredIPs: [String] = []
-    private let logger = Logger(subsystem: "com.example.mDNSShark", category: "LocalDeviceScanner")
+    private let logger = Logger(subsystem: "com.mDNSShark", category: "LocalDeviceScanner")
     
     /// Heuristically determines the default gateway.
     /// Assumes the router is at x.x.x.1, where x.x.x. is the device's Wi‑Fi prefix.

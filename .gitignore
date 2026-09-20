@@ -2,6 +2,7 @@
 /docs
 .claude/
 docs/superpowers/
+.superpowers/
 *.claude
 CLAUDE.md
 

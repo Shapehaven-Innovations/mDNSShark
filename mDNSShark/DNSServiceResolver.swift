@@ -5,7 +5,7 @@ import os
 
 public typealias DNSResolveCompletion = (String?, UInt16?) -> Void
 
-private let dnsLogger = Logger(subsystem: "com.example.mDNSShark", category: "DNSServiceResolver")
+private let dnsLogger = Logger(subsystem: "com.mDNSShark", category: "DNSServiceResolver")
 
 public typealias MyDNSServiceResolveReply = @convention(c) (
     DNSServiceRef?,
