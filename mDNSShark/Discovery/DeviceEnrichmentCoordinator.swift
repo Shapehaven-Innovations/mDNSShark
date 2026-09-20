@@ -14,8 +14,8 @@ import os
 /// Marked `@MainActor` because its only caller (`NetworkScanViewModel`) is
 /// itself MainActor-isolated, and because `activeTasks` (the in-flight-task
 /// tracking `cancelAll()` needs) has to live in one consistent isolation
-/// domain to be mutated safely both from `enrich`/`enrichDescription`
-/// (synchronous calls from the view model) and from each task's own cleanup
+/// domain to be mutated safely both from `enrich`/`enrichDescription`/
+/// `enrichGoogleWifi` (synchronous calls from the view model) and from each task's own cleanup
 /// when it finishes. This does not push actual network I/O onto the main
 /// thread — the probe types themselves (`UbiquitiDiscoveryProbe`,
 /// `NetBIOSProbe`, etc.) are plain, non-isolated classes, so their socket
@@ -31,6 +31,7 @@ final class DeviceEnrichmentCoordinator {
     private let ubiquitiProbe = UbiquitiDiscoveryProbe()
     private let asusProbe = ASUSDiscoveryProbe()
     private let jnapHnapProbe = JNAPHNAPProbe()
+    private let googleWifiProbe = GoogleWifiStatusProbe()
     private let netBIOSProbe = NetBIOSProbe()
     private let ttlProbe = TTLProbe()
     private let ssdpFetcher = SSDPDescriptionFetcher()
@@ -43,8 +44,12 @@ final class DeviceEnrichmentCoordinator {
     /// fallback — worst case (neither answers) holds the limiter slot for
     /// roughly 2x this, same order as fetchTimeout.
     private let jnapHnapAttemptTimeout: TimeInterval = 1.0
+    /// Single-request budget for GoogleWifiStatusProbe - one plain GET, no
+    /// fallback attempt, so this is a straight per-call timeout (unlike
+    /// jnapHnapAttemptTimeout's ~2x worst case).
+    private let googleWifiTimeout: TimeInterval = 1.5
 
-    /// In-flight `enrich`/`enrichDescription` tasks, keyed by a locally
+    /// In-flight `enrich`/`enrichDescription`/`enrichGoogleWifi` tasks, keyed by a locally
     /// generated id so each task can remove itself when it finishes without
     /// relying on `Task` being storable in a `Set` by identity. `cancelAll()`
     /// cancels and clears everything still running — called whenever a
@@ -161,7 +166,40 @@ final class DeviceEnrichmentCoordinator {
         activeTasks[taskID] = task
     }
 
-    /// Cancels every in-flight `enrich`/`enrichDescription` task and clears
+    /// Narrower entry point dedicated to the Google Wifi status probe.
+    /// Not part of `enrich()`'s fan-out because firing it requires knowing
+    /// the mDNS service type (`_googlecast._tcp`) that flagged this host as
+    /// Google Cast-capable — a signal only `NetworkScanViewModel` tracks.
+    /// Callers must only invoke this for hosts already carrying that hint,
+    /// the same anti-speculative-traffic discipline as `enrichDescription`.
+    func enrichGoogleWifi(ip: String) {
+        guard SSDPDescriptionFetcher.isLANLocalAddress(ip) else {
+            logger.debug("enrichGoogleWifi: refusing non-LAN-local ip \(ip, privacy: .public)")
+            return
+        }
+        let taskID = UUID()
+        let task = Task {
+            defer { activeTasks.removeValue(forKey: taskID) }
+            guard await limitedGoogleWifiProbe(ip: ip) != nil else { return }
+            // Deliberately NOT surfacing modelId/hardwareId as inferredOS:
+            // this endpoint's real values are undocumented by Google and the
+            // community-observed shape for modelId is a board codename
+            // ("MISTRAL"), not a human-readable name - and hardwareId
+            // includes a per-unit serial. Since this source is ground truth
+            // (unconditionally overrides existing fields in merge()),
+            // surfacing either would silently replace the already-correct,
+            // human-readable name inferOS() derives from the device's own
+            // mDNS "md" TXT record ("Nest Wifi") with a codename or serial
+            // number. manufacturer alone is the one field this endpoint's
+            // mere presence confirms with confidence.
+            let enrichment = DeviceEnrichment(mac: nil, manufacturer: "Google", inferredOS: nil,
+                                               openPorts: [], source: .googleWifiDiscovery)
+            results.send((ip: ip, enrichments: [enrichment]))
+        }
+        activeTasks[taskID] = task
+    }
+
+    /// Cancels every in-flight `enrich`/`enrichDescription`/`enrichGoogleWifi` task and clears
     /// the tracking set. Call whenever a fresh scan starts so a previous
     /// scan's still-running probes never bleed results into (or race) the
     /// new scan.
@@ -186,6 +224,12 @@ final class DeviceEnrichmentCoordinator {
         await limiter.acquire()
         defer { Task { await limiter.release() } }
         return await jnapHnapProbe.probe(ip: ip, timeout: jnapHnapAttemptTimeout)
+    }
+
+    private func limitedGoogleWifiProbe(ip: String) async -> GoogleWifiStatusInfo? {
+        await limiter.acquire()
+        defer { Task { await limiter.release() } }
+        return await googleWifiProbe.probe(ip: ip, timeout: googleWifiTimeout)
     }
 
     private func limitedNetBIOSProbe(ip: String) async -> NetBIOSReply? {

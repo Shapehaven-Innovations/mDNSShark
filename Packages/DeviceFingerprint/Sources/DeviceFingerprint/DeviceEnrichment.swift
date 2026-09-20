@@ -4,6 +4,7 @@ public enum EnrichmentSource: Int, Comparable {
     case ubiquitiDiscovery   // ground truth: the device told us
     case asusDiscovery       // ground truth: the device told us (ASUS infosvr)
     case jnapHnapDiscovery   // ground truth: the device told us (Linksys JNAP / HNAP)
+    case googleWifiDiscovery // ground truth: the device told us (Google Wifi /api/v1/status)
     case ouiLookup           // mDNS-TXT MAC resolved through the OUI table
     case ssdpDescription     // UPnP device-description XML
     case portBanner          // TCP banner-grab guess
@@ -19,12 +20,11 @@ public enum EnrichmentSource: Int, Comparable {
     /// heuristic). `merge()` lets any ground-truth source unconditionally
     /// win mac/manufacturer/inferredOS over whatever `existing` already
     /// holds, picking the strongest ground-truth source when more than one
-    /// answered. Add new vendor-discovery sources here (e.g. Google Wifi's
-    /// `/api/v1/status`) instead of hardcoding another `$0.source == .someCase`
-    /// check in `merge()`.
+    /// answered. Add new vendor-discovery sources here instead of
+    /// hardcoding another `$0.source == .someCase` check in `merge()`.
     public var isGroundTruth: Bool {
         switch self {
-        case .ubiquitiDiscovery, .asusDiscovery, .jnapHnapDiscovery: return true
+        case .ubiquitiDiscovery, .asusDiscovery, .jnapHnapDiscovery, .googleWifiDiscovery: return true
         case .ouiLookup, .ssdpDescription, .portBanner, .ttlGuess: return false
         }
     }
@@ -61,7 +61,7 @@ public struct EnrichedFields {
 
 /// Folds a batch of probe results into the fields already known for a
 /// device. Ground-truth discovery replies (see `EnrichmentSource.isGroundTruth`
-/// — currently Ubiquiti, ASUS, and Linksys JNAP/HNAP) win outright for mac/manufacturer/inferredOS,
+/// — currently Ubiquiti, ASUS, Linksys JNAP/HNAP, and Google Wifi) win outright for mac/manufacturer/inferredOS,
 /// using the strongest ground-truth source when more than one answered;
 /// otherwise the lowest-`rawValue` (strongest) source with a non-nil answer
 /// wins per field, independently. `openPorts` is always a union, never

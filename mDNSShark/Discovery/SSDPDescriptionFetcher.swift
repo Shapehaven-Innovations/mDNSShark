@@ -25,7 +25,7 @@ final class SSDPDescriptionFetcher {
         var request = URLRequest(url: locationURL)
         request.timeoutInterval = timeout
         do {
-            let (data, response) = try await URLSession.shared.data(for: request, delegate: RedirectBlockingDelegate())
+            let (data, response) = try await URLSession.shared.data(for: request, delegate: LANRedirectBlockingDelegate())
             if let httpResponse = response as? HTTPURLResponse, !(200...299).contains(httpResponse.statusCode) {
                 logger.debug("SSDPDescriptionFetcher: non-200 response (\(httpResponse.statusCode, privacy: .public)) for \(locationURL.absoluteString, privacy: .public)")
                 return nil
@@ -85,13 +85,5 @@ final class SSDPDescriptionFetcher {
         let bytes = withUnsafeBytes(of: &addr) { Array($0) }
         guard bytes.count == 16 else { return nil }
         return bytes
-    }
-
-    /// Blocks all HTTP redirects so a validated LAN-local starting URL
-    /// cannot be redirected off-LAN by the responding device.
-    private final class RedirectBlockingDelegate: NSObject, URLSessionTaskDelegate {
-        func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
-            completionHandler(nil)
-        }
     }
 }

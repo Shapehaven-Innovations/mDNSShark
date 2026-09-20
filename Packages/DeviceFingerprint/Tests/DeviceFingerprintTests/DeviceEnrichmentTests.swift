@@ -57,8 +57,8 @@ final class DeviceEnrichmentTests: XCTestCase {
     func test_strengthSort_betweenNonUbiquitiSources_reverseOrderInArray() {
         // Test that when two non-ground-truth sources both answer the same
         // field, the stronger source wins even if listed in reverse
-        // strength order in the array. ouiLookup (rawValue 3) is stronger
-        // than portBanner (rawValue 5).
+        // strength order in the array. ouiLookup (rawValue 4) is stronger
+        // than portBanner (rawValue 6).
         let existing = EnrichedFields(mac: nil, manufacturer: nil, inferredOS: nil, openPorts: [])
         let incoming = [
             DeviceEnrichment(mac: nil, manufacturer: "Wrong Guess", inferredOS: nil,
@@ -127,6 +127,39 @@ final class DeviceEnrichmentTests: XCTestCase {
         XCTAssertEqual(result.manufacturer, "ASUS")
     }
 
+    func test_googleWifiSource_winsOverEverythingElse_forManufacturerMacOS() {
+        // Mirrors test_jnapHnapSource_winsOverEverythingElse_forManufacturerMacOS:
+        // googleWifiDiscovery is the same ground-truth tier, so it must
+        // unconditionally override existing (possibly stale/weaker) fields.
+        let existing = EnrichedFields(mac: "aa:bb:cc:dd:ee:ff", manufacturer: "Some OUI Guess",
+                                       inferredOS: "Linux (likely)", openPorts: [80])
+        let incoming = [
+            DeviceEnrichment(mac: nil, manufacturer: "Google",
+                              inferredOS: "Google Wifi (15068.66.1)", openPorts: [], source: .googleWifiDiscovery),
+            DeviceEnrichment(mac: nil, manufacturer: "Wrong Guess", inferredOS: "Windows (likely)",
+                              openPorts: [22], source: .ttlGuess)
+        ]
+        let result = merge(existing: existing, incoming: incoming)
+        XCTAssertEqual(result.mac, "aa:bb:cc:dd:ee:ff")
+        XCTAssertEqual(result.manufacturer, "Google")
+        XCTAssertEqual(result.inferredOS, "Google Wifi (15068.66.1)")
+    }
+
+    func test_jnapHnapBeatsGoogleWifi_whenBothGroundTruthSourcesAnswer() {
+        // jnapHnapDiscovery (rawValue 2) is declared before
+        // googleWifiDiscovery (rawValue 3), so it's the stronger of the two
+        // when both somehow answered for the same device.
+        let existing = EnrichedFields(mac: nil, manufacturer: nil, inferredOS: nil, openPorts: [])
+        let incoming = [
+            DeviceEnrichment(mac: nil, manufacturer: "Google", inferredOS: "Google Wifi",
+                              openPorts: [], source: .googleWifiDiscovery),
+            DeviceEnrichment(mac: nil, manufacturer: "Linksys", inferredOS: "Linksys MX5500",
+                              openPorts: [], source: .jnapHnapDiscovery)
+        ]
+        let result = merge(existing: existing, incoming: incoming)
+        XCTAssertEqual(result.manufacturer, "Linksys")
+    }
+
     func test_bothGroundTruthSourcesPresent_strongestWins() {
         // ubiquitiDiscovery (rawValue 0) is declared before asusDiscovery
         // (rawValue 1), so it's the stronger of the two ground-truth
@@ -149,11 +182,14 @@ final class DeviceEnrichmentTests: XCTestCase {
         XCTAssertEqual(EnrichmentSource.ubiquitiDiscovery.rawValue, 0)
         XCTAssertEqual(EnrichmentSource.asusDiscovery.rawValue, 1)
         XCTAssertEqual(EnrichmentSource.jnapHnapDiscovery.rawValue, 2)
-        XCTAssertEqual(EnrichmentSource.ouiLookup.rawValue, 3)
-        XCTAssertEqual(EnrichmentSource.ssdpDescription.rawValue, 4)
-        XCTAssertEqual(EnrichmentSource.portBanner.rawValue, 5)
-        XCTAssertEqual(EnrichmentSource.ttlGuess.rawValue, 6)
+        XCTAssertEqual(EnrichmentSource.googleWifiDiscovery.rawValue, 3)
+        XCTAssertEqual(EnrichmentSource.ouiLookup.rawValue, 4)
+        XCTAssertEqual(EnrichmentSource.ssdpDescription.rawValue, 5)
+        XCTAssertEqual(EnrichmentSource.portBanner.rawValue, 6)
+        XCTAssertEqual(EnrichmentSource.ttlGuess.rawValue, 7)
         XCTAssertTrue(EnrichmentSource.asusDiscovery.isGroundTruth)
+        XCTAssertTrue(EnrichmentSource.googleWifiDiscovery.isGroundTruth)
+        XCTAssertTrue(EnrichmentSource.googleWifiDiscovery < EnrichmentSource.ouiLookup)
         XCTAssertTrue(EnrichmentSource.jnapHnapDiscovery.isGroundTruth)
         XCTAssertTrue(EnrichmentSource.asusDiscovery < EnrichmentSource.ouiLookup)
         XCTAssertTrue(EnrichmentSource.jnapHnapDiscovery < EnrichmentSource.ouiLookup)

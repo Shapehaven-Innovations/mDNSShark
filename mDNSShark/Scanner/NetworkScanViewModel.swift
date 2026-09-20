@@ -28,6 +28,9 @@ final class NetworkScanViewModel: ObservableObject {
     // so a re-appearing `locationURL` across multiple raw Device rows for
     // the same IP only triggers one SSDP description fetch.
     private var fetchedDescriptionIPs = Set<String>()
+    // Which IPs have already had `enrichGoogleWifi` dispatched this scan,
+    // same one-shot-per-IP reasoning as `fetchedDescriptionIPs`.
+    private var fetchedGoogleWifiIPs = Set<String>()
     // Which IPs have already had the main `enrich()` probe pass dispatched
     // THIS scan. Deliberately separate from `knownIDs`: a re-scan should
     // give every device a fresh enrichment pass (e.g. a host that was
@@ -86,6 +89,7 @@ final class NetworkScanViewModel: ObservableObject {
         enrichedIPsThisScan.removeAll()
         rawEnrichmentsByIP.removeAll()
         fetchedDescriptionIPs.removeAll()
+        fetchedGoogleWifiIPs.removeAll()
         scanner.scanNetwork(duration: duration)
     }
 
@@ -113,6 +117,7 @@ final class NetworkScanViewModel: ObservableObject {
                 }
                 byIP[ip] = existing
                 dispatchDescriptionFetchIfNeeded(ip: ip, locationURL: device.locationURL)
+                dispatchGoogleWifiIfNeeded(ip: ip, serviceType: device.serviceType)
             } else {
                 let mac = device.txtRecords?["mac"]
                 var mfr = mac.flatMap { ouiDB.manufacturer(for: String($0.prefix(8))) }
@@ -164,6 +169,7 @@ final class NetworkScanViewModel: ObservableObject {
                     enrichmentCoordinator.enrich(ip: ip, locationURL: device.locationURL)
                 }
                 dispatchDescriptionFetchIfNeeded(ip: ip, locationURL: device.locationURL)
+                dispatchGoogleWifiIfNeeded(ip: ip, serviceType: device.serviceType)
             }
         }
         return Array(byIP.values).sorted { $0.ipAddress < $1.ipAddress }
@@ -178,6 +184,19 @@ final class NetworkScanViewModel: ObservableObject {
         guard let locationURL, !fetchedDescriptionIPs.contains(ip) else { return }
         fetchedDescriptionIPs.insert(ip)
         enrichmentCoordinator.enrichDescription(ip: ip, locationURL: locationURL)
+    }
+
+    /// Fires the Google Wifi status probe the first time ANY raw `Device`
+    /// row for this IP reveals `_googlecast._tcp` - regardless of whether
+    /// it came from the new-device or existing-device branch of `merge()`,
+    /// same reasoning as `dispatchDescriptionFetchIfNeeded`. This is the
+    /// probe's only trigger; `enrich()` never fires it directly, so an
+    /// active HTTP probe never fires against a host with no Google Cast
+    /// mDNS hint at all.
+    private func dispatchGoogleWifiIfNeeded(ip: String, serviceType: String) {
+        guard serviceType == "_googlecast._tcp", !fetchedGoogleWifiIPs.contains(ip) else { return }
+        fetchedGoogleWifiIPs.insert(ip)
+        enrichmentCoordinator.enrichGoogleWifi(ip: ip)
     }
 
     private func inferOS(serviceType: String, manufacturer: String?, txtRecords: [String: String]? = nil) -> String? {

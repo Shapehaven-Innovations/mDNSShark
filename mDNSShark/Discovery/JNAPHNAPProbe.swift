@@ -48,7 +48,7 @@ final class JNAPHNAPProbe {
         request.setValue("application/json; charset=UTF-8", forHTTPHeaderField: "Content-Type")
         request.httpBody = Data("{}".utf8)
         do {
-            let (data, response) = try await URLSession.shared.data(for: request, delegate: RedirectBlockingDelegate())
+            let (data, response) = try await URLSession.shared.data(for: request, delegate: LANRedirectBlockingDelegate())
             guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
                 return nil
             }
@@ -75,7 +75,7 @@ final class JNAPHNAPProbe {
         </soap:Envelope>
         """.utf8)
         do {
-            let (data, response) = try await URLSession.shared.data(for: request, delegate: RedirectBlockingDelegate())
+            let (data, response) = try await URLSession.shared.data(for: request, delegate: LANRedirectBlockingDelegate())
             guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
                 return nil
             }
@@ -83,15 +83,6 @@ final class JNAPHNAPProbe {
         } catch {
             logger.debug("JNAPHNAPProbe: HNAP fetch failed for \(ip, privacy: .public): \(error.localizedDescription)")
             return nil
-        }
-    }
-
-    /// Blocks all HTTP redirects, same reasoning as `SSDPDescriptionFetcher`'s
-    /// own delegate — a LAN-local target must not be able to redirect the
-    /// request off-LAN.
-    private final class RedirectBlockingDelegate: NSObject, URLSessionTaskDelegate {
-        func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
-            completionHandler(nil)
         }
     }
 }
