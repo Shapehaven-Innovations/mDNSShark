@@ -19,9 +19,9 @@ public enum EnrichmentSource: Int, Comparable {
     /// heuristic). `merge()` lets any ground-truth source unconditionally
     /// win mac/manufacturer/inferredOS over whatever `existing` already
     /// holds, picking the strongest ground-truth source when more than one
-    /// answered. Add new vendor-discovery sources here (e.g. HNAP/JNAP,
-    /// Google Wifi's `/api/v1/status`) instead of hardcoding another
-    /// `$0.source == .someCase` check in `merge()`.
+    /// answered. Add new vendor-discovery sources here (e.g. Google Wifi's
+    /// `/api/v1/status`) instead of hardcoding another `$0.source == .someCase`
+    /// check in `merge()`.
     public var isGroundTruth: Bool {
         switch self {
         case .ubiquitiDiscovery, .asusDiscovery, .jnapHnapDiscovery: return true

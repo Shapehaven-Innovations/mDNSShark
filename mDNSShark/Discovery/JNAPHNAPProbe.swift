@@ -21,9 +21,21 @@ final class JNAPHNAPProbe {
             logger.debug("JNAPHNAPProbe: refusing non-LAN-local ip \(ip, privacy: .public)")
             return nil
         }
+        // IPv4 only for now: URL(string:) needs an IPv6 host bracketed
+        // ("http://[fe80::1]/...") and a zone id stripped first, which
+        // isLANLocalAddress's own IPv6 support doesn't handle end-to-end
+        // yet. Rejecting explicitly here (rather than letting the URL
+        // fail to construct silently) keeps this an informed limitation,
+        // not a silent no-op — the UDP probes make the same IPv4-only
+        // call via inet_pton(AF_INET).
+        guard !ip.contains(":") else {
+            logger.debug("JNAPHNAPProbe: IPv6 not yet supported, skipping \(ip, privacy: .public)")
+            return nil
+        }
         if let info = await fetchJNAP(ip: ip, timeout: timeout) {
             return info
         }
+        guard !Task.isCancelled else { return nil }
         return await fetchHNAP(ip: ip, timeout: timeout)
     }
 

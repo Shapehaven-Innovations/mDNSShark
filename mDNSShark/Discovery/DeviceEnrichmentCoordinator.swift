@@ -52,7 +52,7 @@ final class DeviceEnrichmentCoordinator {
     /// race or deliver results into the new scan's state.
     private var activeTasks: [UUID: Task<Void, Never>] = [:]
 
-    /// Fire all six probes for one IP concurrently and publish the combined
+    /// Fire all seven probes for one IP concurrently and publish the combined
     /// results once every probe has either answered or timed out. Safe to
     /// call many times concurrently for different IPs — the shared limiter
     /// is what keeps total outbound traffic bounded, not caller discipline.
@@ -60,7 +60,7 @@ final class DeviceEnrichmentCoordinator {
     /// Guarded at the top by the same LAN-local check `SSDPDescriptionFetcher`
     /// applies to its own fetch: `ip` here can originate from an
     /// attacker-controlled SSDP LOCATION header or an mDNS-resolved hostname,
-    /// and every one of the six probes below (including PortScanner's
+    /// and every one of the seven probes below (including PortScanner's
     /// NWConnection, which accepts a hostname and would trigger a DNS
     /// lookup) must never fire against an address outside the
     /// private/link-local/loopback ranges — this is the single choke point
@@ -94,10 +94,12 @@ final class DeviceEnrichmentCoordinator {
                                                      openPorts: [], source: .asusDiscovery))
             }
             if let r = await jnapHnap {
+                // Unlike UbiquitiDiscoveryProbe/ASUSDiscoveryProbe, this
+                // probe covers multiple vendors (Linksys, D-Link), so the
+                // vendor prefix comes from the reply itself, not a literal.
+                let label = r.modelName.map { m in r.vendorName.map { "\($0) \(m)" } ?? m }
                 enrichments.append(DeviceEnrichment(mac: nil, manufacturer: r.vendorName,
-                                                     inferredOS: r.modelName.map { m in
-                                                         r.firmwareVersion.map { "\(m) (\($0))" } ?? m
-                                                     },
+                                                     inferredOS: label.map { l in r.firmwareVersion.map { "\(l) (\($0))" } ?? l },
                                                      openPorts: [], source: .jnapHnapDiscovery))
             }
             if let r = await netbios, let mac = r.mac {

@@ -57,8 +57,8 @@ final class DeviceEnrichmentTests: XCTestCase {
     func test_strengthSort_betweenNonUbiquitiSources_reverseOrderInArray() {
         // Test that when two non-ground-truth sources both answer the same
         // field, the stronger source wins even if listed in reverse
-        // strength order in the array. ouiLookup (rawValue 2) is stronger
-        // than portBanner (rawValue 4).
+        // strength order in the array. ouiLookup (rawValue 3) is stronger
+        // than portBanner (rawValue 5).
         let existing = EnrichedFields(mac: nil, manufacturer: nil, inferredOS: nil, openPorts: [])
         let incoming = [
             DeviceEnrichment(mac: nil, manufacturer: "Wrong Guess", inferredOS: nil,
@@ -89,6 +89,42 @@ final class DeviceEnrichmentTests: XCTestCase {
         XCTAssertEqual(result.mac, "11:22:33:44:55:66")
         XCTAssertEqual(result.manufacturer, "ASUS")
         XCTAssertEqual(result.inferredOS, "ASUS (RT-AC68U)")
+    }
+
+    func test_jnapHnapSource_winsOverEverythingElse_forManufacturerMacOS() {
+        // Mirrors test_asusSource_winsOverEverythingElse_forManufacturerMacOS:
+        // jnapHnapDiscovery is the same ground-truth tier, so it must
+        // unconditionally override existing (possibly stale/weaker) fields,
+        // not merely win the general strength-sorted fallback for still-nil
+        // fields. (mac stays nil here since JNAP/HNAP doesn't report one -
+        // existing.mac is untouched by the `?? result.mac` fallback.)
+        let existing = EnrichedFields(mac: "aa:bb:cc:dd:ee:ff", manufacturer: "Some OUI Guess",
+                                       inferredOS: "Linux (likely)", openPorts: [80])
+        let incoming = [
+            DeviceEnrichment(mac: nil, manufacturer: "Linksys",
+                              inferredOS: "Linksys MX5500 (1.0.03.204078)", openPorts: [], source: .jnapHnapDiscovery),
+            DeviceEnrichment(mac: nil, manufacturer: "Wrong Guess", inferredOS: "Windows (likely)",
+                              openPorts: [22], source: .ttlGuess)
+        ]
+        let result = merge(existing: existing, incoming: incoming)
+        XCTAssertEqual(result.mac, "aa:bb:cc:dd:ee:ff")
+        XCTAssertEqual(result.manufacturer, "Linksys")
+        XCTAssertEqual(result.inferredOS, "Linksys MX5500 (1.0.03.204078)")
+    }
+
+    func test_asusBeatsJnapHnap_whenBothGroundTruthSourcesAnswer() {
+        // asusDiscovery (rawValue 1) is declared before jnapHnapDiscovery
+        // (rawValue 2), so it's the stronger of the two when both somehow
+        // answered for the same device.
+        let existing = EnrichedFields(mac: nil, manufacturer: nil, inferredOS: nil, openPorts: [])
+        let incoming = [
+            DeviceEnrichment(mac: nil, manufacturer: "Linksys", inferredOS: "Linksys MX5500",
+                              openPorts: [], source: .jnapHnapDiscovery),
+            DeviceEnrichment(mac: "aa:aa:aa:aa:aa:aa", manufacturer: "ASUS", inferredOS: "ASUS (RT-AC68U)",
+                              openPorts: [], source: .asusDiscovery)
+        ]
+        let result = merge(existing: existing, incoming: incoming)
+        XCTAssertEqual(result.manufacturer, "ASUS")
     }
 
     func test_bothGroundTruthSourcesPresent_strongestWins() {

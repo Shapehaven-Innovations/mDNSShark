@@ -20,6 +20,15 @@ final class JNAPHNAPInfoTests: XCTestCase {
         XCTAssertNil(JNAPHNAPParser.parseJNAP(json))
     }
 
+    func test_jnapNonOKResultWithOutput_returnsNil() {
+        // Guards against accepting a 200 response shaped like the envelope
+        // but where the device itself reported failure.
+        let json = """
+        {"result":"ERROR","output":{"manufacturer":"Linksys","modelNumber":"MX5500"}}
+        """.data(using: .utf8)!
+        XCTAssertNil(JNAPHNAPParser.parseJNAP(json))
+    }
+
     func test_jnapMalformedJSON_returnsNil() {
         let json = "not json".data(using: .utf8)!
         XCTAssertNil(JNAPHNAPParser.parseJNAP(json))
@@ -38,6 +47,7 @@ final class JNAPHNAPInfoTests: XCTestCase {
         <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
         <soap:Body>
         <GetDeviceSettingsResponse xmlns="http://purenetworks.com/HNAP1/">
+        <GetDeviceSettingsResult>OK</GetDeviceSettingsResult>
         <VendorName>D-Link</VendorName>
         <ModelName>DIR-885L</ModelName>
         <ModelDescription>AC3150 Ultra Wi-Fi Router</ModelDescription>
@@ -53,25 +63,39 @@ final class JNAPHNAPInfoTests: XCTestCase {
         XCTAssertEqual(info?.firmwareVersion, "1.13B04")
     }
 
-    func test_hnapDeviceNameFallback_usedWhenModelNameMissing() {
+    func test_hnapNonOKResult_returnsNil() {
         let xml = """
         <GetDeviceSettingsResponse xmlns="http://purenetworks.com/HNAP1/">
-        <DeviceName>Linksys03472</DeviceName>
+        <GetDeviceSettingsResult>ERROR</GetDeviceSettingsResult>
+        <ModelName>DIR-885L</ModelName>
         </GetDeviceSettingsResponse>
         """.data(using: .utf8)!
-        let info = JNAPHNAPParser.parseHNAP(xml)
-        XCTAssertEqual(info?.modelName, "Linksys03472")
+        XCTAssertNil(JNAPHNAPParser.parseHNAP(xml))
     }
 
-    func test_hnapModelNamePresent_deviceNameNotUsed() {
+    func test_hnapMissingResult_returnsNil() {
+        // No GetDeviceSettingsResult element at all - result defaults to nil,
+        // which must not be treated as success.
         let xml = """
         <GetDeviceSettingsResponse xmlns="http://purenetworks.com/HNAP1/">
         <ModelName>DIR-885L</ModelName>
-        <DeviceName>Linksys03472</DeviceName>
         </GetDeviceSettingsResponse>
         """.data(using: .utf8)!
-        let info = JNAPHNAPParser.parseHNAP(xml)
-        XCTAssertEqual(info?.modelName, "DIR-885L")
+        XCTAssertNil(JNAPHNAPParser.parseHNAP(xml))
+    }
+
+    func test_hnapDeviceNameAlone_neverUsedAsModelName() {
+        // DeviceName is the user-editable host name, not a model - even
+        // with GetDeviceSettingsResult == OK, a DeviceName-only response
+        // carries no real identity and must return nil, not fabricate a
+        // modelName from it.
+        let xml = """
+        <GetDeviceSettingsResponse xmlns="http://purenetworks.com/HNAP1/">
+        <GetDeviceSettingsResult>OK</GetDeviceSettingsResult>
+        <DeviceName>Living Room</DeviceName>
+        </GetDeviceSettingsResponse>
+        """.data(using: .utf8)!
+        XCTAssertNil(JNAPHNAPParser.parseHNAP(xml))
     }
 
     func test_hnapMalformedXML_returnsNil() {
@@ -80,7 +104,7 @@ final class JNAPHNAPInfoTests: XCTestCase {
     }
 
     func test_hnapEmptyDocument_returnsNil() {
-        let xml = "<GetDeviceSettingsResponse xmlns=\"http://purenetworks.com/HNAP1/\"></GetDeviceSettingsResponse>".data(using: .utf8)!
+        let xml = "<GetDeviceSettingsResponse xmlns=\"http://purenetworks.com/HNAP1/\"><GetDeviceSettingsResult>OK</GetDeviceSettingsResult></GetDeviceSettingsResponse>".data(using: .utf8)!
         XCTAssertNil(JNAPHNAPParser.parseHNAP(xml))
     }
 }

@@ -32,35 +32,20 @@ socket-I/O wrapper in `mDNSShark/Discovery/`, wired into
 `UDPSendPacer` if UDP), with a new `EnrichmentSource` case in
 `DeviceEnrichment.swift`.
 
-## 1. HNAP + Linksys JNAP (Linksys, some D-Link)
-
-- **Signal:** `POST /HNAP1/` (SOAP, `GetDeviceSettings` action) or
-  `POST /JNAP/` (JSON, `X-JNAP-Action` header) → VendorName/ModelDescription/
-  ModelName/FirmwareVersion directly. HNAP covers older Linksys + some D-Link;
-  JNAP covers newer Linksys (Velop mesh included).
-- **Effort:** small — same shape as the already-built SSDP-description
-  fetcher (one HTTP POST, parse a structured response). Combine both into one
-  probe that tries JNAP first, falls back to HNAP, since both target the same
-  vendor family and firing both at every host doubles traffic for no reason.
-- **Gate on:** an existing OUI/SSDP-manufacturer hint suggesting Linksys/
-  D-Link first, rather than firing at every host — keeps per-host request
-  count flat as more vendor-specific probes get added over time.
-- **Own session:** no — same size/shape as the three items already shipped
-  this pass, fits a similar single-session dispatch.
-
-## 2. Google Wifi `/api/v1/status`
+## 1. Google Wifi `/api/v1/status`
 
 - **Signal:** unauthenticated `GET http://<ip>/api/v1/status` (port 80) →
   hardware id, software version, model. Definitive Google/Nest Wifi
   identification.
 - **Effort:** small — literally a plain HTTP GET, no auth, no SOAP/JSON
   envelope to construct.
-- **Gate on:** the `_googlecast._tcp` mDNS hit from item 3 of the first
-  batch (only fire this active probe against hosts mDNS already flagged as
-  Google Cast-capable, to avoid probing every host on the LAN speculatively).
+- **Gate on:** the `_googlecast._tcp` mDNS hit from the mDNS-extension item
+  of the first batch (only fire this active probe against hosts mDNS
+  already flagged as Google Cast-capable, to avoid probing every host on
+  the LAN speculatively).
 - **Own session:** no.
 
-## 3. Verify MAC-OUI coverage for mesh vendors (no new probe — testing only)
+## 2. Verify MAC-OUI coverage for mesh vendors (no new probe — testing only)
 
 - **Signal:** none new — the app already bundles the full IEEE OUI table.
   eero, Google, Netgear, Linksys, TP-Link, ASUS should already resolve to a
@@ -68,11 +53,12 @@ socket-I/O wrapper in `mDNSShark/Discovery/`, wired into
   an existing path (NetBIOS reply, or a future probe).
 - **Effort:** small, verification-only — add a package-level test asserting
   known OUI prefixes for these vendors resolve correctly via `OUIDataset`,
-  and do a real on-device check once item 1/2 above exist and can surface a
-  MAC for a Linksys/Google device to confirm end-to-end.
+  and do a real on-device check once item 1 above (or the already-shipped
+  JNAP/HNAP probe) surfaces a MAC for a Linksys/Google device to confirm
+  end-to-end.
 - **Own session:** no — can piggyback on whichever item above ships next.
 
-## 4. Netgear Orbi `GetAllSatellites` (router-side SOAP)
+## 3. Netgear Orbi `GetAllSatellites` (router-side SOAP)
 
 - **Signal:** SOAP call to the PRIMARY Orbi router lists its satellite
   nodes' info.
@@ -87,11 +73,11 @@ socket-I/O wrapper in `mDNSShark/Discovery/`, wired into
   not just a new probe file. Brainstorm/design first, likely its own
   bounded (or larger) planning pass.
 
-## 5. TR-064 (some ISP gateways — AT&T/Spectrum unconfirmed)
+## 4. TR-064 (some ISP gateways — AT&T/Spectrum unconfirmed)
 
 - **Signal:** LAN-side SOAP configuration protocol, UPnP-extension.
 - **Effort:** small if a target device is confirmed to implement it — same
-  shape as HNAP/JNAP.
+  shape as the already-shipped JNAP/HNAP probe.
 - **Blocker:** no confirmed AT&T or Spectrum gateway model implementing
   this was found during research. Building a speculative probe against
   every gateway is traffic spent with no evidence of payoff, and conflicts
@@ -102,7 +88,7 @@ socket-I/O wrapper in `mDNSShark/Discovery/`, wired into
   speaking gateway, revisit — small effort once a target exists.
 - **Own session:** n/a until unblocked.
 
-## 6. TP-Link Deco (OneMesh, UDP 20002)
+## 5. TP-Link Deco (OneMesh, UDP 20002)
 
 - **Signal:** broadcast probe (type `0xF8`), but the reply payload is
   **AES-128 encrypted with a hardcoded key** — the mechanism is real and
@@ -119,7 +105,7 @@ socket-I/O wrapper in `mDNSShark/Discovery/`, wired into
   Only worth doing if Deco users are a measurable share of the target
   audience — worth asking whether that's true before investing here.
 
-## 7. Starlink local gRPC API (`192.168.100.1:9200`)
+## 6. Starlink local gRPC API (`192.168.100.1:9200`)
 
 - **Signal:** `get_status` → `device_info` (hardware/software version, unit
   ID). Well-documented via community tooling (`starlink-grpc-tools`,
