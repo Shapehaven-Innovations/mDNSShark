@@ -4,7 +4,7 @@ import Combine
 import DeviceFingerprint
 import os
 
-/// Fans the six active probes out per discovered IP, each gated by one
+/// Fans the seven active probes out per discovered IP, each gated by one
 /// shared ProbeConcurrencyLimiter (global cap across every probe type and
 /// every IP — never per-IP) and, for the UDP probes, one shared
 /// UDPSendPacer (minimum spacing between sends). Publishes each IP's
@@ -30,6 +30,7 @@ final class DeviceEnrichmentCoordinator {
 
     private let ubiquitiProbe = UbiquitiDiscoveryProbe()
     private let asusProbe = ASUSDiscoveryProbe()
+    private let jnapHnapProbe = JNAPHNAPProbe()
     private let netBIOSProbe = NetBIOSProbe()
     private let ttlProbe = TTLProbe()
     private let ssdpFetcher = SSDPDescriptionFetcher()
@@ -38,6 +39,10 @@ final class DeviceEnrichmentCoordinator {
     private let probeTimeout: TimeInterval = 1.5
     private let fetchTimeout: TimeInterval = 2.5
     private let portScanTimeout: TimeInterval = 1.0
+    /// Per-attempt budget for JNAPHNAPProbe's JNAP try and its HNAP
+    /// fallback — worst case (neither answers) holds the limiter slot for
+    /// roughly 2x this, same order as fetchTimeout.
+    private let jnapHnapAttemptTimeout: TimeInterval = 1.0
 
     /// In-flight `enrich`/`enrichDescription` tasks, keyed by a locally
     /// generated id so each task can remove itself when it finishes without
@@ -59,7 +64,9 @@ final class DeviceEnrichmentCoordinator {
     /// NWConnection, which accepts a hostname and would trigger a DNS
     /// lookup) must never fire against an address outside the
     /// private/link-local/loopback ranges — this is the single choke point
-    /// every enrichment path goes through.
+    /// every enrichment path goes through. `JNAPHNAPProbe` applies the same
+    /// guard again internally since it targets `ip` directly rather than
+    /// going through this call site.
     func enrich(ip: String, locationURL: URL?) {
         guard SSDPDescriptionFetcher.isLANLocalAddress(ip) else {
             logger.debug("enrich: refusing non-LAN-local ip \(ip, privacy: .public)")
@@ -69,6 +76,7 @@ final class DeviceEnrichmentCoordinator {
         let task = Task {
             async let ubiquiti = limitedUbiquitiProbe(ip: ip)
             async let asus = limitedASUSProbe(ip: ip)
+            async let jnapHnap = limitedJNAPHNAPProbe(ip: ip)
             async let netbios = limitedNetBIOSProbe(ip: ip)
             async let ttl = limitedTTLProbe(ip: ip)
             async let ssdp = limitedSSDPFetch(locationURL: locationURL)
@@ -84,6 +92,13 @@ final class DeviceEnrichmentCoordinator {
                 enrichments.append(DeviceEnrichment(mac: r.mac, manufacturer: "ASUS",
                                                      inferredOS: r.model.map { "ASUS (\($0))" },
                                                      openPorts: [], source: .asusDiscovery))
+            }
+            if let r = await jnapHnap {
+                enrichments.append(DeviceEnrichment(mac: nil, manufacturer: r.vendorName,
+                                                     inferredOS: r.modelName.map { m in
+                                                         r.firmwareVersion.map { "\(m) (\($0))" } ?? m
+                                                     },
+                                                     openPorts: [], source: .jnapHnapDiscovery))
             }
             if let r = await netbios, let mac = r.mac {
                 enrichments.append(DeviceEnrichment(mac: mac, manufacturer: OUIDatabase.shared.manufacturer(for: mac), inferredOS: nil,
@@ -163,6 +178,12 @@ final class DeviceEnrichmentCoordinator {
         await limiter.acquire()
         defer { Task { await limiter.release() } }
         return await asusProbe.probe(ip: ip, pacer: udpPacer, timeout: probeTimeout)
+    }
+
+    private func limitedJNAPHNAPProbe(ip: String) async -> JNAPHNAPInfo? {
+        await limiter.acquire()
+        defer { Task { await limiter.release() } }
+        return await jnapHnapProbe.probe(ip: ip, timeout: jnapHnapAttemptTimeout)
     }
 
     private func limitedNetBIOSProbe(ip: String) async -> NetBIOSReply? {

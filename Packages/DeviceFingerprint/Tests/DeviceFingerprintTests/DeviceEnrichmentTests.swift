@@ -112,11 +112,14 @@ final class DeviceEnrichmentTests: XCTestCase {
         // would silently change precedence without any other test noticing.
         XCTAssertEqual(EnrichmentSource.ubiquitiDiscovery.rawValue, 0)
         XCTAssertEqual(EnrichmentSource.asusDiscovery.rawValue, 1)
-        XCTAssertEqual(EnrichmentSource.ouiLookup.rawValue, 2)
-        XCTAssertEqual(EnrichmentSource.ssdpDescription.rawValue, 3)
-        XCTAssertEqual(EnrichmentSource.portBanner.rawValue, 4)
-        XCTAssertEqual(EnrichmentSource.ttlGuess.rawValue, 5)
+        XCTAssertEqual(EnrichmentSource.jnapHnapDiscovery.rawValue, 2)
+        XCTAssertEqual(EnrichmentSource.ouiLookup.rawValue, 3)
+        XCTAssertEqual(EnrichmentSource.ssdpDescription.rawValue, 4)
+        XCTAssertEqual(EnrichmentSource.portBanner.rawValue, 5)
+        XCTAssertEqual(EnrichmentSource.ttlGuess.rawValue, 6)
         XCTAssertTrue(EnrichmentSource.asusDiscovery.isGroundTruth)
+        XCTAssertTrue(EnrichmentSource.jnapHnapDiscovery.isGroundTruth)
         XCTAssertTrue(EnrichmentSource.asusDiscovery < EnrichmentSource.ouiLookup)
+        XCTAssertTrue(EnrichmentSource.jnapHnapDiscovery < EnrichmentSource.ouiLookup)
     }
 }

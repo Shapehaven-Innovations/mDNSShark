@@ -3,6 +3,7 @@
 public enum EnrichmentSource: Int, Comparable {
     case ubiquitiDiscovery   // ground truth: the device told us
     case asusDiscovery       // ground truth: the device told us (ASUS infosvr)
+    case jnapHnapDiscovery   // ground truth: the device told us (Linksys JNAP / HNAP)
     case ouiLookup           // mDNS-TXT MAC resolved through the OUI table
     case ssdpDescription     // UPnP device-description XML
     case portBanner          // TCP banner-grab guess
@@ -23,7 +24,7 @@ public enum EnrichmentSource: Int, Comparable {
     /// `$0.source == .someCase` check in `merge()`.
     public var isGroundTruth: Bool {
         switch self {
-        case .ubiquitiDiscovery, .asusDiscovery: return true
+        case .ubiquitiDiscovery, .asusDiscovery, .jnapHnapDiscovery: return true
         case .ouiLookup, .ssdpDescription, .portBanner, .ttlGuess: return false
         }
     }
@@ -60,7 +61,7 @@ public struct EnrichedFields {
 
 /// Folds a batch of probe results into the fields already known for a
 /// device. Ground-truth discovery replies (see `EnrichmentSource.isGroundTruth`
-/// — currently Ubiquiti and ASUS) win outright for mac/manufacturer/inferredOS,
+/// — currently Ubiquiti, ASUS, and Linksys JNAP/HNAP) win outright for mac/manufacturer/inferredOS,
 /// using the strongest ground-truth source when more than one answered;
 /// otherwise the lowest-`rawValue` (strongest) source with a non-nil answer
 /// wins per field, independently. `openPorts` is always a union, never
