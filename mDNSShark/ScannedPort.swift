@@ -147,7 +147,7 @@ class PortScanner {
         // into this fix.
         sec_protocol_options_set_min_tls_protocol_version(
             tlsOptions.securityProtocolOptions,
-            .TLSv10
+            .TLSv13
         )
 
         return NWParameters(tls: tlsOptions)
