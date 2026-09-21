@@ -7,8 +7,15 @@ import os
 /// though, unlike the network probes it sits alongside, there's no socket
 /// I/O here. Reading the kernel's ARP table is a local `sysctl(2)` call
 /// against the device's own routing table, not LAN traffic, so it doesn't
-/// go through `ProbeConcurrencyLimiter` or `UDPSendPacer` and is safe to
-/// call synchronously from `DeviceEnrichmentCoordinator`.
+/// go through `ProbeConcurrencyLimiter` or `UDPSendPacer`.
+///
+/// Still synchronous and blocking (a full `sysctl` + byte-parse of the
+/// whole ARP table, no internal `await`), so `DeviceEnrichmentCoordinator`
+/// must call it from a detached task, never inline on its `@MainActor`
+/// enrichment `Task` — inline, it serializes every device's enrichment
+/// behind this one's sysctl call, starving the main actor of the slots
+/// the other probes' continuations (port scan included) need to resume
+/// on, and can blow their timeouts across an entire scan.
 final class ARPTableProbe {
     private let logger = Logger(subsystem: "com.mDNSShark", category: "ARPTableProbe")
 

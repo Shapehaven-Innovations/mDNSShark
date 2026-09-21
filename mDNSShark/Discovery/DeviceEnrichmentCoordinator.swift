@@ -8,8 +8,11 @@ import os
 /// shared ProbeConcurrencyLimiter (global cap across every probe type and
 /// every IP — never per-IP) and, for the UDP probes, one shared
 /// UDPSendPacer (minimum spacing between sends) — except ARPTableProbe,
-/// which is a local sysctl read (no LAN traffic) and so is called
-/// synchronously, outside the limiter/pacer. Publishes each IP's
+/// which is a local sysctl read (no LAN traffic), so it skips the
+/// limiter/pacer, but still runs on a detached task rather than inline:
+/// it's synchronous with no internal `await`, and inline on this
+/// `@MainActor` orchestration it would serialize every device's
+/// enrichment behind each other's ARP read. Publishes each IP's
 /// collected DeviceEnrichment results as they complete; NetworkScanViewModel
 /// folds them into the matching DiscoveredDevice via DeviceFingerprint.merge.
 ///
@@ -107,6 +110,17 @@ final class DeviceEnrichmentCoordinator {
             async let ttl = limitedTTLProbe(ip: ip)
             async let ssdp = limitedSSDPFetch(locationURL: locationURL)
             async let ports = limitedPortScan(ip: ip)
+            // Detached: the sysctl(2) read + full ARP-table parse is
+            // synchronous with no await in it. Called inline (no
+            // .detached), it would run in-place on this @MainActor
+            // Task's executor — once per discovered IP, back-to-back for
+            // every device in a scan — starving the main actor of the
+            // slots every other probe's continuation needs to resume on,
+            // including limitedPortScan's, long enough to blow through
+            // their timeouts.
+            async let arpMac = Task.detached { [arpTableProbe] in
+                arpTableProbe.macAddress(forIP: ip)
+            }.value
 
             var enrichments: [DeviceEnrichment] = []
             if let r = await ubiquiti {
@@ -132,12 +146,14 @@ final class DeviceEnrichmentCoordinator {
                 enrichments.append(DeviceEnrichment(mac: mac, manufacturer: OUIDatabase.shared.manufacturer(for: mac), inferredOS: nil,
                                                      openPorts: [], source: .ouiLookup))
             }
-            // Local kernel read, not network I/O — called synchronously,
-            // not through the limiter/pacer the network probes above share.
-            // manufacturer comes from the same OUI table the NetBIOS-sourced
-            // mac above resolves through — arpTableLookup is just another
-            // path to a real mac, not a different kind of signal.
-            if let mac = arpTableProbe.macAddress(forIP: ip) {
+            // Local kernel read, not network I/O — doesn't go through the
+            // limiter/pacer the network probes above share, but still runs
+            // detached (see the async let above), not inline on this
+            // MainActor task. manufacturer comes from the same OUI table
+            // the NetBIOS-sourced mac above resolves through —
+            // arpTableLookup is just another path to a real mac, not a
+            // different kind of signal.
+            if let mac = await arpMac {
                 enrichments.append(DeviceEnrichment(mac: mac, manufacturer: OUIDatabase.shared.manufacturer(for: mac), inferredOS: nil,
                                                      openPorts: [], source: .arpTableLookup))
             }
