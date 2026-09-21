@@ -61,7 +61,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				PacketTunnelProvider.swift,
 			);
 			target = 9A1C9E882D443D5300643122 /* mDNSShark */;
 		};
@@ -83,7 +82,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Models/PacketModel.swift,
-				PacketTunnelProvider.swift,
 				Shared/KeychainStore.swift,
 				Shared/SharedSettings.swift,
 				Shared/X509CertBuilder.swift,
