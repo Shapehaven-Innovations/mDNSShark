@@ -1,5 +1,6 @@
 // mDNSShark/Models/DiscoveredDevice.swift
 import Foundation
+import DeviceFingerprint
 
 enum DeviceType: Hashable {
     case router, apple, computer, printer, tv, unknown
@@ -29,6 +30,18 @@ struct DiscoveredDevice: Identifiable, Equatable {
     static func == (l: DiscoveredDevice, r: DiscoveredDevice) -> Bool { l.id == r.id }
 
     var isGateway: Bool { ipAddress.hasSuffix(".1") }
+
+    /// `inferredOS` if any real source (banner text, ground-truth
+    /// discovery reply, etc) ever supplied one; otherwise a generic
+    /// manufacturer-based guess computed fresh here, never persisted.
+    /// Deliberately NOT folded into `inferredOS`/`merge()`'s stored state:
+    /// writing a guess into that field would permanently block a later,
+    /// more specific non-ground-truth OS answer from a slower probe batch
+    /// from ever landing, since the field would no longer look empty. See
+    /// `DeviceEnrichment.merge()`'s doc comment for the full reasoning.
+    var displayInferredOS: String? {
+        inferredOS ?? manufacturer.flatMap { inferredOSFamily(forManufacturer: $0) }
+    }
 
     var deviceType: DeviceType {
         if isGateway { return .router }

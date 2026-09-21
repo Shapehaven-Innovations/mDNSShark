@@ -40,7 +40,22 @@ final class AppCoordinator: ObservableObject {
         packetCaptureManager  = PacketCaptureManager()
         analysisViewModel     = AnalysisViewModel()
         wire()
-        Task { networkScanViewModel.startScan() }
+        // Waits out iOS's Local Network Privacy decision before the very
+        // first scan fires — starting immediately here raced the system
+        // permission alert on every fresh install (confirmed via a live
+        // device log: `errno=65 EHOSTUNREACH` / `Local network prohibited`
+        // on probes that fired before the user could possibly have
+        // answered it, since the alert itself only renders in response to
+        // this same traffic). See LocalNetworkPermissionGate.swift.
+        Task {
+            await LocalNetworkPermissionGate.waitForDecision()
+            // If the user already ran a manual scan (the header Scan
+            // button isn't disabled during the gate wait) while this was
+            // still resolving, don't silently replace it with a second,
+            // unrequested scan.
+            guard !networkScanViewModel.hasScannedAtLeastOnce else { return }
+            networkScanViewModel.startScan()
+        }
         packetCaptureManager.healStaleVPNConfigIfNeeded()
     }
 

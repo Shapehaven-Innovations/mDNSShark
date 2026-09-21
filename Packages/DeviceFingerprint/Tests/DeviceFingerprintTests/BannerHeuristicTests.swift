@@ -64,6 +64,52 @@ final class BannerHeuristicTests: XCTestCase {
         XCTAssertEqual(guess.manufacturer, "GL.iNet")
     }
 
+    /// Real GL-MT6000 hardware response: generic Server/Title, only
+    /// "gl-ui" (GL.iNet's own admin-UI product name) in the page body.
+    func test_glUIBodyMarkerWithGenericServerAndTitle_guessesManufacturer() {
+        let guess = guessFromBanner(
+            "Server: nginx/1.26.1 | Title: Admin Panel | " +
+            "<noscript>We're sorry but gl-ui doesn't work properly without JavaScript enabled.</noscript>"
+        )
+        XCTAssertEqual(guess.manufacturer, "GL.iNet")
+    }
+
+    // MARK: - Generalized manufacturer -> OS fallback
+
+    func test_glInetWithNoOSSignalInBanner_stillInfersEmbeddedLinux() {
+        // No "luci"/"openwrt" string anywhere - matches GL.iNet's real web
+        // UI, which carries no OS-naming text at all, only the vendor one.
+        let guess = guessFromBanner("Server: nginx/1.26.1 | Title: Admin Panel | gl-ui")
+        XCTAssertEqual(guess.manufacturer, "GL.iNet")
+        XCTAssertEqual(guess.os, "Linux (embedded, likely)")
+    }
+
+    func test_synologyWithNoOSSignal_infersDSM() {
+        let guess = guessFromBanner("Server: Synology/DSM")
+        XCTAssertEqual(guess.manufacturer, "Synology")
+        XCTAssertEqual(guess.os, "DSM (Synology, Linux-based, likely)")
+    }
+
+    func test_mikrotikWithNoOSSignal_infersRouterOS() {
+        let guess = guessFromBanner("Server: RouterOS")
+        XCTAssertEqual(guess.manufacturer, "MikroTik")
+        XCTAssertEqual(guess.os, "RouterOS (MikroTik, Linux-based, likely)")
+    }
+
+    func test_glInetWithLuciSignal_keepsOpenWrtOSNotGenericFallback() {
+        // The specific "luci" match must win over the generic
+        // manufacturer-based fallback when both are present.
+        let guess = guessFromBanner("<title>GL.iNet LuCI</title>")
+        XCTAssertEqual(guess.manufacturer, "GL.iNet")
+        XCTAssertEqual(guess.os, "Linux (OpenWrt, likely)")
+    }
+
+    func test_unmatchedManufacturer_noGenericOSFallbackApplied() {
+        let guess = guessFromBanner("Server: some-random-unrecognized-httpd")
+        XCTAssertNil(guess.manufacturer)
+        XCTAssertNil(guess.os)
+    }
+
     func test_sshBannerWithLuciSubstring_keepsSSHDerivedOS() {
         let guess = guessFromBanner("SSH-2.0-dropbear luci")
         XCTAssertEqual(guess.os, "Linux (embedded, likely)")

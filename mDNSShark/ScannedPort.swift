@@ -154,19 +154,36 @@ class PortScanner {
     }
 
     /// Turns whatever bytes came back from an HTTP-shaped port into a
-    /// banner string. Prefers the parsed Server/Title/WWW-Authenticate
-    /// realm (richer and more often populated than the raw bytes), falling
-    /// back to the raw decoded text if parsing found nothing usable.
+    /// banner string for `guessFromBanner`'s substring matching. Leads with
+    /// the parsed Server/Title/WWW-Authenticate realm (readable, and often
+    /// the whole answer) — only widening to the full raw page body when
+    /// that narrow text alone doesn't already identify a manufacturer or
+    /// OS. Blending in the raw body unconditionally would widen every
+    /// vendor substring check (including risky ones like a bare "asus") to
+    /// arbitrary page content — a JS bundle URL, ad script, or footer text
+    /// that happens to contain a vendor's name — for every device, not just
+    /// the ones that actually need it. Confirmed on real hardware: a
+    /// GL.iNet GL-MT6000 reports a fully generic `Server: nginx/1.26.1` and
+    /// `<title>Admin Panel</title>` (narrow guess finds nothing), with its
+    /// only identifying string ("gl-ui", GL.iNet's own admin-UI product
+    /// name) sitting in the body's `<noscript>` fallback text.
     private static func httpBannerString(from data: Data?) -> String? {
         guard let data, !data.isEmpty else { return nil }
-        if let info = HTTPBannerParser.parse(data) {
-            var parts: [String] = []
-            if let server = info.server { parts.append("Server: \(server)") }
-            if let title = info.title { parts.append("Title: \(title)") }
-            if let realm = info.authRealm { parts.append("Realm: \(realm)") }
-            if !parts.isEmpty { return parts.joined(separator: " | ") }
+        let raw = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1)
+        guard let info = HTTPBannerParser.parse(data) else { return raw }
+
+        var parts: [String] = []
+        if let server = info.server { parts.append("Server: \(server)") }
+        if let title = info.title { parts.append("Title: \(title)") }
+        if let realm = info.authRealm { parts.append("Realm: \(realm)") }
+        guard !parts.isEmpty else { return raw }
+
+        let narrow = parts.joined(separator: " | ")
+        let narrowGuess = guessFromBanner(narrow)
+        if narrowGuess.manufacturer == nil, narrowGuess.os == nil, let raw {
+            return narrow + " | " + raw
         }
-        return String(data: data, encoding: .utf8)
+        return narrow
     }
 
     /// Scans an explicit, possibly non-contiguous, set of ports on one host

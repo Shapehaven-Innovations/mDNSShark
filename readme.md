@@ -14,6 +14,19 @@ mDNSShark was created by engineers who love transparent, lightweight solutions -
 
 mDNSShark is still **in active development**, with regular updates that refine performance, expand support for various network protocols, and polish the user experience. We welcome your ideas - whether it's a new device detection trick, an easier UI flow, or an innovative scanning feature. Our public repository provides a transparent view of current issues and ongoing discussions, letting you jump in wherever your skills or interests fit best.
 
+### Recent improvements
+
+- **More reliable first scans.** On some devices, the very first scan after
+  installing (or right after a fresh permission prompt) could come back
+  with no device details at all - the scan was starting a moment before
+  iOS finished confirming local-network access. Scans now wait for that
+  confirmation first.
+- **Better device identification for more routers.** Manufacturer and OS
+  detection now looks at more of what a device's admin page actually sends
+  back, rather than just the page title - catching vendors (GL.iNet
+  routers, among others) that were previously showing as Unknown despite
+  being fully reachable.
+
 ## Core Features at a Glance
 
 - **Bonjour/mDNS (DNS-SD)**: Identifies devices like AirPlay receivers, printers, or file-sharing services through built-in discovery.
@@ -117,6 +130,31 @@ Tapping **Remove Certificate** in Settings purges all CA items and disables insp
 2. **iOS Version**: **iOS 18.2 or later**, for both the main app and TLS Inspection's `PacketTunnel` extension.
 3. **Network**: A reliable Wi-Fi connection is recommended for full scanning capabilities.
 4. **Development (Optional)**: To build or modify the code, you'll need a recent **Xcode** (verified with Xcode 26.5).
+
+## Future Enhancements
+
+A rough look at what's next, roughly in priority order:
+
+- **MAC address display for more devices.** Right now mDNSShark only shows
+  a MAC address when a device announces it directly during discovery. On
+  iOS 11 through iOS 26, that's the only option - Apple's sandbox blocks
+  apps from reading a neighboring device's MAC address any other way, as an
+  anti-tracking protection. iOS 27 is the first release to open a narrow
+  path around that. We're watching it, but want real hardware and a proven
+  track record before building on it.
+- **Better identification for GL.iNet routers**, moving from a page-content
+  match to GL.iNet's own device API for a more durable signal.
+- **ASUS / AiMesh device identification.** The detection logic is already
+  built and tested, but it needs a specific Apple-granted networking
+  permission that's still pending approval.
+- **Netgear Orbi mesh support** - identifying satellite nodes alongside the
+  primary router, not just the primary router itself.
+- **Smoother interaction between packet capture and network scanning**
+  when both are running at the same time.
+
+None of these are promises with dates attached - just where our attention
+is headed next. If one of them is exactly the itch you want to scratch,
+see [Contribute and Collaborate](#contribute-and-collaborate) below.
 
 ## Contribute and Collaborate
 

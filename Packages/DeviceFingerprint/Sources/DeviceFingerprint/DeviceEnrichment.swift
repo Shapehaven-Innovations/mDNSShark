@@ -80,6 +80,20 @@ public func merge(existing: EnrichedFields, incoming: [DeviceEnrichment]) -> Enr
     if result.manufacturer == nil { result.manufacturer = byStrength.first(where: { $0.manufacturer != nil })?.manufacturer }
     if result.inferredOS == nil { result.inferredOS = byStrength.first(where: { $0.inferredOS != nil })?.inferredOS }
 
+    // Deliberately NOT applying `inferredOSFamily`'s manufacturer-based
+    // fallback here. `merge()` is called incrementally — each call's
+    // `existing` is a PREVIOUS call's output — and this function's own
+    // precedence rule only lets a field be filled once per non-ground-truth
+    // source (`result.inferredOS == nil` above). Writing a generic guess
+    // into `result.inferredOS` the first time a manufacturer becomes known
+    // would permanently block a later, genuinely more specific
+    // non-ground-truth answer (e.g. a real "luci"/OpenWrt banner hit
+    // arriving in a slower probe batch after a faster SSDP fetch already
+    // resolved just the manufacturer) from ever landing, since the field
+    // would no longer look empty. Callers apply `inferredOSFamily` as a
+    // display-time fallback instead — see `DiscoveredDevice.displayInferredOS`
+    // — computed fresh every time, so it can never block a real update.
+
     var ports = Set(result.openPorts)
     for e in incoming { ports.formUnion(e.openPorts) }
     result.openPorts = Array(ports).sorted()

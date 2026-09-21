@@ -13,7 +13,7 @@ struct DeviceDetailView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(device.hostname).font(.title2.bold())
                             Text(device.ipAddress).foregroundColor(.secondary)
-                            if let os = device.inferredOS { Text(os).font(.caption).foregroundColor(.secondary) }
+                            if let os = device.displayInferredOS { Text(os).font(.caption).foregroundColor(.secondary) }
                         }
                         Spacer()
                     }
@@ -25,7 +25,7 @@ struct DeviceDetailView: View {
                         Divider()
                         row("MAC Address",  device.macAddress ?? "Unknown")
                         row("Manufacturer", device.manufacturer ?? "Unknown")
-                        row("Inferred OS",  device.inferredOS  ?? "Unknown")
+                        row("Inferred OS",  device.displayInferredOS  ?? "Unknown")
                         row("Open Ports",   device.openPorts.isEmpty ? "None" : device.openPorts.map { String($0) }.joined(separator: ", "))
                     }
                 }

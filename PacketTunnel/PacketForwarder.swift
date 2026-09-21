@@ -2,6 +2,7 @@
 import Foundation
 import NetworkExtension
 import Network
+import os
 
 // Called for every packet in both directions.
 // rawIP: complete IPv4 packet bytes
@@ -19,6 +20,16 @@ final class PacketForwarder {
     private var tlsInterceptor: TLSInterceptor?
     private var dnsCache: [String: String] = [:]   // [destIP: hostname] from observed DNS responses
     private var onDecryptedHTTPS: ((Data, String) -> Void)?
+
+    /// Measures per-flow relay latency (session open → first reply) without
+    /// the cost or Console-attachment requirement of `os.Logger` — signposts
+    /// are near-zero-cost when nothing is recording and, unlike `.debug`
+    /// log lines, can be captured for later analysis via `log collect`
+    /// (once `Signpost-Persisted` is set for this subsystem). Exists to
+    /// answer a specific open question (todo.md item 5): does relaying LAN
+    /// scan-probe traffic through this NWConnection-per-flow path add
+    /// enough latency to break the device scanner's short probe timeouts.
+    private let signposter = OSSignposter(subsystem: "com.mDNSShark.PacketTunnel", category: "relay")
 
     init(flow: NEPacketTunnelFlow,
          onDecryptedHTTPS: ((Data, String) -> Void)? = nil,
@@ -46,7 +57,12 @@ final class PacketForwarder {
         tlsInterceptor?.stop()
         tlsInterceptor = nil
         queue.sync {
-            sessions.values.forEach { $0.connection.cancel() }
+            // Close out any still-open relay-latency signposts before
+            // discarding the sessions — without this, a flow that hadn't
+            // been answered yet when capture stopped would leave its
+            // interval open forever instead of recording "no reply",
+            // exactly the case this instrumentation exists to catch.
+            sessions.values.forEach { endSignpostIfNoReply($0); $0.connection.cancel() }
             sessions.removeAll()
         }
     }
@@ -100,10 +116,18 @@ final class PacketForwarder {
             using: .udp
         )
         let session = ActiveSession(connection: conn, srcIP: srcIP, srcPort: srcPort)
+        session.relaySignpostState = signposter.beginInterval(
+            "relayFlow", id: signposter.makeSignpostID(),
+            "UDP \(key.dstIP, privacy: .private):\(key.dstPort)"
+        )
         sessions[key] = session
 
         conn.stateUpdateHandler = { [weak self] state in
-            if case .failed = state { self?.queue.async { self?.sessions.removeValue(forKey: key) } }
+            if case .failed = state {
+                self?.queue.async {
+                    if let s = self?.sessions.removeValue(forKey: key) { self?.endSignpostIfNoReply(s) }
+                }
+            }
         }
 
         receiveUDP(conn: conn, key: key, srcIP: srcIP, srcPort: srcPort)
@@ -125,7 +149,14 @@ final class PacketForwarder {
             if key.dstPort == 53 || key.srcPort == 53 {
                 self.cacheDNSResponse(payload)
             }
-            self.queue.async { self.sessions[key]?.lastActivity = Date() }
+            self.queue.async {
+                guard let session = self.sessions[key] else { return }
+                session.lastActivity = Date()
+                if !session.firstReplyRecorded, let state = session.relaySignpostState {
+                    session.firstReplyRecorded = true
+                    self.signposter.endInterval("relayFlow", state)
+                }
+            }
             // recurse to keep receiving
             self.receiveUDP(conn: conn, key: key, srcIP: srcIP, srcPort: srcPort)
         }
@@ -167,6 +198,7 @@ final class PacketForwarder {
             }
 
             if isFIN || isRST {
+                if let s = self.sessions[key] { self.endSignpostIfNoReply(s) }
                 self.sessions[key]?.connection.cancel()
                 self.sessions.removeValue(forKey: key)
                 return
@@ -212,12 +244,18 @@ final class PacketForwarder {
             using: .tcp
         )
         let session = ActiveSession(connection: conn, srcIP: srcIP, srcPort: srcPort)
+        session.relaySignpostState = signposter.beginInterval(
+            "relayFlow", id: signposter.makeSignpostID(),
+            "TCP \(key.dstIP, privacy: .private):\(key.dstPort)"
+        )
         sessions[key] = session
 
         conn.stateUpdateHandler = { [weak self] state in
             switch state {
             case .failed, .cancelled:
-                self?.queue.async { self?.sessions.removeValue(forKey: key) }
+                self?.queue.async {
+                    if let s = self?.sessions.removeValue(forKey: key) { self?.endSignpostIfNoReply(s) }
+                }
             default: break
             }
         }
@@ -239,12 +277,21 @@ final class PacketForwarder {
                 session.seqCounter &+= UInt32(payload.count)
                 self.flow.writePackets([responsePacket], withProtocols: [NSNumber(value: AF_INET)])
                 self.onPacket(responsePacket, .inbound, true)  // isReconstructed = true for TCP
-                self.queue.async { session.lastActivity = Date() }
+                self.queue.async {
+                    session.lastActivity = Date()
+                    if !session.firstReplyRecorded, let state = session.relaySignpostState {
+                        session.firstReplyRecorded = true
+                        self.signposter.endInterval("relayFlow", state)
+                    }
+                }
             }
             if !isComplete && error == nil {
                 self.receiveTCP(conn: conn, key: key, srcIP: srcIP, srcPort: srcPort, session: session)
             } else {
-                self.queue.async { self.sessions.removeValue(forKey: key) }
+                self.queue.async {
+                    self.endSignpostIfNoReply(session)
+                    self.sessions.removeValue(forKey: key)
+                }
             }
         }
     }
@@ -381,9 +428,26 @@ final class PacketForwarder {
     private func removeIdleSessions() {
         let cutoff = Date().addingTimeInterval(-60)
         sessions = sessions.filter { _, session in
-            if session.lastActivity < cutoff { session.connection.cancel(); return false }
+            if session.lastActivity < cutoff {
+                endSignpostIfNoReply(session)
+                session.connection.cancel()
+                return false
+            }
             return true
         }
+    }
+
+    /// Closes a session's relay-latency signpost interval when it's torn
+    /// down without ever getting a reply relayed back (idle timeout,
+    /// connection failure, or the peer closing first) — the counterpart to
+    /// the normal close in `receiveUDP`/`receiveTCP`. Without this, a
+    /// never-answered flow (exactly the case this instrumentation exists to
+    /// catch — e.g. a scan probe that times out) would leave its interval
+    /// open forever instead of recording "no reply within N seconds".
+    private func endSignpostIfNoReply(_ session: ActiveSession) {
+        guard !session.firstReplyRecorded, let state = session.relaySignpostState else { return }
+        session.firstReplyRecorded = true
+        signposter.endInterval("relayFlow", state, "no reply")
     }
 }
 
@@ -402,6 +466,14 @@ final class ActiveSession {
     let srcPort: UInt16
     var lastActivity: Date = Date()
     var seqCounter: UInt32 = 1000  // approximate, for TCP reconstruction
+
+    /// Signpost interval covering "session opened" → "first reply relayed
+    /// back to the device". Ended once, on the first reply only — a
+    /// long-lived session (e.g. a kept-alive TCP connection) would otherwise
+    /// keep re-measuring the same already-answered interval on every
+    /// subsequent packet.
+    var relaySignpostState: OSSignpostIntervalState?
+    var firstReplyRecorded = false
 
     init(connection: NWConnection, srcIP: String, srcPort: UInt16) {
         self.connection = connection

@@ -28,6 +28,16 @@ final class DeviceEnrichmentCoordinator {
     private let limiter = ProbeConcurrencyLimiter(maxConcurrent: 32)
     private let udpPacer = UDPSendPacer(minimumSpacing: .milliseconds(15))
 
+    /// TODO(multicast-entitlement): flip to `true` once
+    /// `com.apple.developer.networking.multicast` is approved and
+    /// restored in both `.entitlements` files (see todo.md). ASUS's reply
+    /// is a UDP broadcast the OS silently drops without that entitlement,
+    /// so `limitedASUSProbe` can never succeed while this is `false` — skip
+    /// firing it at all rather than burning the full `probeTimeout` and a
+    /// `ProbeConcurrencyLimiter` slot on every single scanned host for a
+    /// probe that's guaranteed to fail.
+    private let asusEntitlementAvailable = false
+
     private let ubiquitiProbe = UbiquitiDiscoveryProbe()
     private let asusProbe = ASUSDiscoveryProbe()
     private let jnapHnapProbe = JNAPHNAPProbe()
@@ -39,7 +49,15 @@ final class DeviceEnrichmentCoordinator {
 
     private let probeTimeout: TimeInterval = 1.5
     private let fetchTimeout: TimeInterval = 2.5
-    private let portScanTimeout: TimeInterval = 1.0
+    /// 2026-09-20: raised from 1.0s — PortScanner marks an HTTP-shaped port
+    /// (80/443/8080/8443) open the moment its TCP handshake reaches
+    /// `.ready`, even if the GET response hasn't arrived yet (`banner: nil`
+    /// in that case). Confirmed on real hardware (GL.iNet GL-MT6000): ports
+    /// were correctly found open, but manufacturer/OS stayed Unknown
+    /// despite `BannerHeuristic` already recognizing "gl.inet"/"gl-inet" —
+    /// 1.0s wasn't enough time for a JS-heavy custom router web UI to
+    /// finish serving its page before the timeout cut the read off.
+    private let portScanTimeout: TimeInterval = 4.0
     /// Per-attempt budget for JNAPHNAPProbe's JNAP try and its HNAP
     /// fallback — worst case (neither answers) holds the limiter slot for
     /// roughly 2x this, same order as fetchTimeout.
@@ -80,7 +98,7 @@ final class DeviceEnrichmentCoordinator {
         let taskID = UUID()
         let task = Task {
             async let ubiquiti = limitedUbiquitiProbe(ip: ip)
-            async let asus = limitedASUSProbe(ip: ip)
+            async let asus = asusEntitlementAvailable ? limitedASUSProbe(ip: ip) : nil
             async let jnapHnap = limitedJNAPHNAPProbe(ip: ip)
             async let netbios = limitedNetBIOSProbe(ip: ip)
             async let ttl = limitedTTLProbe(ip: ip)

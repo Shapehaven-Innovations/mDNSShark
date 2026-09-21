@@ -10,7 +10,15 @@
 	<array>
 		<string>group.beta.mDNSShark</string>
 	</array>
+	<!-- TODO(multicast-entitlement): removed pending Apple approval, request
+	     ID V6723AP975 (submitted 2026-09-20) — see todo.md "Blocked:
+	     multicast entitlement (ASUS probe)". Present, blocks Release signing
+	     until approved (Xcode: "Provisioning profile ... doesn't include the
+	     Multicast Networking capability"). Once approved: uncomment this
+	     block, remove this TODO comment, regenerate the provisioning
+	     profile, rebuild.
 	<key>com.apple.developer.networking.multicast</key>
 	<true/>
+	-->
 </dict>
 </plist>

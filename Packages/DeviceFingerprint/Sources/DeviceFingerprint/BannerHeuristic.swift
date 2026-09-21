@@ -31,7 +31,12 @@ public func guessFromBanner(_ banner: String) -> BannerGuess {
         manufacturer = "Linksys"
     } else if lower.contains("tp-link") || lower.contains("tplink") {
         manufacturer = "TP-Link"
-    } else if lower.contains("gl.inet") || lower.contains("gl-inet") {
+    } else if lower.contains("gl.inet") || lower.contains("gl-inet") || lower.contains("gl-ui") {
+        // "gl-ui" is GL.iNet's own internal product name for their admin
+        // web framework — confirmed present in real GL-MT6000 hardware's
+        // page body (a <noscript> fallback string) even when the Server
+        // header (generic "nginx") and <title> ("Admin Panel") carry no
+        // vendor-identifying text at all.
         manufacturer = "GL.iNet"
     } else if lower.contains("netgear") {
         manufacturer = "Netgear"
@@ -48,6 +53,17 @@ public func guessFromBanner(_ banner: String) -> BannerGuess {
     // when it doesn't identify a specific manufacturer on its own.
     if os == nil, lower.contains("luci") {
         os = "Linux (OpenWrt, likely)"
+    }
+
+    // Generalized fallback, not vendor-specific: a positively matched
+    // manufacturer above is itself weak-but-real evidence about the OS
+    // family, even when nothing in the banner named the OS directly (e.g.
+    // GL.iNet's own web UI carries no LuCI/OpenWrt string at all, so the
+    // check above never fires for it despite being OpenWrt-based). Shared
+    // with `merge()`'s equivalent fallback for non-banner-derived
+    // manufacturers (e.g. OUI lookup) via `inferredOSFamily(forManufacturer:)`.
+    if os == nil, let manufacturer {
+        os = inferredOSFamily(forManufacturer: manufacturer)
     }
 
     return BannerGuess(manufacturer: manufacturer, os: os)

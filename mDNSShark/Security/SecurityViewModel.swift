@@ -20,6 +20,18 @@ final class SecurityViewModel: ObservableObject {
     private let threatDatabase: ThreatDatabase
     private let logger = Logger(subsystem: "com.mDNSShark", category: "SecurityViewModel")
 
+    /// Identifies the most recently STARTED `assess()` call. `$devices`
+    /// publishes constantly mid-scan (every enrichment result updates it),
+    /// and `AppCoordinator` spawns an independent, uncancelled `Task` per
+    /// publish — with no ordering guarantee between them, an early call
+    /// (snapshotted before a device's open ports were known) can finish
+    /// AFTER a later, fully-enriched call and silently overwrite `findings`
+    /// with a stale, incomplete result. `assess()` checks this token before
+    /// committing its result, discarding itself if a newer call has since
+    /// started rather than clobbering that newer call's (possibly
+    /// still-in-flight) result.
+    private var currentAssessmentID = UUID()
+
     // MARK: - Rules
 
     private let portRules: [Int: (Severity, String, String, String)] = [
@@ -34,7 +46,9 @@ final class SecurityViewModel: ObservableObject {
         554:  (.warning,      "RTSP Stream Exposed",       "RTSP may allow unauthorized access to camera or media streams.",                             "Restrict RTSP to trusted IPs."),
         1900: (.informational,"UPnP Exposed",              "UPnP can be abused to open router ports without authorization.",                             "Disable UPnP on your router if unused."),
         80:   (.informational,"HTTP Service",              "Unencrypted HTTP service. Traffic is readable on the local network.",                        "Prefer HTTPS."),
-        8080: (.informational,"HTTP Alternate Port",       "HTTP service on port 8080.",                                                                 "Confirm this is an intended service.")
+        8080: (.informational,"HTTP Alternate Port",       "HTTP service on port 8080.",                                                                 "Confirm this is an intended service."),
+        443:  (.informational,"HTTPS Admin Interface",     "An encrypted web admin interface is exposed on the local network.",                          "Confirm this is an intended service and uses a strong password."),
+        8443: (.informational,"HTTPS Alternate Port",      "HTTPS service on port 8443.",                                                                 "Confirm this is an intended service.")
     ]
 
     private let bonjourRules: [String: (Severity, String, String, String)] = [
@@ -61,6 +75,8 @@ final class SecurityViewModel: ObservableObject {
     // MARK: - Public API
 
     func assess(devices: [DiscoveredDevice]) async {
+        let assessmentID = UUID()
+        currentAssessmentID = assessmentID
         isAssessing = true
         var all: [SecurityFinding] = []
         for device in devices {
@@ -69,6 +85,11 @@ final class SecurityViewModel: ObservableObject {
             async let tf = threatFindings(device: device)
             all += await pf + bf + tf
         }
+        // A newer call already superseded this one while the awaits above
+        // were in flight - discard this stale result instead of
+        // overwriting whatever the newer call already committed (or is
+        // still computing).
+        guard currentAssessmentID == assessmentID else { return }
         var seen = Set<String>()
         findings = all.filter { f in seen.insert("\(f.deviceID)-\(f.title)").inserted }
         isAssessing = false

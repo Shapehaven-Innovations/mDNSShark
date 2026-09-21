@@ -194,4 +194,60 @@ final class DeviceEnrichmentTests: XCTestCase {
         XCTAssertTrue(EnrichmentSource.asusDiscovery < EnrichmentSource.ouiLookup)
         XCTAssertTrue(EnrichmentSource.jnapHnapDiscovery < EnrichmentSource.ouiLookup)
     }
+
+    // MARK: - manufacturer -> OS fallback is deliberately NOT applied inside merge()
+
+    func test_ouiResolvedManufacturer_withNoOSSource_mergeLeavesInferredOSNil() {
+        // manufacturer arrives via OUI lookup with no source ever providing
+        // inferredOS - merge() itself must NOT guess one (that's a
+        // display-time-only fallback now, via DiscoveredDevice.displayInferredOS
+        // / inferredOSFamily), so a later, more specific non-ground-truth
+        // answer arriving in a SEPARATE merge() call is never blocked.
+        let existing = EnrichedFields(mac: "aa:bb:cc:dd:ee:ff", manufacturer: nil,
+                                       inferredOS: nil, openPorts: [])
+        let incoming = [
+            DeviceEnrichment(mac: nil, manufacturer: "Netgear", inferredOS: nil,
+                              openPorts: [80], source: .ouiLookup)
+        ]
+        let result = merge(existing: existing, incoming: incoming)
+        XCTAssertEqual(result.manufacturer, "Netgear")
+        XCTAssertNil(result.inferredOS)
+    }
+
+    func test_incrementalMerges_laterSpecificOSAnswer_isNeverBlockedByAnEarlierManufacturerOnlyMerge() {
+        // Reproduces the exact race a manufacturer-based fallback INSIDE
+        // merge() would cause: a fast SSDP fetch resolves manufacturer
+        // first (one merge() call), then a slower banner probe brings a
+        // real, specific OS answer in a SEPARATE, later merge() call using
+        // the first call's output as its `existing`. The second answer
+        // must land - manufacturer being known from call 1 must not have
+        // pre-filled (and thereby locked) inferredOS.
+        let afterSSDP = merge(
+            existing: EnrichedFields(mac: nil, manufacturer: nil, inferredOS: nil, openPorts: []),
+            incoming: [DeviceEnrichment(mac: nil, manufacturer: "GL.iNet", inferredOS: nil,
+                                         openPorts: [], source: .ssdpDescription)]
+        )
+        XCTAssertEqual(afterSSDP.manufacturer, "GL.iNet")
+        XCTAssertNil(afterSSDP.inferredOS)
+
+        let afterBanner = merge(
+            existing: afterSSDP,
+            incoming: [DeviceEnrichment(mac: nil, manufacturer: nil, inferredOS: "Linux (OpenWrt, likely)",
+                                         openPorts: [], source: .portBanner)]
+        )
+        XCTAssertEqual(afterBanner.inferredOS, "Linux (OpenWrt, likely)")
+    }
+
+    func test_realOSAnswer_isNeverOverriddenByTheGenericFallback() {
+        // A source that already supplied a specific OS answer must win over
+        // the generic curated fallback, even for a vendor the fallback also
+        // recognizes.
+        let existing = EnrichedFields(mac: nil, manufacturer: nil, inferredOS: nil, openPorts: [])
+        let incoming = [
+            DeviceEnrichment(mac: nil, manufacturer: "MikroTik", inferredOS: "RouterOS 7.15 (exact)",
+                              openPorts: [], source: .ssdpDescription)
+        ]
+        let result = merge(existing: existing, incoming: incoming)
+        XCTAssertEqual(result.inferredOS, "RouterOS 7.15 (exact)")
+    }
 }

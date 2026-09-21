@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		3173238BF83DA8A145886A53 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F0ABF2194E516D286205B0E3 /* NetworkExtension.framework */; };
 		9A40CE772D5EC623000379E7 /* MIT.license in Resources */ = {isa = PBXBuildFile; fileRef = 9A40CE762D5EC61A000379E7 /* MIT.license */; };
+		9A5CC49930609B7900425B38 /* DeviceFingerprint in Frameworks */ = {isa = PBXBuildFile; productRef = 2C183D20A8B0785BAA01DD06 /* DeviceFingerprint */; };
 		9A8F66FF2D4F069100A033B5 /* ScanX-Bridging-Header.m in Sources */ = {isa = PBXBuildFile; fileRef = 9A8F66FE2D4F069100A033B5 /* ScanX-Bridging-Header.m */; };
 		9AC2AB6C2D4F1F3B004A9F66 /* libmdns.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 9AC2AB6B2D4F1F3B004A9F66 /* libmdns.tbd */; };
 		9AC2AB802D4F2285004A9F66 /* CFNetwork.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9AC2AB7E2D4F2024004A9F66 /* CFNetwork.framework */; };
@@ -117,6 +118,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9A5CC49930609B7900425B38 /* DeviceFingerprint in Frameworks */,
 				9AC2AB802D4F2285004A9F66 /* CFNetwork.framework in Frameworks */,
 				9AC2AB6C2D4F1F3B004A9F66 /* libmdns.tbd in Frameworks */,
 				3173238BF83DA8A145886A53 /* NetworkExtension.framework in Frameworks */,
@@ -455,7 +457,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.5;
+				MARKETING_VERSION = 1.6;
 				PRODUCT_BUNDLE_IDENTIFIER = beta.mDNSShark;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -496,7 +498,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.5;
+				MARKETING_VERSION = 1.6;
 				PRODUCT_BUNDLE_IDENTIFIER = beta.mDNSShark;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -528,7 +530,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.5;
+				MARKETING_VERSION = 1.6;
 				PRODUCT_BUNDLE_IDENTIFIER = beta.mDNSShark.PacketTunnel;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -559,7 +561,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.5;
+				MARKETING_VERSION = 1.6;
 				PRODUCT_BUNDLE_IDENTIFIER = beta.mDNSShark.PacketTunnel;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";

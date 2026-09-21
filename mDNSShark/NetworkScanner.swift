@@ -196,6 +196,20 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         for result in results {
             switch result.endpoint {
             case .service(let name, let type, let domain, _):
+                // Never surface this app's own internal Bonjour preflight
+                // probe (LocalNetworkPermissionGate.swift) as a discovered
+                // device — it's a same-device self-advertisement used only
+                // to detect Local Network Privacy's decision, not a real
+                // host. NWBrowser reports service types with a trailing
+                // dot, hence the prefix check. Checked on both `type` AND
+                // `name`: a direct browse of this type reports it in
+                // `type`, but this app's meta-query browse
+                // ("_services._dns-sd._udp", a DNS-SD type-enumeration
+                // query) surfaces discovered type strings in `name`
+                // instead, with `type` fixed to the meta-service string —
+                // checking only one field lets it slip through the other path.
+                guard !type.hasPrefix("_mdnssharklnp._tcp"),
+                      !name.hasPrefix("_mdnssharklnp._tcp") else { continue }
                 DispatchQueue.main.async {
                     if !self.devices.contains(where: { $0.serviceName == name &&
                         $0.serviceDomain == domain &&

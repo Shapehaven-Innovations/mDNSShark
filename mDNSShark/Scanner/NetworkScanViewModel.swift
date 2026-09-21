@@ -8,6 +8,12 @@ import os
 final class NetworkScanViewModel: ObservableObject {
     @Published var devices: [DiscoveredDevice] = []
     @Published var isScanning: Bool = false
+    /// True once any scan has actually started (manual button tap or the
+    /// automatic launch scan) — lets `AppCoordinator` skip its
+    /// gate-delayed automatic first scan if the user already ran one
+    /// manually while `LocalNetworkPermissionGate` was still resolving, so
+    /// it can't silently stomp on results the user is already looking at.
+    private(set) var hasScannedAtLeastOnce = false
 
     private let scanner     = NetworkScanner()
     private let localUtil   = LocalDeviceScanner()
@@ -85,6 +91,7 @@ final class NetworkScanViewModel: ObservableObject {
         // it serves only stable row-ID assignment across the device's
         // lifetime, unrelated to enrichment gating.
         guard !scanner.isScanning else { return }
+        hasScannedAtLeastOnce = true
         enrichmentCoordinator.cancelAll()
         enrichedIPsThisScan.removeAll()
         rawEnrichmentsByIP.removeAll()

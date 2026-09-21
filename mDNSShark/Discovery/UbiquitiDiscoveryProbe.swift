@@ -43,11 +43,30 @@ final class UbiquitiDiscoveryProbe: Sendable {
                 }
             }
         }
-        guard sent > 0 else { return nil }
+        guard sent > 0 else {
+            let sendErrno = errno
+            logger.debug("UbiquitiDiscoveryProbe: sendto(\(ip, privacy: .public):\(self.port)) failed, result=\(sent), errno=\(sendErrno) (\(String(cString: strerror(sendErrno)), privacy: .public))")
+            return nil
+        }
+        logger.debug("UbiquitiDiscoveryProbe: sendto(\(ip, privacy: .public):\(self.port)) sent \(sent) bytes, waiting for reply")
 
         var buffer = [UInt8](repeating: 0, count: 2048)
         let received = recv(sock, &buffer, buffer.count, 0)
-        guard received > 0 else { return nil }
-        return UbiquitiDiscoveryPacket.decode(Data(buffer[0..<received]))
+        guard received > 0 else {
+            // `errno` is only meaningful after a -1 return — a 0 return is
+            // a legitimate (if unrealistic for this protocol) empty
+            // datagram, not an error, and doesn't set errno itself. Logging
+            // it unconditionally would report a stale, misleading code.
+            if received < 0 {
+                let recvErrno = errno
+                logger.debug("UbiquitiDiscoveryProbe: recv(\(ip, privacy: .public)) failed, result=\(received), errno=\(recvErrno) (\(String(cString: strerror(recvErrno)), privacy: .public))")
+            } else {
+                logger.debug("UbiquitiDiscoveryProbe: recv(\(ip, privacy: .public)) got an empty datagram")
+            }
+            return nil
+        }
+        let decoded = UbiquitiDiscoveryPacket.decode(Data(buffer[0..<received]))
+        logger.debug("UbiquitiDiscoveryProbe: recv(\(ip, privacy: .public)) got \(received) bytes, decode \(decoded == nil ? "FAILED" : "succeeded", privacy: .public)")
+        return decoded
     }
 }
