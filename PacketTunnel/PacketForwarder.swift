@@ -122,10 +122,11 @@ final class PacketForwarder {
         )
         sessions[key] = session
 
-        conn.stateUpdateHandler = { [weak self] state in
+        conn.stateUpdateHandler = { [weak self, weak session] state in
             if case .failed = state {
                 self?.queue.async {
-                    if let s = self?.sessions.removeValue(forKey: key) { self?.endSignpostIfNoReply(s) }
+                    guard let self, let session else { return }
+                    self.removeSessionIfCurrent(key: key, session: session)
                 }
             }
         }
@@ -250,11 +251,12 @@ final class PacketForwarder {
         )
         sessions[key] = session
 
-        conn.stateUpdateHandler = { [weak self] state in
+        conn.stateUpdateHandler = { [weak self, weak session] state in
             switch state {
             case .failed, .cancelled:
                 self?.queue.async {
-                    if let s = self?.sessions.removeValue(forKey: key) { self?.endSignpostIfNoReply(s) }
+                    guard let self, let session else { return }
+                    self.removeSessionIfCurrent(key: key, session: session)
                 }
             default: break
             }
@@ -289,8 +291,7 @@ final class PacketForwarder {
                 self.receiveTCP(conn: conn, key: key, srcIP: srcIP, srcPort: srcPort, session: session)
             } else {
                 self.queue.async {
-                    self.endSignpostIfNoReply(session)
-                    self.sessions.removeValue(forKey: key)
+                    self.removeSessionIfCurrent(key: key, session: session)
                 }
             }
         }
@@ -448,6 +449,15 @@ final class PacketForwarder {
         guard !session.firstReplyRecorded, let state = session.relaySignpostState else { return }
         session.firstReplyRecorded = true
         signposter.endInterval("relayFlow", state, "no reply")
+    }
+
+    /// Removes `key`'s entry only if it still points at `session` — a delayed
+    /// teardown callback for an old flow must never evict a new flow that has
+    /// since reclaimed the same 4-tuple key.
+    private func removeSessionIfCurrent(key: SessionKey, session: ActiveSession) {
+        guard sessions[key] === session else { return }
+        endSignpostIfNoReply(session)
+        sessions.removeValue(forKey: key)
     }
 }
 
