@@ -33,6 +33,7 @@ struct SettingsView: View {
 
     // Capture filters
     @State private var activeFilters: Set<String> = SharedSettings.captureFilterProtocols
+    @State private var includeAllNetworks: Bool = SharedSettings.includeAllNetworksInCapture
 
     var body: some View {
         NavigationView {
@@ -42,6 +43,7 @@ struct SettingsView: View {
                 bypassListSection
                 dnsSection
                 captureFiltersSection
+                captureRoutingSection
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Settings")
@@ -429,6 +431,24 @@ struct SettingsView: View {
                     }
                 ))
             }
+        }
+    }
+
+    // Experimental — see SharedSettings.includeAllNetworksInCapture. Off by
+    // default (matches today's behavior). Only takes effect on the next
+    // Start Capture, since it's part of the tunnel's saved VPN config, not
+    // something changeable while a capture is already running.
+    private var captureRoutingSection: some View {
+        Section {
+            Toggle("Include LAN traffic in capture", isOn: Binding(
+                get: { includeAllNetworks },
+                set: { val in
+                    includeAllNetworks = val
+                    SharedSettings.includeAllNetworksInCapture = val
+                }
+            ))
+        } footer: {
+            Text("Experimental. May route all same-subnet LAN traffic through the capture relay, which can add latency to scans running at the same time. Takes effect the next time you start a capture.")
         }
     }
 }
