@@ -23,7 +23,7 @@ struct DevicesView: View {
                                 if !findings.isEmpty { return AppColors.info }
                                 return AppColors.secure
                             }()
-                            NavigationLink(destination: DeviceDetailView(device: enriched(device, findings))) {
+                            NavigationLink(destination: DeviceDetailView(device: device)) {
                                 DeviceCardView(device: device, issueCount: issueCount, badgeColor: badgeColor)
                             }
                             .buttonStyle(.plain)
@@ -34,9 +34,5 @@ struct DevicesView: View {
             }
             .navigationBarHidden(true)
         }
-    }
-
-    private func enriched(_ d: DiscoveredDevice, _ findings: [SecurityFinding]) -> DiscoveredDevice {
-        var copy = d; copy.securityFindings = findings; return copy
     }
 }

@@ -4,10 +4,12 @@ import Combine
 import DeviceFingerprint
 import os
 
-/// Fans the seven active probes out per discovered IP, each gated by one
+/// Fans the eight active probes out per discovered IP, each gated by one
 /// shared ProbeConcurrencyLimiter (global cap across every probe type and
 /// every IP — never per-IP) and, for the UDP probes, one shared
-/// UDPSendPacer (minimum spacing between sends). Publishes each IP's
+/// UDPSendPacer (minimum spacing between sends) — except ARPTableProbe,
+/// which is a local sysctl read (no LAN traffic) and so is called
+/// synchronously, outside the limiter/pacer. Publishes each IP's
 /// collected DeviceEnrichment results as they complete; NetworkScanViewModel
 /// folds them into the matching DiscoveredDevice via DeviceFingerprint.merge.
 ///
@@ -45,6 +47,7 @@ final class DeviceEnrichmentCoordinator {
     private let netBIOSProbe = NetBIOSProbe()
     private let ttlProbe = TTLProbe()
     private let ssdpFetcher = SSDPDescriptionFetcher()
+    private let arpTableProbe = ARPTableProbe()
     private let logger = Logger(subsystem: "com.mDNSShark", category: "DeviceEnrichmentCoordinator")
 
     private let probeTimeout: TimeInterval = 1.5
@@ -128,6 +131,15 @@ final class DeviceEnrichmentCoordinator {
             if let r = await netbios, let mac = r.mac {
                 enrichments.append(DeviceEnrichment(mac: mac, manufacturer: OUIDatabase.shared.manufacturer(for: mac), inferredOS: nil,
                                                      openPorts: [], source: .ouiLookup))
+            }
+            // Local kernel read, not network I/O — called synchronously,
+            // not through the limiter/pacer the network probes above share.
+            // manufacturer comes from the same OUI table the NetBIOS-sourced
+            // mac above resolves through — arpTableLookup is just another
+            // path to a real mac, not a different kind of signal.
+            if let mac = arpTableProbe.macAddress(forIP: ip) {
+                enrichments.append(DeviceEnrichment(mac: mac, manufacturer: OUIDatabase.shared.manufacturer(for: mac), inferredOS: nil,
+                                                     openPorts: [], source: .arpTableLookup))
             }
             if let os = await ttl {
                 enrichments.append(DeviceEnrichment(mac: nil, manufacturer: nil, inferredOS: os,

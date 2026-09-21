@@ -183,16 +183,53 @@ final class DeviceEnrichmentTests: XCTestCase {
         XCTAssertEqual(EnrichmentSource.asusDiscovery.rawValue, 1)
         XCTAssertEqual(EnrichmentSource.jnapHnapDiscovery.rawValue, 2)
         XCTAssertEqual(EnrichmentSource.googleWifiDiscovery.rawValue, 3)
-        XCTAssertEqual(EnrichmentSource.ouiLookup.rawValue, 4)
-        XCTAssertEqual(EnrichmentSource.ssdpDescription.rawValue, 5)
-        XCTAssertEqual(EnrichmentSource.portBanner.rawValue, 6)
-        XCTAssertEqual(EnrichmentSource.ttlGuess.rawValue, 7)
+        XCTAssertEqual(EnrichmentSource.arpTableLookup.rawValue, 4)
+        XCTAssertEqual(EnrichmentSource.ouiLookup.rawValue, 5)
+        XCTAssertEqual(EnrichmentSource.ssdpDescription.rawValue, 6)
+        XCTAssertEqual(EnrichmentSource.portBanner.rawValue, 7)
+        XCTAssertEqual(EnrichmentSource.ttlGuess.rawValue, 8)
         XCTAssertTrue(EnrichmentSource.asusDiscovery.isGroundTruth)
         XCTAssertTrue(EnrichmentSource.googleWifiDiscovery.isGroundTruth)
         XCTAssertTrue(EnrichmentSource.googleWifiDiscovery < EnrichmentSource.ouiLookup)
         XCTAssertTrue(EnrichmentSource.jnapHnapDiscovery.isGroundTruth)
         XCTAssertTrue(EnrichmentSource.asusDiscovery < EnrichmentSource.ouiLookup)
         XCTAssertTrue(EnrichmentSource.jnapHnapDiscovery < EnrichmentSource.ouiLookup)
+        // arpTableLookup is a real per-IP link-layer read (not a guess), but
+        // deliberately NOT ground truth — the device didn't tell us about
+        // itself, and the entitlement it depends on is undocumented and
+        // unconfirmed-reliable (todo.md item 4). It still outranks
+        // ouiLookup/ssdpDescription/portBanner/ttlGuess for `mac` since,
+        // when non-nil, it's a direct kernel read rather than an inference.
+        XCTAssertFalse(EnrichmentSource.arpTableLookup.isGroundTruth)
+        XCTAssertTrue(EnrichmentSource.arpTableLookup < EnrichmentSource.ouiLookup)
+        XCTAssertTrue(EnrichmentSource.googleWifiDiscovery < EnrichmentSource.arpTableLookup)
+    }
+
+    func test_arpTableLookup_doesNotOverrideGroundTruthMac() {
+        // Ground truth (device told us directly) must still win outright
+        // over arpTableLookup even though arpTableLookup is a real kernel
+        // read, per isGroundTruth's contract.
+        let existing = EnrichedFields(mac: nil, manufacturer: nil, inferredOS: nil, openPorts: [])
+        let incoming = [
+            DeviceEnrichment(mac: "aa:aa:aa:aa:aa:aa", manufacturer: nil, inferredOS: nil,
+                              openPorts: [], source: .arpTableLookup),
+            DeviceEnrichment(mac: "bb:bb:bb:bb:bb:bb", manufacturer: "Ubiquiti Networks Inc.", inferredOS: "UniFi OS",
+                              openPorts: [], source: .ubiquitiDiscovery)
+        ]
+        let result = merge(existing: existing, incoming: incoming)
+        XCTAssertEqual(result.mac, "bb:bb:bb:bb:bb:bb")
+    }
+
+    func test_arpTableLookup_winsMacOverOUILookup() {
+        let existing = EnrichedFields(mac: nil, manufacturer: nil, inferredOS: nil, openPorts: [])
+        let incoming = [
+            DeviceEnrichment(mac: "cc:cc:cc:cc:cc:cc", manufacturer: "Some Vendor", inferredOS: nil,
+                              openPorts: [], source: .ouiLookup),
+            DeviceEnrichment(mac: "aa:aa:aa:aa:aa:aa", manufacturer: nil, inferredOS: nil,
+                              openPorts: [], source: .arpTableLookup)
+        ]
+        let result = merge(existing: existing, incoming: incoming)
+        XCTAssertEqual(result.mac, "aa:aa:aa:aa:aa:aa")
     }
 
     // MARK: - manufacturer -> OS fallback is deliberately NOT applied inside merge()

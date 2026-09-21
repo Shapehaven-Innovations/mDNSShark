@@ -5,6 +5,7 @@ public enum EnrichmentSource: Int, Comparable {
     case asusDiscovery       // ground truth: the device told us (ASUS infosvr)
     case jnapHnapDiscovery   // ground truth: the device told us (Linksys JNAP / HNAP)
     case googleWifiDiscovery // ground truth: the device told us (Google Wifi /api/v1/status)
+    case arpTableLookup      // iOS 27+ sysctl ARP-table read (topology-observation entitlement) — real per-IP link-layer MAC, not ground truth (see isGroundTruth)
     case ouiLookup           // mDNS-TXT MAC resolved through the OUI table
     case ssdpDescription     // UPnP device-description XML
     case portBanner          // TCP banner-grab guess
@@ -22,10 +23,17 @@ public enum EnrichmentSource: Int, Comparable {
     /// holds, picking the strongest ground-truth source when more than one
     /// answered. Add new vendor-discovery sources here instead of
     /// hardcoding another `$0.source == .someCase` check in `merge()`.
+    ///
+    /// `arpTableLookup` is deliberately excluded even though it's a real,
+    /// non-guessed link-layer address: the device didn't tell us about
+    /// itself, and the undocumented entitlement it depends on is unproven
+    /// long-term (see todo.md item 4) — so it wins the general
+    /// strength-sorted fallback for `mac` (declared above `ouiLookup`) but
+    /// never overrides an already-known field the way ground truth does.
     public var isGroundTruth: Bool {
         switch self {
         case .ubiquitiDiscovery, .asusDiscovery, .jnapHnapDiscovery, .googleWifiDiscovery: return true
-        case .ouiLookup, .ssdpDescription, .portBanner, .ttlGuess: return false
+        case .arpTableLookup, .ouiLookup, .ssdpDescription, .portBanner, .ttlGuess: return false
         }
     }
 }

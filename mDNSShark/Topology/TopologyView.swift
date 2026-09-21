@@ -3,7 +3,13 @@ import SwiftUI
 
 struct TopologyView: View {
     @EnvironmentObject var coordinator: AppCoordinator
-    @State private var selectedDevice: DiscoveredDevice? = nil
+    // Only the id, not a DiscoveredDevice snapshot: `DiscoveredDevice` is a
+    // struct, so a stored value here would freeze mac/manufacturer/
+    // inferredOS at whatever they were at tap time. Re-deriving the live
+    // device by id in `navigationDestination`'s closure below means an
+    // already-open detail view keeps reflecting enrichment as it streams
+    // in, instead of getting stuck on "Unknown" if tapped before it lands.
+    @State private var selectedDeviceID: UUID? = nil
     @State private var navigateToDetail = false
     @State private var securityFilters: Set<SecurityStatus> = []
     @State private var typeFilters: Set<DeviceType> = []
@@ -116,7 +122,7 @@ struct TopologyView: View {
                                                 .scaleEffect(scale)
                                                 .position(pixelPos(node.position))
                                                 .onTapGesture {
-                                                    selectedDevice = node.device
+                                                    selectedDeviceID = node.device.id
                                                     navigateToDetail = true
                                                 }
                                         }
@@ -156,7 +162,16 @@ struct TopologyView: View {
             }
             .navigationBarHidden(true)
             .navigationDestination(isPresented: $navigateToDetail) {
-                if let device = selectedDevice { DeviceDetailView(device: device) }
+                // Looked up from the raw (unfiltered, uncapped) devices
+                // array, not `nodes` — `nodes` drops out-of-filter/beyond
+                // top-10 devices, and a filter change or new device joining
+                // while this detail view is open must not blank it out.
+                // No findings overlay here: DeviceDetailView re-reads the
+                // live row and findings from the coordinator itself.
+                if let id = selectedDeviceID,
+                   let device = coordinator.networkScanViewModel.devices.first(where: { $0.id == id }) {
+                    DeviceDetailView(device: device)
+                }
             }
         }
     }

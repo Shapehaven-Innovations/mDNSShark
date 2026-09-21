@@ -20,7 +20,15 @@ struct DeviceCardView: View {
                              color: badgeColor)
                 }
                 Divider()
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                // alignment: .leading — LazyVGrid defaults to .center, which
+                // centers each cell's VStack independently within its column
+                // using that VStack's own intrinsic width. MAC ("0c:ea:14:...",
+                // 17 chars) and OS ("Linux (embedded, likely...)", wider pre-
+                // truncation) share column 1 but have different intrinsic
+                // widths, so they land at different x-offsets instead of a
+                // shared left edge. .leading pins every cell flush to its
+                // column's leading edge regardless of content width.
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 8) {
                     cell("MAC",          device.macAddress ?? "Unknown")
                     cell("Manufacturer", device.manufacturer ?? "Unknown")
                     cell("OS",           device.displayInferredOS  ?? "Unknown")

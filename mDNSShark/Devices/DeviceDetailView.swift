@@ -2,9 +2,35 @@
 import SwiftUI
 
 struct DeviceDetailView: View {
-    let device: DiscoveredDevice
+    @EnvironmentObject var coordinator: AppCoordinator
+    // Navigation-time snapshot. Only a fallback — see `device` below.
+    private let snapshot: DiscoveredDevice
+
+    init(device: DiscoveredDevice) { snapshot = device }
+
+    /// The live row for this device, re-read from the coordinator on every
+    /// body evaluation, with the current security findings applied.
+    ///
+    /// Reading `coordinator` here — rather than rendering whatever value
+    /// the parent passed in — is what keeps an already-pushed detail
+    /// screen updating as enrichment streams in. `@EnvironmentObject`
+    /// registers a dependency on `coordinator.objectWillChange`, so any
+    /// devices/findings mutation re-runs this body. A parent-supplied
+    /// value alone cannot: SwiftUI decides whether to re-run a child's
+    /// body by comparing the old and new view values field-by-field using
+    /// each field's `Equatable`, and `DiscoveredDevice ==` compares only
+    /// `id` — so a fresh copy carrying a newly-discovered MAC/manufacturer/
+    /// OS diffs as "unchanged" and is silently dropped, leaving the screen
+    /// stuck on "Unknown". The snapshot is used only if the row has since
+    /// left the live list.
+    private var device: DiscoveredDevice {
+        var live = coordinator.networkScanViewModel.devices.first { $0.id == snapshot.id } ?? snapshot
+        live.securityFindings = coordinator.securityViewModel.findings.filter { $0.deviceID == snapshot.id }
+        return live
+    }
 
     var body: some View {
+        let device = self.device
         ScrollView {
             VStack(spacing: 16) {
                 CardView {
@@ -67,7 +93,12 @@ struct DeviceDetailView: View {
     }
 
     private func row(_ label: String, _ value: String) -> some View {
-        HStack {
+        // .firstTextBaseline, not the default .center: MAC/OS values can now
+        // be long enough to wrap (a real MAC via arpTableLookup is 17
+        // characters), and a wrapped 2-line value under center alignment
+        // pulls the single-line label down to the vertical midpoint instead
+        // of lining up with the value's first line.
+        HStack(alignment: .firstTextBaseline) {
             Text(label).foregroundColor(.secondary).font(.subheadline)
             Spacer()
             Text(value).font(.subheadline.weight(.medium)).multilineTextAlignment(.trailing)

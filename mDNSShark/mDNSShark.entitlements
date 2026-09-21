@@ -10,6 +10,19 @@
 	<array>
 		<string>group.beta.mDNSShark</string>
 	</array>
+	<!-- TODO(topology-observation-entitlement): added 2026-09-21 for the
+	     iOS 27 ARP-table MAC read (todo.md item 4). Undocumented — unlike
+	     the multicast entitlement above, Apple DTS says this one needs no
+	     approval request, but it still needs the capability enabled for
+	     this App ID in the Developer Portal and the provisioning profile
+	     regenerated before it will actually take effect (same
+	     signing-breakage risk class as the multicast entitlement hit this
+	     session: if the profile doesn't have it yet, Release signing may
+	     fail the same way). Do that BEFORE building Release with this
+	     present. ARPTableParser/ARPTableReader degrade safely either way
+	     (nil mac) if the entitlement isn't actually granted at runtime. -->
+	<key>com.apple.developer.networking.topology-observation</key>
+	<true/>
 	<!-- TODO(multicast-entitlement): removed pending Apple approval, request
 	     ID V6723AP975 (submitted 2026-09-20) — see todo.md "Blocked:
 	     multicast entitlement (ASUS probe)". Present, blocks Release signing
