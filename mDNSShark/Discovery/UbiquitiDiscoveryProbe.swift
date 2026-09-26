@@ -3,7 +3,7 @@ import DeviceFingerprint
 import os
 
 /// Sends a Ubiquiti discovery-protocol probe to one host and waits for a
-/// reply. Tries v1 first, falls back to v2 if v1 times out — matches nmap's
+/// reply. Tries v1 first, falls back to v2 if v1 times out, matching nmap's
 /// `ubiquiti-discovery.nse` behavior. Uses a raw BSD UDP socket, the same
 /// technique `NetworkScanner.scanSSDP()` already uses in this codebase.
 final class UbiquitiDiscoveryProbe: Sendable {
@@ -53,7 +53,7 @@ final class UbiquitiDiscoveryProbe: Sendable {
         var buffer = [UInt8](repeating: 0, count: 2048)
         let received = recv(sock, &buffer, buffer.count, 0)
         guard received > 0 else {
-            // `errno` is only meaningful after a -1 return — a 0 return is
+            // `errno` is only meaningful after a -1 return; a 0 return is
             // a legitimate (if unrealistic for this protocol) empty
             // datagram, not an error, and doesn't set errno itself. Logging
             // it unconditionally would report a stale, misleading code.

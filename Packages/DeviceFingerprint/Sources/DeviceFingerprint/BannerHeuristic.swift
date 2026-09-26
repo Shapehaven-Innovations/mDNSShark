@@ -6,7 +6,7 @@ public struct BannerGuess {
 }
 
 /// Cheap substring matching over a raw TCP banner (SSH version string, HTTP
-/// Server header, etc). Weak evidence, same tier as the TTL guess — never
+/// Server header, etc). Weak evidence, same tier as the TTL guess; never
 /// treat this as certain.
 public func guessFromBanner(_ banner: String) -> BannerGuess {
     let lower = banner.lowercased()
@@ -33,7 +33,7 @@ public func guessFromBanner(_ banner: String) -> BannerGuess {
         manufacturer = "TP-Link"
     } else if lower.contains("gl.inet") || lower.contains("gl-inet") || lower.contains("gl-ui") {
         // "gl-ui" is GL.iNet's own internal product name for their admin
-        // web framework — confirmed present in real GL-MT6000 hardware's
+        // web framework, confirmed present in real GL-MT6000 hardware's
         // page body (a <noscript> fallback string) even when the Server
         // header (generic "nginx") and <title> ("Admin Panel") carry no
         // vendor-identifying text at all.

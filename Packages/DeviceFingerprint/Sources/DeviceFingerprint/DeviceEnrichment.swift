@@ -1,11 +1,11 @@
-/// Where a piece of enrichment data came from — used only to order precedence
+/// Where a piece of enrichment data came from; used only to order precedence
 /// when two sources disagree. Never shown to the user directly.
 public enum EnrichmentSource: Int, Comparable {
     case ubiquitiDiscovery   // ground truth: the device told us
     case asusDiscovery       // ground truth: the device told us (ASUS infosvr)
     case jnapHnapDiscovery   // ground truth: the device told us (Linksys JNAP / HNAP)
     case googleWifiDiscovery // ground truth: the device told us (Google Wifi /api/v1/status)
-    case arpTableLookup      // iOS 27+ sysctl ARP-table read (topology-observation entitlement) — real per-IP link-layer MAC, not ground truth (see isGroundTruth)
+    case arpTableLookup      // iOS 27+ sysctl ARP-table read (topology-observation entitlement): real per-IP link-layer MAC, not ground truth (see isGroundTruth)
     case ouiLookup           // mDNS-TXT MAC resolved through the OUI table
     case ssdpDescription     // UPnP device-description XML
     case portBanner          // TCP banner-grab guess
@@ -27,7 +27,7 @@ public enum EnrichmentSource: Int, Comparable {
     /// `arpTableLookup` is deliberately excluded even though it's a real,
     /// non-guessed link-layer address: the device didn't tell us about
     /// itself, and the undocumented entitlement it depends on is unproven
-    /// long-term (see todo.md item 4) — so it wins the general
+    /// long-term (see todo.md item 4), so it wins the general
     /// strength-sorted fallback for `mac` (declared above `ouiLookup`) but
     /// never overrides an already-known field the way ground truth does.
     public var isGroundTruth: Bool {
@@ -52,7 +52,7 @@ public struct DeviceEnrichment {
     }
 }
 
-/// The subset of `DiscoveredDevice`'s fields this merge operates on — kept
+/// The subset of `DiscoveredDevice`'s fields this merge operates on, kept
 /// as a plain struct here so the package has no dependency on the app
 /// target's `DiscoveredDevice` type.
 public struct EnrichedFields {
@@ -68,8 +68,8 @@ public struct EnrichedFields {
 }
 
 /// Folds a batch of probe results into the fields already known for a
-/// device. Ground-truth discovery replies (see `EnrichmentSource.isGroundTruth`
-/// — currently Ubiquiti, ASUS, Linksys JNAP/HNAP, and Google Wifi) win outright for mac/manufacturer/inferredOS,
+/// device. Ground-truth discovery replies (see `EnrichmentSource.isGroundTruth`;
+/// currently Ubiquiti, ASUS, Linksys JNAP/HNAP, and Google Wifi) win outright for mac/manufacturer/inferredOS,
 /// using the strongest ground-truth source when more than one answered;
 /// otherwise the lowest-`rawValue` (strongest) source with a non-nil answer
 /// wins per field, independently. `openPorts` is always a union, never
@@ -89,8 +89,8 @@ public func merge(existing: EnrichedFields, incoming: [DeviceEnrichment]) -> Enr
     if result.inferredOS == nil { result.inferredOS = byStrength.first(where: { $0.inferredOS != nil })?.inferredOS }
 
     // Deliberately NOT applying `inferredOSFamily`'s manufacturer-based
-    // fallback here. `merge()` is called incrementally — each call's
-    // `existing` is a PREVIOUS call's output — and this function's own
+    // fallback here. `merge()` is called incrementally (each call's
+    // `existing` is a PREVIOUS call's output), and this function's own
     // precedence rule only lets a field be filled once per non-ground-truth
     // source (`result.inferredOS == nil` above). Writing a generic guess
     // into `result.inferredOS` the first time a manufacturer becomes known
@@ -99,8 +99,8 @@ public func merge(existing: EnrichedFields, incoming: [DeviceEnrichment]) -> Enr
     // arriving in a slower probe batch after a faster SSDP fetch already
     // resolved just the manufacturer) from ever landing, since the field
     // would no longer look empty. Callers apply `inferredOSFamily` as a
-    // display-time fallback instead — see `DiscoveredDevice.displayInferredOS`
-    // — computed fresh every time, so it can never block a real update.
+    // display-time fallback instead; see `DiscoveredDevice.displayInferredOS`,
+    // which is computed fresh every time, so it can never block a real update.
 
     var ports = Set(result.openPorts)
     for e in incoming { ports.formUnion(e.openPorts) }

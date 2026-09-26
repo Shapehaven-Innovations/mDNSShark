@@ -15,12 +15,12 @@ func parseSNI(from buffer: Data) -> String? {
     // post-quantum hybrid key-share extension routinely exceeds one TCP
     // segment (e.g. a real 1554-byte ClientHello arriving as 1460 + 94
     // bytes), and the SNI extension sits well before the end of the
-    // record — requiring the whole thing up front discarded a real,
+    // record; requiring the whole thing up front discarded a real,
     // already-buffered SNI on every such ClientHello, silently falling
     // back to dstIP. Every later field access below already has its own
     // bounds check (`guard i + ... <= bytes.count`), so parsing just stops
     // and returns nil if we genuinely don't have enough bytes yet to reach
-    // the SNI extension — no need for this to be checked twice, and this
+    // the SNI extension, so there is no need for this to be checked twice, and this
     // copy of the check was actively wrong for the truncated-buffer case.
     guard bytes[5] == 0x01 else { return nil }
     var i = 5 + 4
@@ -76,7 +76,7 @@ final class LeafCertCache {
             throw TLSInterceptorError.caKeyMissing
         }
         // The leaf's issuer must be the CA certificate's subject, byte for
-        // byte — the device builds the chain from the leaf to the installed
+        // byte: the device builds the chain from the leaf to the installed
         // CA by that name.
         guard let caCert = KeychainStore.loadCACert(),
               let issuer = X509CertBuilder.subjectName(fromCertificateDER: SecCertificateCopyData(caCert) as Data)
@@ -97,13 +97,13 @@ final class LeafCertCache {
         // application tag as the private key. Two keychain items (one
         // public, one private) sharing one tag is exactly the ambiguity
         // that let identity lookup return the public half as if it were the
-        // signing key — confirmed on-device via LeafCertCache.verifyUsable:
+        // signing key. Confirmed on-device via LeafCertCache.verifyUsable:
         // SecIdentityCopyPrivateKey reported kSecAttrKeyClass=0 (public;
         // Security framework represents kSecAttrKeyClassPublic as the
         // literal string "0" and Private as "1") and canSign=0, exactly
         // matching a public key handed back in place of the private one.
         // The public key here only ever needs to exist in memory long
-        // enough to embed in the leaf's SPKI below — it never needs its own
+        // enough to embed in the leaf's SPKI below; it never needs its own
         // keychain item.
         let keyAttrs: [String: Any] = [
             kSecAttrKeyType as String:       kSecAttrKeyTypeECSECPrimeRandom,
@@ -141,7 +141,7 @@ final class LeafCertCache {
     /// private key. If that signature can't be produced, Network.framework
     /// aborts while processing the ClientHello: the accepted connection's
     /// receive completes with `-9858: handshake failed` while its state is
-    /// still `.preparing`, and not one byte reaches the device — the exact
+    /// still `.preparing`, and not one byte reaches the device: the exact
     /// on-device signature of the duckduckgo.com failure. Reproduced on macOS
     /// with a `kSecClassIdentity` lookup that returned an identity whose key
     /// was not the leaf's: same error, same state, no ServerHello; the same
@@ -238,7 +238,7 @@ final class TLSSession {
     let certCache: LeafCertCache
     // Every packet-capture instrumentation call in this file previously went
     // straight to `flow.writePackets`, never through PacketForwarder's
-    // `onPacket` — so none of our synthetic replies (SYN-ACK, ServerHello
+    // `onPacket`, so none of our synthetic replies (SYN-ACK, ServerHello
     // flight, ACKs, the teardown FIN) ever appeared in a device pcap, only
     // the device's own outbound packets. That one-sided capture is what made
     // the FIN-retransmit-storm investigation impossible to close from a pcap
@@ -249,9 +249,9 @@ final class TLSSession {
 
     // `serverSeq` is the next sequence number we will send; `clientSeq` is
     // the next sequence number we expect from the device (i.e. our ack
-    // number). Both are touched from more than one thread — `receive(_:)`
+    // number). Both are touched from more than one thread (`receive(_:)`
     // runs on PacketForwarder's queue and `writeToDevice(_:)` on the
-    // proxyToDevice thread — so every read/modify of them, and the
+    // proxyToDevice thread), so every read/modify of them, and the
     // writePackets that consumes the pair, happens under `seqLock`. Holding
     // the lock across the write also keeps our synthetic packets leaving in
     // sequence-number order.
@@ -263,7 +263,7 @@ final class TLSSession {
     private let condition = NSCondition()
     private var sessionClosed = false
 
-    // Diagnostic for todo.md item 1's checksum spike — the decisive
+    // Diagnostic for todo.md item 1's checksum spike: the decisive
     // question is whether the device's kernel ever ACKs sendSYNACK()'s
     // packet at all. Logged once, not every packet: `receive(_:)` fires on
     // every inbound chunk, and this session lives across an entire TLS
@@ -273,7 +273,7 @@ final class TLSSession {
 
     // Diagnostic scaffolding for the on-device HTTPS-hang investigation
     // (todo.md item 1). `stage` names the last step runSession reached so
-    // close() can report *where* a session died — every guard in
+    // close() can report *where* a session died; every guard in
     // runSession used to bail via `incrementDropCount(); close(); return`
     // with no indication of which one fired. `receiveCount` gates the
     // per-chunk log to the first few inbound chunks (enough to see a
@@ -284,7 +284,7 @@ final class TLSSession {
     // `stage` specifically is written from more than one thread once
     // tlsConn.start(queue: .global()) is called below (its state handler and
     // receiveFromTLS's callback both run there, concurrently with each
-    // other and with runSession's own thread) — lock-protected so a
+    // other and with runSession's own thread). Lock-protected so a
     // diagnostic meant to answer "which stage did we die at" doesn't itself
     // race.
     private var _stage = "opened"
@@ -306,18 +306,18 @@ final class TLSSession {
     private var receiveCount = 0
     private var wroteFirstToDevice = false
     // Set only when the real upstream server has actually sent back
-    // application data that we relayed toward the device — distinct from
+    // application data that we relayed toward the device. Distinct from
     // `stage == "decrypting"`, which flips true the moment the device's
     // *request* is first decrypted and then never resets. Using stage alone
     // in recordBridgeEnd meant any errorless upstream/device-facing EOF after
     // that point was assumed to be a normal finished exchange even if zero
-    // response bytes had ever gone back — silently hiding a real stall (seen
+    // response bytes had ever gone back, silently hiding a real stall (seen
     // on-device: full handshake, request relayed, "Last:" stays blank, no
     // response ever reaches Safari).
     // Same lock as `stage`/`lastBridgeFailure`: written from
     // receiveFromUpstream's completion (upstream connection's queue), read
     // from recordBridgeEnd (reachable from either connection's completion,
-    // both on .global()) — an unguarded var here would be a real data race.
+    // both on .global()); an unguarded var here would be a real data race.
     private var _upstreamRespondedWithData = false
     private var upstreamRespondedWithData: Bool {
         get { stageLock.lock(); defer { stageLock.unlock() }; return _upstreamRespondedWithData }
@@ -332,7 +332,7 @@ final class TLSSession {
     private var tlsListener: NWListener?
     private var upstream: NWConnection?
     // The NWListener-accepted, device-facing connection receiveFromTLS reads
-    // from. close() must cancel this too, same as `upstream` — without it,
+    // from. close() must cancel this too, same as `upstream`. Without it,
     // a session that never sees a natural EOF on the device-facing side
     // (e.g. the device gives up and RSTs instead of the loopback stream
     // ending) leaves that connection's receive() pending forever: never
@@ -344,11 +344,11 @@ final class TLSSession {
 
     // Set by TLSInterceptor.openSession right after construction. close() was
     // previously only ever removed from TLSInterceptor.sessions by the
-    // device-FIN/RST path (closeSession(for:)) — a session that closes itself
+    // device-FIN/RST path (closeSession(for:)): a session that closes itself
     // (e.g. one of the bounded listener/accept/upstream timeouts) left a dead
     // entry keyed by the same 4-tuple, so a device SYN retransmit on that key
     // found hasSession(for:) still true and PacketForwarder just logged it
-    // instead of ever retrying the handshake — the flow stayed wedged until
+    // instead of ever retrying the handshake; the flow stayed wedged until
     // the device gave up, reproducing the exact hang this file's diagnostics
     // exist to catch.
     var onClosed: (() -> Void)?
@@ -365,7 +365,7 @@ final class TLSSession {
     }
 
     // Single choke point for every synthetic packet this session sends to
-    // the device — see `onPacket`'s doc comment for why this exists.
+    // the device; see `onPacket`'s doc comment for why this exists.
     private func sendToDevice(_ packet: Data) {
         flow.writePackets([packet], withProtocols: [NSNumber(value: AF_INET)])
         onPacket?(packet, .inbound, true)
@@ -376,13 +376,13 @@ final class TLSSession {
     // tcp_mssdflt (512), which the pcap showed as a 1512-byte ClientHello
     // arriving in three 512-byte segments. 1460 is the standard Ethernet
     // value; the tunnel MTU is at least that, and the bytes never touch a
-    // real wire anyway — they go straight into inboundBuffer.
+    // real wire anyway; they go straight into inboundBuffer.
     private static let advertisedMSS = 1460
     private static let mssOption: Data = Data([0x02, 0x04, 0x05, 0xB4])
 
     // The ISN used for the SYN-ACK, fixed on the first call. A retransmitted
     // SYN-ACK (PacketForwarder.resendSYNACK, when the device retries its SYN
-    // because the first one was rejected) must reuse this exact value —
+    // because the first one was rejected) must reuse this exact value:
     // sending a different seq on retry is itself a protocol violation the
     // device's kernel would reject, not something a retry should fix.
     private var synAckSeq: UInt32?
@@ -413,7 +413,7 @@ final class TLSSession {
     /// `clientSeq` (a retransmit, or reordering) is dropped rather than
     /// blindly appended: accepting it would advance `clientSeq` past bytes
     /// the device never actually sent, making our next ack invalid on the
-    /// device's side — its kernel would treat that as unacceptable (RFC
+    /// device's side: its kernel would treat that as unacceptable (RFC
     /// 9293 §3.10.7.4) and silently drop everything we send afterward,
     /// including the ServerHello flight, wedging the connection instead of
     /// just delaying it. Every call still acks: an in-window segment gets
@@ -462,11 +462,11 @@ final class TLSSession {
         condition.unlock()
 
         // First real bytes back from the device is the proof the SYN-ACK
-        // was accepted and the kernel completed its handshake — if the
+        // was accepted and the kernel completed its handshake; if the
         // checksum fix didn't work, this never fires for this session.
         if !loggedFirstReceive {
             loggedFirstReceive = true
-            logger.debug("first device bytes received for \(self.srcIP, privacy: .public):\(self.key.srcPort) → \(self.dstIP, privacy: .public):\(self.dstPort) (\(data.count) bytes) — handshake completed")
+            logger.debug("first device bytes received for \(self.srcIP, privacy: .public):\(self.key.srcPort) → \(self.dstIP, privacy: .public):\(self.dstPort) (\(data.count) bytes): handshake completed")
         }
         receiveCount += 1
         if receiveCount <= 6 {
@@ -475,7 +475,7 @@ final class TLSSession {
         }
     }
 
-    // Records *why* a session was dropped, not just that one was — the
+    // Records *why* a session was dropped, not just that one was. The
     // Settings screen already shows a running drop count
     // (SharedSettings.tlsInterceptorDropCount) with no reason attached, and
     // on-device Console access has repeatedly been unreliable for reading
@@ -488,7 +488,7 @@ final class TLSSession {
 
     // The two receive chains (receiveFromTLS / receiveFromUpstream) are the
     // only paths after the ClientHello that used to close() without going
-    // through dropSession — so a session dying in the bridge phase (e.g.
+    // through dropSession, so a session dying in the bridge phase (e.g.
     // the device-facing TLS handshake failing before a ServerHello ever
     // left) incremented nothing and left "Last:" blank in Settings, while
     // the packet capture showed every attempt ending in our FIN. Seen on
@@ -501,8 +501,8 @@ final class TLSSession {
         guard !sessionClosed else { return }
         let stage = self.stage
         // A clean EOF is the normal end of an HTTP exchange only if the
-        // upstream server actually sent back application data at some point
-        // — `stage == "decrypting"` (the old check here) flips true the
+        // upstream server actually sent back application data at some point.
+        // `stage == "decrypting"` (the old check here) flips true the
         // moment the device's own *request* is first decrypted and never
         // resets, so it can't tell "exchange finished" apart from "upstream
         // silently never responded."
@@ -513,11 +513,11 @@ final class TLSSession {
 
     /// `deviceFINSeq`: when the device itself initiated the close (a FIN
     /// arrived), this is that FIN's own sequence number. A FIN consumes one
-    /// sequence number same as real data — but the FIN packet carries no
+    /// sequence number same as real data, but the FIN packet carries no
     /// payload and never goes through `receive(_:seq:)`, so `clientSeq` was
     /// never advanced past it. Replying with the stale `clientSeq` acks one
     /// byte short of the device's FIN, which its kernel doesn't recognize as
-    /// acknowledging that FIN at all — confirmed on-device: the device
+    /// acknowledging that FIN at all. Confirmed on-device: the device
     /// re-sent the same FIN 12+ times over ~18s (growing backoff) before
     /// finally giving up with an RST, even though our reply otherwise
     /// arrived fine. Passing the FIN's own seq here lets close() ack
@@ -531,7 +531,7 @@ final class TLSSession {
 
         // Handled before the `alreadyClosed` guard, and sent even when this
         // call turns out to be a no-op below: a *simultaneous* close is a
-        // real, common case here, not an edge case — the upstream server
+        // real, common case here, not an edge case: the upstream server
         // finishing its response triggers our own close() (deviceFINSeq nil)
         // at essentially the same moment the device, having gotten what it
         // wanted, sends its own FIN. Confirmed on-device: our FIN (sent first,
@@ -539,7 +539,7 @@ final class TLSSession {
         // device's FIN crossed on the wire seconds apart. Once alreadyClosed
         // is true, nothing below this block runs again, so if the seq bump
         // and the ack it requires stayed gated behind that guard (as they
-        // did before), the device's FIN would never get acked at all —
+        // did before), the device's FIN would never get acked at all,
         // reproducing the exact retransmit-storm-then-RST failure this
         // parameter exists to prevent, just for the simultaneous-close case
         // instead of the plain device-closes-first one.
@@ -563,11 +563,11 @@ final class TLSSession {
 
         logger.debug("[\(self.tag, privacy: .public)] +\(self.elapsedMs)ms close() at stage=\(self.stage, privacy: .public) chunksReceived=\(self.receiveCount) wroteToDevice=\(self.wroteFirstToDevice)")
 
-        // Tell the device we're done. Previously sent nothing here — on
+        // Tell the device we're done. Previously sent nothing here; on
         // device, that showed up as Safari's own ~30s connect timeout
         // firing, then the device retransmitting an unacknowledged FIN
         // with growing backoff forever, since nothing ever answered it.
-        // Not a full RFC close handshake (no FIN_WAIT/LAST_ACK tracking —
+        // Not a full RFC close handshake (no FIN_WAIT/LAST_ACK tracking;
         // this session is being torn down regardless), just enough for the
         // device's kernel to see a FIN from us and stop waiting.
         seqLock.lock()
@@ -592,11 +592,11 @@ final class TLSSession {
 
     func writeToDevice(_ data: Data) {
         // proxyToDevice's recv loop only checks sessionClosed at the top of
-        // its while loop — a Darwin.recv() already in flight when close()
+        // its while loop. A Darwin.recv() already in flight when close()
         // sends the synthetic FIN would otherwise still deliver its bytes
         // here afterward, so the device sees real payload after (or
         // interleaved with) the FIN. A real TCP stack treats that as a
-        // protocol violation and answers with RST — the same failure this
+        // protocol violation and answers with RST, the same failure this
         // FIN was added to eliminate.
         guard !sessionClosed else { return }
         seqLock.lock(); defer { seqLock.unlock() }
@@ -605,7 +605,7 @@ final class TLSSession {
         // whole payload. A real response easily runs past 1460 bytes (an
         // 11KB duckduckgo results page, confirmed on-device), and a single
         // oversized synthetic segment silently violates both the MSS we
-        // advertised in our own SYN-ACK and the tunnel's 1500-byte MTU — the
+        // advertised in our own SYN-ACK and the tunnel's 1500-byte MTU: the
         // device's kernel just never acks it, which looked identical to "no
         // response ever arrived" until packet capture covered our own
         // outbound packets and made the oversized segment visible at all.
@@ -665,7 +665,7 @@ final class TLSSession {
 
         if SharedSettings.tlsBypassList.contains(where: { sni == $0 || sni.hasSuffix(".\($0)") }) {
             stage = "bypassed"
-            logger.debug("[\(self.tag, privacy: .public)] sni=\(sni, privacy: .public) is on the bypass list — closing (device gets no RST, its socket is now orphaned)")
+            logger.debug("[\(self.tag, privacy: .public)] sni=\(sni, privacy: .public) is on the bypass list; closing (device gets no RST, its socket is now orphaned)")
             close(); return
         }
 
@@ -698,15 +698,15 @@ final class TLSSession {
         // provider that is not a neutral choice: NECP's VPN-loop-prevention
         // policy scopes this process's sockets to the physical interface
         // (en0/pdp_ip0) so the provider's own traffic never re-enters the
-        // tunnel. A wildcard-bound listener gets that scope — the kernel's
+        // tunnel. A wildcard-bound listener gets that scope (the kernel's
         // loopback bypass only applies to sockets whose local/remote
-        // address is loopback or that are bound to lo0, not to 0.0.0.0 —
+        // address is loopback or that are bound to lo0, not to 0.0.0.0),
         // and every connection it accepts inherits it (xnu tcp_input:
         // "Inherit INP_BOUND_IF from listener"). The accepted socket's
         // SYN-ACK to 127.0.0.1 then fails source-interface selection in
         // ip_output (127.0.0.1 is not an address of en0 → EADDRNOTAVAIL)
         // and is dropped silently, so posixConnect below sees no reply and
-        // fails with ETIMEDOUT (errno 60) — the exact reason recorded in
+        // fails with ETIMEDOUT (errno 60), the exact reason recorded in
         // SharedSettings.tlsInterceptorLastError on device, 91/91 drops.
         // Refused (61) would have meant "no listener"; timed out means
         // "listener heard us and could not answer". Both settings below
@@ -741,7 +741,7 @@ final class TLSSession {
             case .cancelled:
                 listenerSem.signal()
             case .waiting(let err):
-                // Never signals the semaphore — if this is the last line for
+                // Never signals the semaphore; if this is the last line for
                 // a session, runSession's thread is parked on listenerSem.
                 self?.logger.debug("[\(self?.tag ?? "?", privacy: .public)] NWListener waiting (thread stays blocked): \(String(describing: err), privacy: .public)")
             default: break
@@ -760,7 +760,7 @@ final class TLSSession {
         lst.start(queue: .global())
         // Bounded, not .wait() forever: .waiting never signals this
         // semaphore, so an unbounded wait here would park this thread
-        // permanently on a listener that never becomes ready — the device
+        // permanently on a listener that never becomes ready; the device
         // would then sit unacknowledged until its own connect timeout (seen
         // on-device: Safari gives up after ~30s with nothing from us).
         if listenerSem.wait(timeout: .now() + 5) == .timedOut {
@@ -770,7 +770,7 @@ final class TLSSession {
         }
 
         guard listenerPort > 0, !sessionClosed else {
-            logger.debug("[\(self.tag, privacy: .public)] DROP: listener not usable — port=\(listenerPort) sessionClosed=\(self.sessionClosed)")
+            logger.debug("[\(self.tag, privacy: .public)] DROP: listener not usable: port=\(listenerPort) sessionClosed=\(self.sessionClosed)")
             dropSession("Listener not usable (port=\(listenerPort) sessionClosed=\(sessionClosed))")
             close(); return
         }
@@ -792,7 +792,7 @@ final class TLSSession {
 
         // Bounded like every other wait in this function. A blocking
         // connect() whose SYN gets no answer sits in the kernel for its
-        // full SYN-retransmit budget (~75s on iOS) before ETIMEDOUT — on
+        // full SYN-retransmit budget (~75s on iOS) before ETIMEDOUT; on
         // device that parked this thread and left the device's socket
         // hanging for over a minute per session. Non-blocking connect +
         // poll() gives it the same 5s the listener/accept waits get. The
@@ -837,7 +837,7 @@ final class TLSSession {
 
         // Wait for NWListener to accept our POSIX connection. Pure loopback,
         // so this should be near-instant; bounded anyway for the same
-        // reason as listenerSem above — a stuck accept must not park this
+        // reason as listenerSem above: a stuck accept must not park this
         // thread forever.
         stage = "acceptWait"
         if acceptSem.wait(timeout: .now() + 5) == .timedOut {
@@ -846,7 +846,7 @@ final class TLSSession {
             close(); return
         }
         guard let tlsConn = acceptedConn, !sessionClosed else {
-            logger.debug("[\(self.tag, privacy: .public)] DROP: no accepted connection — accepted=\(acceptedConn != nil) sessionClosed=\(self.sessionClosed)")
+            logger.debug("[\(self.tag, privacy: .public)] DROP: no accepted connection: accepted=\(acceptedConn != nil) sessionClosed=\(self.sessionClosed)")
             dropSession("No accepted loopback connection (accepted=\(acceptedConn != nil))")
             close(); return
         }
@@ -855,17 +855,17 @@ final class TLSSession {
 
         // Connect to the real upstream TLS server.
         //
-        // Connect to the IP the device itself chose (dstIP) — the exact
+        // Connect to the IP the device itself chose (dstIP): the exact
         // server the device resolved, with no second DNS lookup and no risk
-        // of a CDN handing this process a different edge — but give the TLS
+        // of a CDN handing this process a different edge. But give the TLS
         // layer the real hostname from the device's ClientHello. Without it
         // the endpoint is an IP literal, Network.framework sends no SNI, and
         // the server's default certificate cannot match an IP. Reproduced on
         // macOS 26 against 52.149.246.39 (Safari's duckduckgo.com endpoint):
         // the bare-IP connection goes `.waiting(-9808: bad certificate
         // format)` within ~400ms and stays there indefinitely. It never
-        // reaches `.failed` — since macOS 13 / iOS 16 establishment-time
-        // failures are surfaced as `.waiting`, not `.failed` — so the old
+        // reaches `.failed` (since macOS 13 / iOS 16 establishment-time
+        // failures are surfaced as `.waiting`, not `.failed`), so the old
         // handler, which only signaled on `.ready`/`.failed`, left every
         // session to die at the 10s timeout below. The same IP with
         // sec_protocol_options_set_tls_server_name(sni) is `.ready` in
@@ -874,7 +874,7 @@ final class TLSSession {
         // validation (the header describes it as overriding "the server name
         // obtained from the endpoint"; Apple DTS recommends it for exactly
         // this connect-by-IP-with-separate-SNI case). Only set when the
-        // device's ClientHello actually carried an SNI — `sni` falls back to
+        // device's ClientHello actually carried an SNI; `sni` falls back to
         // dstIP otherwise, and an IP literal is not a legal SNI value
         // (RFC 6066 §3).
         stage = "upstreamConnect"
@@ -895,7 +895,7 @@ final class TLSSession {
         // caller here is close() → upstream.cancel(). A timeout that reads
         // `.cancelled` therefore means something closed this session from
         // outside runSession (device FIN/RST via closeSession, or stop())
-        // before the wait expired — on device that showed up as "never
+        // before the wait expired; on device that showed up as "never
         // became ready within 10s (cancelled)", hiding what the connection
         // had actually been doing. Written on the connection's queue, read
         // on this thread, hence the lock.
@@ -917,8 +917,8 @@ final class TLSSession {
                 upstreamSem.signal()
             case .waiting(.tls(let status)):
                 // A TLS-layer error (trust, protocol) is terminal in
-                // practice — no path change will make the server's
-                // certificate match — but it arrives as `.waiting`, not
+                // practice (no path change will make the server's
+                // certificate match), but it arrives as `.waiting`, not
                 // `.failed` (see above). Signal so the guard below reports
                 // the real reason at once instead of after the 10s wait.
                 self?.logger.debug("[\(self?.tag ?? "?", privacy: .public)] +\(self?.elapsedMs ?? -1)ms upstream TLS to \(self?.dstIP ?? "?", privacy: .public) waiting on TLS error (treated as failed): \(status)")
@@ -933,7 +933,7 @@ final class TLSSession {
         }
         upstreamConn.start(queue: .global())
         // `.waiting` with a non-TLS error (no route, slow TCP handshake to
-        // the real destination) still never signals this semaphore —
+        // the real destination) still never signals this semaphore;
         // bounded for the same reason as listenerSem above. 10s, longer
         // than the loopback-only waits, since this is a real network
         // connection.
@@ -955,14 +955,14 @@ final class TLSSession {
         // This is the device-facing TLS *server*. `.ready` here means the
         // device's TLS client finished the handshake against our leaf cert
         // (so it trusted the CA). `.failed` with a peer-alert error is the
-        // device rejecting the cert — that's the signature of a genuine
+        // device rejecting the cert; that's the signature of a genuine
         // untrusted-CA rejection, as opposed to a transport-level stall.
         stage = "deviceTLSHandshake"
         tlsConn.stateUpdateHandler = { [weak self] state in
             switch state {
             case .ready:
                 self?.stage = "bridged"
-                self?.logger.debug("[\(self?.tag ?? "?", privacy: .public)] +\(self?.elapsedMs ?? -1)ms device-facing TLS READY — device completed handshake with our leaf cert")
+                self?.logger.debug("[\(self?.tag ?? "?", privacy: .public)] +\(self?.elapsedMs ?? -1)ms device-facing TLS READY: device completed handshake with our leaf cert")
             case .failed(let err):
                 self?.lastBridgeFailure = "device-facing TLS failed: \(err)"
                 self?.logger.debug("[\(self?.tag ?? "?", privacy: .public)] +\(self?.elapsedMs ?? -1)ms device-facing TLS FAILED: \(String(describing: err), privacy: .public)")
@@ -1090,17 +1090,17 @@ final class TLSSession {
 
     // Spike (todo.md item 1): checksums were previously left as 0x0000 on
     // every synthetic packet this class sends. That's only valid for UDP's
-    // own checksum field under IPv4 — the IPv4 header checksum and the TCP
+    // own checksum field under IPv4; the IPv4 header checksum and the TCP
     // checksum are both verified by the receiving device's kernel (utun
     // sets no checksum-offload flags), so a zero checksum here is
     // indistinguishable from a corrupt packet and gets silently dropped.
-    // If that's the actual blocker, no synthetic packet from this class —
-    // including sendSYNACK() — has ever been accepted by the device.
+    // If that's the actual blocker, no synthetic packet from this class,
+    // including sendSYNACK(), has ever been accepted by the device.
     //
     // `options` is raw TCP option bytes appended after the fixed 20-byte
     // header (e.g. the MSS option in the SYN-ACK). It is padded with EOL
     // (0x00) to a 4-byte boundary and the data-offset nibble is derived
-    // from the resulting header length — so the offset byte is 0x50 only for
+    // from the resulting header length, so the offset byte is 0x50 only for
     // the no-options case, not hardcoded.
     private func buildTCPPacket(srcIP: String, dstIP: String,
                                  srcPort: UInt16, dstPort: UInt16,
@@ -1155,7 +1155,7 @@ final class TLSInterceptor {
     private let lock = NSLock()
     let certCache = LeafCertCache()
     // Forwarded to every TLSSession so its synthetic replies reach the same
-    // pcap capture as the plain-relay path's — see TLSSession.onPacket.
+    // pcap capture as the plain-relay path's; see TLSSession.onPacket.
     private let onPacket: PacketHandler?
 
     init(onPacket: PacketHandler? = nil) {
@@ -1174,7 +1174,7 @@ final class TLSInterceptor {
             guard let self else { return }
             self.lock.lock()
             // Only remove if this session is still the one registered for the
-            // key — closeSession(for:) may have already removed (and
+            // key: closeSession(for:) may have already removed (and
             // replaced) it, e.g. a device FIN arriving right as this session
             // was independently timing out.
             if self.sessions[key] === session { self.sessions.removeValue(forKey: key) }
@@ -1191,7 +1191,7 @@ final class TLSInterceptor {
     }
 
     // Called when PacketForwarder sees the device retransmit its SYN on a
-    // key that already has a session — the original sendSYNACK() was never
+    // key that already has a session: the original sendSYNACK() was never
     // accepted, so retry it rather than leaving the flow wedged.
     func resendSYNACK(for key: SessionKey) {
         lock.lock(); let s = sessions[key]; lock.unlock()

@@ -26,7 +26,7 @@ final class OUIDatasetTests: XCTestCase {
     }
 
     /// Loads the real bundled `oui-database.txt` (app resource, not a test
-    /// fixture — `OUIDataset` itself stays bundle-free per its doc comment,
+    /// fixture; `OUIDataset` itself stays bundle-free per its doc comment,
     /// so this test reaches across the package boundary via `#filePath`
     /// instead) and confirms the mesh/router vendors relevant to device
     /// fingerprinting (todo.md item 1) resolve through it. Regressions here

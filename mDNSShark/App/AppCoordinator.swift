@@ -41,7 +41,7 @@ final class AppCoordinator: ObservableObject {
         analysisViewModel     = AnalysisViewModel()
         wire()
         // Waits out iOS's Local Network Privacy decision before the very
-        // first scan fires — starting immediately here raced the system
+        // first scan fires. Starting immediately here raced the system
         // permission alert on every fresh install (confirmed via a live
         // device log: `errno=65 EHOSTUNREACH` / `Local network prohibited`
         // on probes that fired before the user could possibly have

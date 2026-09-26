@@ -9,7 +9,7 @@ final class NetworkScanViewModel: ObservableObject {
     @Published var devices: [DiscoveredDevice] = []
     @Published var isScanning: Bool = false
     /// True once any scan has actually started (manual button tap or the
-    /// automatic launch scan) — lets `AppCoordinator` skip its
+    /// automatic launch scan); lets `AppCoordinator` skip its
     /// gate-delayed automatic first scan if the user already ran one
     /// manually while `LocalNetworkPermissionGate` was still resolving, so
     /// it can't silently stomp on results the user is already looking at.
@@ -20,7 +20,7 @@ final class NetworkScanViewModel: ObservableObject {
     private let ouiDB       = OUIDatabase.shared
     private let enrichmentCoordinator = DeviceEnrichmentCoordinator()
     private var cancellables = Set<AnyCancellable>()
-    // Stable UUID assignment only — persists across re-scans so rows keep
+    // Stable UUID assignment only: persists across re-scans so rows keep
     // identity, and is intentionally NOT used to gate enrichment dispatch
     // (see `enrichedIPsThisScan` below).
     private var knownIDs: [String: UUID] = [:]
@@ -63,7 +63,7 @@ final class NetworkScanViewModel: ObservableObject {
             .sink { [weak self] result in
                 guard let self else { return }
                 // Always accumulate the raw results, independent of whether
-                // a matching device row currently exists — `merge(raw:)`
+                // a matching device row currently exists: `merge(raw:)`
                 // re-derives fields from this against the live baseline the
                 // next time it rebuilds a row for this IP (Fix 2).
                 self.rawEnrichmentsByIP[result.ip, default: []].append(contentsOf: result.enrichments)
@@ -87,7 +87,7 @@ final class NetworkScanViewModel: ObservableObject {
     func startScan(duration: Double = 25.0) {
         // A fresh scan gets a genuinely fresh enrichment pass: cancel
         // whatever the previous scan still had in flight and clear all
-        // per-scan enrichment state. `knownIDs` is deliberately untouched —
+        // per-scan enrichment state. `knownIDs` is deliberately untouched:
         // it serves only stable row-ID assignment across the device's
         // lifetime, unrelated to enrichment gating.
         guard !scanner.isScanning else { return }
@@ -157,7 +157,7 @@ final class NetworkScanViewModel: ObservableObject {
                 )
                 // Re-merge stored raw enrichments against the FRESH baseline
                 // just built above, never against a stale pre-merged
-                // snapshot — otherwise a later rebuild against a NOW-BETTER
+                // snapshot; otherwise a later rebuild against a NOW-BETTER
                 // baseline (e.g. a real Bonjour identity resolving after a
                 // bare port-80-sweep placeholder) would have its good data
                 // overwritten by an earlier weak snapshot (Fix 2).
@@ -183,7 +183,7 @@ final class NetworkScanViewModel: ObservableObject {
     }
 
     /// Fires the SSDP description fetch the first time ANY raw `Device` row
-    /// for this IP reveals a non-nil `locationURL` — regardless of whether
+    /// for this IP reveals a non-nil `locationURL`, regardless of whether
     /// it came from the new-device or existing-device branch above, and
     /// regardless of whether the main `enrich()` pass already fired for
     /// this IP (Fix 3).

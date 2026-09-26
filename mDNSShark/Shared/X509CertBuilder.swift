@@ -29,7 +29,7 @@ enum X509CertBuilder {
     /// subject Name of the CA certificate, byte-for-byte (see
     /// `subjectName(fromCertificateDER:)`): RFC 5280 §4.1.2.4 requires the leaf's
     /// issuer field to equal the issuing CA's subject, and the platform's chain
-    /// builder locates the issuer by that name — a leaf whose issuer is anything
+    /// builder locates the issuer by that name; a leaf whose issuer is anything
     /// else fails with errSecCreateChainFailed ("Unable to build chain to root")
     /// even with the CA installed as an anchor.
     static func buildLeafCert(domain: String, leafPublicKey: SecKey, caPrivateKey: SecKey, issuer: Data) throws -> Data {

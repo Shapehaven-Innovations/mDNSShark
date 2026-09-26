@@ -22,7 +22,7 @@ final class PacketForwarder {
     private var onDecryptedHTTPS: ((Data, String) -> Void)?
 
     /// Measures per-flow relay latency (session open → first reply) without
-    /// the cost or Console-attachment requirement of `os.Logger` — signposts
+    /// the cost or Console-attachment requirement of `os.Logger`: signposts
     /// are near-zero-cost when nothing is recording and, unlike `.debug`
     /// log lines, can be captured for later analysis via `log collect`
     /// (once `Signpost-Persisted` is set for this subsystem). Exists to
@@ -34,8 +34,8 @@ final class PacketForwarder {
     /// Diagnostic logging for the HTTPS-hang investigation (todo.md item 1).
     /// Lives here rather than in TLSSession because this is the only place
     /// that sees the device's *non-payload* TCP packets on an intercepted
-    /// flow — the empty ACK that completes the handshake, SYN retransmits,
-    /// RST/FIN — which `TLSSession.receive` never gets (it only receives
+    /// flow: the empty ACK that completes the handshake, SYN retransmits,
+    /// RST/FIN. `TLSSession.receive` never sees those (it only receives
     /// payload bytes). Same subsystem as the signposter and TLSSession so a
     /// single Console filter shows everything.
     private let logger = Logger(subsystem: "com.mDNSShark.PacketTunnel", category: "forwarder")
@@ -52,15 +52,15 @@ final class PacketForwarder {
         running = true
         if SharedSettings.tlsInspectionEnabled && !SharedSettings.tlsInspectionUnlocked {
             SharedSettings.tlsInterceptorLastError = "TLS inspection is off - unlock it in Settings"
-            logger.debug("forwarder start: TLS inspection enabled but NOT unlocked — 443 flows take the plain relay path")
+            logger.debug("forwarder start: TLS inspection enabled but NOT unlocked; 443 flows take the plain relay path")
         } else if SharedSettings.tlsInspectionEnabled && KeychainStore.loadCAKey() != nil {
             tlsInterceptor = TLSInterceptor(onPacket: onPacket)
-            logger.debug("forwarder start: TLSInterceptor active — 443 SYNs will be intercepted")
+            logger.debug("forwarder start: TLSInterceptor active: 443 SYNs will be intercepted")
         } else if SharedSettings.tlsInspectionEnabled {
             SharedSettings.tlsInterceptorLastError = "TLS inspection is off - CA key not found in keychain"
-            logger.debug("forwarder start: TLS inspection enabled but CA key not found in keychain (extension process) — plain relay path")
+            logger.debug("forwarder start: TLS inspection enabled but CA key not found in keychain (extension process); plain relay path")
         } else {
-            logger.debug("forwarder start: TLS inspection disabled — plain relay path for everything")
+            logger.debug("forwarder start: TLS inspection disabled; plain relay path for everything")
         }
         scheduleCleanup()
     }
@@ -72,7 +72,7 @@ final class PacketForwarder {
         tlsInterceptor = nil
         queue.sync {
             // Close out any still-open relay-latency signposts before
-            // discarding the sessions — without this, a flow that hadn't
+            // discarding the sessions. Without this, a flow that hadn't
             // been answered yet when capture stopped would leave its
             // interval open forever instead of recording "no reply",
             // exactly the case this instrumentation exists to catch.
@@ -119,7 +119,7 @@ final class PacketForwarder {
             guard let self, self.running else { return }
 
             // QUIC/HTTP-3 runs over UDP:443 by convention and is plain UDP
-            // to this relay — TLSInterceptor never sees it. Whenever a
+            // to this relay; TLSInterceptor never sees it. Whenever a
             // client can use it, it races against our TLS-intercepted TCP
             // path and wins almost every time (QUIC needs no synthetic
             // handshake, no local listener/bridge, no separate upstream TLS
@@ -128,7 +128,7 @@ final class PacketForwarder {
             // accounts.google.com's TCP+TLS attempt got cancelled ~115ms
             // after its ClientHello, right as a parallel QUIC connection to
             // the same IP finished its own handshake. Dropping UDP:443
-            // outright — silently, no ICMP/rejection — while interception
+            // outright (silently, no ICMP/rejection) while interception
             // can actually happen forces the QUIC-to-TCP fallback every
             // real HTTP/3 client already implements for exactly this
             // "middlebox silently drops UDP" case; the same technique real
@@ -237,12 +237,12 @@ final class PacketForwarder {
                     // Darwin's TCP stack routinely coalesces a final write
                     // with the FIN into one segment (write-then-close), so
                     // this branch being checked ahead of the payload one
-                    // below must not just drop that payload — it's often the
+                    // below must not just drop that payload: it's often the
                     // last chunk of a request/response. And the FIN's own
                     // sequence number in that case is tcpSeq + payload.count,
                     // not tcpSeq itself (the FIN consumes the sequence slot
                     // right after the data, same as a bare FIN consumes the
-                    // slot it's sent at) — passing bare tcpSeq here acked one
+                    // slot it's sent at). Passing bare tcpSeq here acked one
                     // segment short of what the device's kernel expects,
                     // reproducing the same "device retransmits its FIN
                     // forever" bug deviceFINSeq was added to fix, just for
@@ -255,22 +255,22 @@ final class PacketForwarder {
                     // received the SYN-ACK (so checksums passed) but rejected
                     // it (bad ack number, or no listening socket anymore).
                     // RST/FIN minutes later = the device's own timer gave up.
-                    self.logger.debug("[\(flowTag, privacy: .public)] device sent \(isRST ? "RST" : "FIN", privacy: .public) flags=0x\(String(tcpFlags, radix: 16), privacy: .public) seq=\(tcpSeq) ack=\(tcpAck) payload=\(payload.count) — closing intercept session")
+                    self.logger.debug("[\(flowTag, privacy: .public)] device sent \(isRST ? "RST" : "FIN", privacy: .public) flags=0x\(String(tcpFlags, radix: 16), privacy: .public) seq=\(tcpSeq) ack=\(tcpAck) payload=\(payload.count); closing intercept session")
                     interceptor.closeSession(for: key, deviceFINSeq: isFIN ? finSeq : nil)
                 } else if isSYN {
                     // A repeated SYN on a key that already has a session means
                     // the device never accepted our SYN-ACK and is retrying
-                    // the handshake — the checksum (or something else in the
+                    // the handshake: the checksum (or something else in the
                     // synthetic packet) is still being rejected. Previously
                     // only logged, never retried, so a rejected SYN-ACK left
                     // the flow permanently wedged even after fixes (checksum,
                     // MSS) that would have made a retry succeed.
-                    self.logger.debug("[\(flowTag, privacy: .public)] device RETRANSMITTED SYN (isn=\(tcpSeq)) — resending SYN-ACK")
+                    self.logger.debug("[\(flowTag, privacy: .public)] device RETRANSMITTED SYN (isn=\(tcpSeq)); resending SYN-ACK")
                     interceptor.resendSYNACK(for: key)
                 } else if !payload.isEmpty {
                     interceptor.deliver(payload, seq: tcpSeq, for: key)
                 } else {
-                    // Pure ACK. The first one is the handshake's third packet —
+                    // Pure ACK. The first one is the handshake's third packet:
                     // direct proof the SYN-ACK was accepted even if Safari
                     // never sends a ClientHello. Later ones show how far the
                     // device has acknowledged our data (compare `ack` against
@@ -392,7 +392,7 @@ final class PacketForwarder {
 
     // MARK: - Packet construction
 
-    // Both builders below patch in real IPv4 header + UDP/TCP checksums —
+    // Both builders below patch in real IPv4 header + UDP/TCP checksums,
     // previously left as 0x0000. TLSInterceptor.swift's synthetic packets had
     // the same defect and fixing it there is what got a real device to accept
     // a synthetic SYN-ACK at all; this plain relay path builds packets the
@@ -402,7 +402,7 @@ final class PacketForwarder {
     // for UDP without it (DNS through it has been observed working), but the
     // IPv4 header checksum has no such allowance, and a real checksum is
     // never wrong to send. TCP's seq(approx)/ack(0, approx) semantics are
-    // unchanged here — that's the separate, larger, not-yet-fixed handshake
+    // unchanged here; that's the separate, larger, not-yet-fixed handshake
     // gap tracked in todo.md item 1, out of scope for a checksum fix.
     private func buildIPv4UDPPacket(srcIP: String, dstIP: String,
                                      srcPort: UInt16, dstPort: UInt16,
@@ -568,10 +568,10 @@ final class PacketForwarder {
 
     /// Closes a session's relay-latency signpost interval when it's torn
     /// down without ever getting a reply relayed back (idle timeout,
-    /// connection failure, or the peer closing first) — the counterpart to
+    /// connection failure, or the peer closing first): the counterpart to
     /// the normal close in `receiveUDP`/`receiveTCP`. Without this, a
     /// never-answered flow (exactly the case this instrumentation exists to
-    /// catch — e.g. a scan probe that times out) would leave its interval
+    /// catch, e.g. a scan probe that times out) would leave its interval
     /// open forever instead of recording "no reply within N seconds".
     private func endSignpostIfNoReply(_ session: ActiveSession) {
         guard !session.firstReplyRecorded, let state = session.relaySignpostState else { return }
@@ -579,7 +579,7 @@ final class PacketForwarder {
         signposter.endInterval("relayFlow", state, "no reply")
     }
 
-    /// Removes `key`'s entry only if it still points at `session` — a delayed
+    /// Removes `key`'s entry only if it still points at `session`: a delayed
     /// teardown callback for an old flow must never evict a new flow that has
     /// since reclaimed the same 4-tuple key.
     private func removeSessionIfCurrent(key: SessionKey, session: ActiveSession) {
@@ -606,7 +606,7 @@ final class ActiveSession {
     var seqCounter: UInt32 = 1000  // approximate, for TCP reconstruction
 
     /// Signpost interval covering "session opened" → "first reply relayed
-    /// back to the device". Ended once, on the first reply only — a
+    /// back to the device". Ended once, on the first reply only: a
     /// long-lived session (e.g. a kept-alive TCP connection) would otherwise
     /// keep re-measuring the same already-answered interval on every
     /// subsequent packet.

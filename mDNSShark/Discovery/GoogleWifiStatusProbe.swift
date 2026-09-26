@@ -4,12 +4,12 @@ import os
 
 /// Fetches a Google Wifi / Nest Wifi router's local status API
 /// (`GET /api/v1/status`, unauthenticated, no request body). The device
-/// answering its own status endpoint directly — ground-truth tier, not a
+/// answering its own status endpoint directly: ground-truth tier, not a
 /// guess.
 ///
 /// Unlike the other probes, this one is only ever dispatched for a host
 /// `NetworkScanViewModel` already flagged as Google Cast-capable via mDNS
-/// (`_googlecast._tcp`) — firing an active HTTP probe at every LAN host on
+/// (`_googlecast._tcp`); firing an active HTTP probe at every LAN host on
 /// the chance it's a Google Wifi router would be exactly the kind of
 /// speculative traffic this app's other probes avoid.
 final class GoogleWifiStatusProbe {

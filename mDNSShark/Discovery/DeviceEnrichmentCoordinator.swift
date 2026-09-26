@@ -6,8 +6,8 @@ import os
 
 /// Fans the eight active probes out per discovered IP, each gated by one
 /// shared ProbeConcurrencyLimiter (global cap across every probe type and
-/// every IP — never per-IP) and, for the UDP probes, one shared
-/// UDPSendPacer (minimum spacing between sends) — except ARPTableProbe,
+/// every IP, never per-IP) and, for the UDP probes, one shared
+/// UDPSendPacer (minimum spacing between sends). The exception is ARPTableProbe,
 /// which is a local sysctl read (no LAN traffic), so it skips the
 /// limiter/pacer, but still runs on a detached task rather than inline:
 /// it's synchronous with no internal `await`, and inline on this
@@ -22,7 +22,7 @@ import os
 /// domain to be mutated safely both from `enrich`/`enrichDescription`/
 /// `enrichGoogleWifi` (synchronous calls from the view model) and from each task's own cleanup
 /// when it finishes. This does not push actual network I/O onto the main
-/// thread — the probe types themselves (`UbiquitiDiscoveryProbe`,
+/// thread: the probe types themselves (`UbiquitiDiscoveryProbe`,
 /// `NetBIOSProbe`, etc.) are plain, non-isolated classes, so their socket
 /// work still runs off the main actor; only the thin orchestration here is
 /// main-actor-isolated.
@@ -37,7 +37,7 @@ final class DeviceEnrichmentCoordinator {
     /// `com.apple.developer.networking.multicast` is approved and
     /// restored in both `.entitlements` files (see todo.md). ASUS's reply
     /// is a UDP broadcast the OS silently drops without that entitlement,
-    /// so `limitedASUSProbe` can never succeed while this is `false` — skip
+    /// so `limitedASUSProbe` can never succeed while this is `false`; skip
     /// firing it at all rather than burning the full `probeTimeout` and a
     /// `ProbeConcurrencyLimiter` slot on every single scanned host for a
     /// probe that's guaranteed to fail.
@@ -55,17 +55,17 @@ final class DeviceEnrichmentCoordinator {
 
     private let probeTimeout: TimeInterval = 1.5
     private let fetchTimeout: TimeInterval = 2.5
-    /// 2026-09-20: raised from 1.0s — PortScanner marks an HTTP-shaped port
+    /// 2026-09-20: raised from 1.0s. PortScanner marks an HTTP-shaped port
     /// (80/443/8080/8443) open the moment its TCP handshake reaches
     /// `.ready`, even if the GET response hasn't arrived yet (`banner: nil`
     /// in that case). Confirmed on real hardware (GL.iNet GL-MT6000): ports
     /// were correctly found open, but manufacturer/OS stayed Unknown
-    /// despite `BannerHeuristic` already recognizing "gl.inet"/"gl-inet" —
+    /// despite `BannerHeuristic` already recognizing "gl.inet"/"gl-inet":
     /// 1.0s wasn't enough time for a JS-heavy custom router web UI to
     /// finish serving its page before the timeout cut the read off.
     private let portScanTimeout: TimeInterval = 4.0
     /// Per-attempt budget for JNAPHNAPProbe's JNAP try and its HNAP
-    /// fallback — worst case (neither answers) holds the limiter slot for
+    /// fallback; worst case (neither answers) holds the limiter slot for
     /// roughly 2x this, same order as fetchTimeout.
     private let jnapHnapAttemptTimeout: TimeInterval = 1.0
     /// Single-request budget for GoogleWifiStatusProbe - one plain GET, no
@@ -76,14 +76,14 @@ final class DeviceEnrichmentCoordinator {
     /// In-flight `enrich`/`enrichDescription`/`enrichGoogleWifi` tasks, keyed by a locally
     /// generated id so each task can remove itself when it finishes without
     /// relying on `Task` being storable in a `Set` by identity. `cancelAll()`
-    /// cancels and clears everything still running — called whenever a
+    /// cancels and clears everything still running; called whenever a
     /// fresh scan starts so a previous scan's still-running probes can never
     /// race or deliver results into the new scan's state.
     private var activeTasks: [UUID: Task<Void, Never>] = [:]
 
     /// Fire all seven probes for one IP concurrently and publish the combined
     /// results once every probe has either answered or timed out. Safe to
-    /// call many times concurrently for different IPs — the shared limiter
+    /// call many times concurrently for different IPs; the shared limiter
     /// is what keeps total outbound traffic bounded, not caller discipline.
     ///
     /// Guarded at the top by the same LAN-local check `SSDPDescriptionFetcher`
@@ -92,7 +92,7 @@ final class DeviceEnrichmentCoordinator {
     /// and every one of the seven probes below (including PortScanner's
     /// NWConnection, which accepts a hostname and would trigger a DNS
     /// lookup) must never fire against an address outside the
-    /// private/link-local/loopback ranges — this is the single choke point
+    /// private/link-local/loopback ranges; this is the single choke point
     /// every enrichment path goes through. `JNAPHNAPProbe` applies the same
     /// guard again internally since it targets `ip` directly rather than
     /// going through this call site.
@@ -113,8 +113,8 @@ final class DeviceEnrichmentCoordinator {
             // Detached: the sysctl(2) read + full ARP-table parse is
             // synchronous with no await in it. Called inline (no
             // .detached), it would run in-place on this @MainActor
-            // Task's executor — once per discovered IP, back-to-back for
-            // every device in a scan — starving the main actor of the
+            // Task's executor (once per discovered IP, back-to-back for
+            // every device in a scan), starving the main actor of the
             // slots every other probe's continuation needs to resume on,
             // including limitedPortScan's, long enough to blow through
             // their timeouts.
@@ -146,11 +146,11 @@ final class DeviceEnrichmentCoordinator {
                 enrichments.append(DeviceEnrichment(mac: mac, manufacturer: OUIDatabase.shared.manufacturer(for: mac), inferredOS: nil,
                                                      openPorts: [], source: .ouiLookup))
             }
-            // Local kernel read, not network I/O — doesn't go through the
+            // Local kernel read, not network I/O, so it doesn't go through the
             // limiter/pacer the network probes above share, but still runs
             // detached (see the async let above), not inline on this
             // MainActor task. manufacturer comes from the same OUI table
-            // the NetBIOS-sourced mac above resolves through —
+            // the NetBIOS-sourced mac above resolves through;
             // arpTableLookup is just another path to a real mac, not a
             // different kind of signal.
             if let mac = await arpMac {
@@ -187,14 +187,14 @@ final class DeviceEnrichmentCoordinator {
 
     /// Narrower entry point dedicated to the SSDP device-description fetch.
     /// `enrich()` fires exactly once per IP (Ruling 14), using whichever
-    /// `Device` was first-seen for it — but the local port-80 subnet sweep
+    /// `Device` was first-seen for it, but the local port-80 subnet sweep
     /// often discovers an IP (with no `locationURL` yet) around the same
     /// time the SSDP reply for that same IP arrives, so `enrich()`'s
     /// one-shot call frequently fires with `locationURL: nil` and the SSDP
     /// description never gets fetched even though a later `Device` update
     /// for the same IP does carry a valid `locationURL`. `NetworkScanViewModel`
     /// calls this independently, once per IP, the first time any row for
-    /// that IP reveals a non-nil `locationURL` — regardless of whether
+    /// that IP reveals a non-nil `locationURL`, regardless of whether
     /// `enrich()` already fired for that IP via an earlier row.
     func enrichDescription(ip: String, locationURL: URL) {
         guard SSDPDescriptionFetcher.isLANLocalAddress(ip) else {
@@ -215,7 +215,7 @@ final class DeviceEnrichmentCoordinator {
     /// Narrower entry point dedicated to the Google Wifi status probe.
     /// Not part of `enrich()`'s fan-out because firing it requires knowing
     /// the mDNS service type (`_googlecast._tcp`) that flagged this host as
-    /// Google Cast-capable — a signal only `NetworkScanViewModel` tracks.
+    /// Google Cast-capable, a signal only `NetworkScanViewModel` tracks.
     /// Callers must only invoke this for hosts already carrying that hint,
     /// the same anti-speculative-traffic discipline as `enrichDescription`.
     func enrichGoogleWifi(ip: String) {
@@ -296,7 +296,7 @@ final class DeviceEnrichmentCoordinator {
     private func limitedSSDPFetch(locationURL: URL?) async -> SSDPDescriptionInfo? {
         // Guarded here (rather than at the `async let` call site with an
         // Optional.map closure) because `async let`'s initializer must be a
-        // direct async call expression — wrapping it in a synchronous
+        // direct async call expression; wrapping it in a synchronous
         // closure ("locationURL.map { limitedSSDPFetch(...) }") does not
         // type-check ("async call in a function that does not support
         // concurrency"), since Optional.map's closure parameter isn't async.

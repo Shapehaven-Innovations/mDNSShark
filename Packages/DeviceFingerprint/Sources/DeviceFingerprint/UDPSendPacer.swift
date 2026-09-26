@@ -1,6 +1,6 @@
 /// Enforces a minimum spacing between successive `waitTurn()` returns so a
 /// burst of near-instant UDP probe sends (one probe per subnet host) spreads
-/// out over time instead of firing all at once — the shape that reads as a
+/// out over time instead of firing all at once, the shape that reads as a
 /// flood/scan signature to a network IDS.
 ///
 /// Design note: this loops and re-checks against the CURRENT `nextSlot` after
@@ -15,7 +15,7 @@
 /// no await in between) against the REAL current time, never a stale plan.
 ///
 /// A cancelled caller's `waitTurn()` returns immediately, without claiming a
-/// slot. Returning does NOT mean "your turn is guaranteed safe to use" —
+/// slot. Returning does NOT mean "your turn is guaranteed safe to use";
 /// callers must check `Task.isCancelled` before actually sending, since a
 /// cancelled call can return early for that reason alone.
 public actor UDPSendPacer {
@@ -38,13 +38,13 @@ public actor UDPSendPacer {
             do {
                 try await Task.sleep(until: floor, tolerance: .zero, clock: clock)
             } catch {
-                // Cancelled: return immediately rather than looping — swallowing
+                // Cancelled: return immediately rather than looping; swallowing
                 // the error with `try?` here would busy-spin, since a cancelled
                 // Task.sleep throws instantly without sleeping and `floor <= now`
                 // would still be false on the very next iteration.
                 return
             }
-            // Loop back and re-check against the LATEST nextSlot — it may have
+            // Loop back and re-check against the LATEST nextSlot; it may have
             // been pushed later by another caller's claim while we were asleep.
         }
     }

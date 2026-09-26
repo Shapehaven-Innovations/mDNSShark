@@ -7,7 +7,7 @@ final class ASUSDiscoveryPacketTests: XCTestCase {
     // Wire format confirmed against ASUS's own GPL firmware source
     // (RMerl/asuswrt-merlin, an enhanced fork of the stock Asuswrt code):
     //   - release/src/router/shared/iboxcom.h (struct/enum definitions,
-    //     `#pragma pack(1)` — no padding)
+    //     `#pragma pack(1)`, no padding)
     //   - release/src/router/infosvr/common.c, `processPacket()` (shows
     //     exactly how NET_CMD_ID_GETINFO populates the reply)
     //
@@ -63,9 +63,9 @@ final class ASUSDiscoveryPacketTests: XCTestCase {
     // MARK: - probe()
 
     // `infosvr.c`'s `processReq()` requires the request to be exactly
-    // INFO_PDU_LENGTH (512) bytes — `iRcv = RECV(sockfd, pdubuf,
+    // INFO_PDU_LENGTH (512) bytes: `iRcv = RECV(sockfd, pdubuf,
     // INFO_PDU_LENGTH, ...); if (iRcv != INFO_PDU_LENGTH) { closesocket(...);
-    // return -1; }` — so an 8-byte-only probe is silently discarded by real
+    // return -1; }`, so an 8-byte-only probe is silently discarded by real
     // hardware. The wire header is still just the first 8 bytes; the rest
     // must be zero padding out to the full datagram size.
     func test_probe_is512BytesTotal_withGetInfoHeaderAndZeroPadding() {
@@ -93,14 +93,14 @@ final class ASUSDiscoveryPacketTests: XCTestCase {
         XCTAssertEqual(ASUSDiscoveryPacket.decode(data)?.model, longModel)
     }
 
-    // MARK: - decode() malformed/truncated input — must never crash, return nil
+    // MARK: - decode() malformed/truncated input: must never crash, return nil
 
     func test_emptyData_returnsNil() {
         XCTAssertNil(ASUSDiscoveryPacket.decode(Data()))
     }
 
     func test_truncatedReply_shorterThanMacOffset_returnsNil() {
-        // Only the header plus a partial PrinterInfo field — far short of
+        // Only the header plus a partial PrinterInfo field, far short of
         // reaching the MAC field, must not crash indexing past the buffer.
         let bytes: [UInt8] = [0x0C, 0x16, 0x1F, 0x00, 0x00, 0x00, 0x00, 0x00] + [UInt8](repeating: 0, count: 10)
         XCTAssertNil(ASUSDiscoveryPacket.decode(Data(bytes)))
@@ -158,7 +158,7 @@ final class ASUSDiscoveryPacketTests: XCTestCase {
     }
 
     func test_allFieldsEmpty_returnsNil() {
-        // If nothing decodable came back at all, the whole reply is nil —
+        // If nothing decodable came back at all, the whole reply is nil,
         // same discipline as UbiquitiDiscoveryPacket: distinguishes "nothing
         // decoded" from "decoded with all-empty fields".
         let data = makeReply(ssid: nil, productID: nil, firmwareVersion: nil, mac: [0, 0, 0, 0, 0, 0])

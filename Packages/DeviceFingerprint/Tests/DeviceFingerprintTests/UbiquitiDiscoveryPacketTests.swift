@@ -26,9 +26,9 @@ final class UbiquitiDiscoveryPacketTests: XCTestCase {
     }
 
     func test_truncatedTLVValue_isIgnoredSafely() {
-        // header says len=10 but only 3 bytes of TLV follow — must not crash.
+        // header says len=10 but only 3 bytes of TLV follow; must not crash.
         // With no other field parsed, decode must return nil for the WHOLE
-        // reply (not just a nil hostname on a non-nil reply) — asserting on
+        // reply (not just a nil hostname on a non-nil reply); asserting on
         // the full optional distinguishes "nothing decoded" from "decoded
         // with an empty hostname field", which `?.hostname == nil` alone
         // cannot tell apart.
@@ -78,7 +78,7 @@ final class UbiquitiDiscoveryPacketTests: XCTestCase {
 
     func test_goodTLV_followedByTruncatedTLV_earlierFieldIsPreserved() {
         // hostname TLV is well-formed and complete; the TLV after it claims
-        // len=0xFF but no such data follows — the loop must stop there
+        // len=0xFF but no such data follows; the loop must stop there
         // WITHOUT discarding the hostname already parsed.
         var bytes: [UInt8] = [0x02, 0x00, 0x00, 0x00]
         var body: [UInt8] = []
@@ -105,7 +105,7 @@ final class UbiquitiDiscoveryPacketTests: XCTestCase {
     func test_macTLV_wrongByteLength_doesNotProduceGarbageMac() {
         let data = makePacket([
             (type: 0x0B, value: Array("host".utf8)), // keep reply non-nil
-            (type: 0x01, value: [0x01, 0x02, 0x03, 0x04, 0x05]) // 5 bytes, not 6 — invalid
+            (type: 0x01, value: [0x01, 0x02, 0x03, 0x04, 0x05]) // 5 bytes, not 6, so invalid
         ])
         let reply = UbiquitiDiscoveryPacket.decode(data)
         XCTAssertEqual(reply?.hostname, "host")

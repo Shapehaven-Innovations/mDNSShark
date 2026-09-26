@@ -1,7 +1,7 @@
 import Foundation
 
 /// One decoded reply from a Ubiquiti device's discovery-protocol responder
-/// (UDP port 10001). Ground-truth data the device reported about itself —
+/// (UDP port 10001). Ground-truth data the device reported about itself,
 /// not an inference.
 public struct UbiquitiDiscoveryReply: Sendable {
     public let mac: String?
@@ -39,7 +39,7 @@ public enum UbiquitiDiscoveryPacket {
             let len = Int(body[i + 1]) << 8 | Int(body[i + 2])
             let valueStart = i + 3
             let valueEnd = valueStart + len
-            guard valueEnd <= body.endIndex else { break } // truncated TLV — stop, keep what we have
+            guard valueEnd <= body.endIndex else { break } // truncated TLV: stop, keep what we have
             let value = body[valueStart..<valueEnd]
 
             switch type {

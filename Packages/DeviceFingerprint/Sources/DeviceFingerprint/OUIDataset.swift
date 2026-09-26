@@ -1,8 +1,8 @@
 import Foundation
 
-/// Loads a `prefix<TAB>vendor` text table (24-bit OUI prefixes only — MA-M/MA-S
+/// Loads a `prefix<TAB>vendor` text table (24-bit OUI prefixes only; MA-M/MA-S
 /// sub-allocations with a `/nn` suffix are out of scope for this lookup) and
-/// answers manufacturer-by-MAC-prefix queries. Pure — no I/O, no Foundation
+/// answers manufacturer-by-MAC-prefix queries. Pure: no I/O, no Foundation
 /// bundle access, so it's fully unit-testable without touching disk.
 public struct OUIDataset {
     private let table: [String: String]

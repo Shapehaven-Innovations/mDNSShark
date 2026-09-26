@@ -15,7 +15,7 @@ enum TLSInspectionProduct {
 // Every StoreKit outcome is logged so a "tapped the button and nothing happened"
 // report can be pinned to a branch from the Xcode console (filter: "Purchase").
 // Without this the purchase flow is invisible: StoreKit's own logs are private and
-// `.userCancelled` is (correctly) silent in the UI — but Xcode's local StoreKit
+// `.userCancelled` is (correctly) silent in the UI, but Xcode's local StoreKit
 // Testing on iOS 26.3+ runtimes has a known regression where purchase() returns
 // `.userCancelled` immediately with no sheet (Apple forums 820991 / 826364,
 // FB22774836), which is indistinguishable from a real cancel without this log.
@@ -57,7 +57,7 @@ final class PurchaseManager: ObservableObject {
             // Preload is best-effort: a failure here must not set lastError.
             // SettingsView's Store Error alert is driven by `lastError != nil`,
             // so a launch-time failure would pop an out-of-context alert the
-            // first time Settings opens — and if that presentation is dropped
+            // first time Settings opens, and if that presentation is dropped
             // (view not in the hierarchy yet), the binding stays true and every
             // later, user-initiated error is swallowed because there's no
             // false→true transition left to present on. purchase() re-fetches
@@ -85,7 +85,7 @@ final class PurchaseManager: ObservableObject {
                 // throwing. In StoreKit Testing this means the .storekit file
                 // isn't active for this run or doesn't define the ID; in the
                 // sandbox it means the ID isn't in App Store Connect.
-                logger.error("loadProducts: StoreKit returned no product for \(stillMissing) — check the scheme's StoreKit Configuration is active for this run destination")
+                logger.error("loadProducts: StoreKit returned no product for \(stillMissing); check the scheme's StoreKit Configuration is active for this run destination")
             }
         } catch {
             logger.error("loadProducts: \(error.localizedDescription) (\(String(describing: error)))")
@@ -135,7 +135,7 @@ final class PurchaseManager: ObservableObject {
                 // Intentionally no user-facing error. A genuine cancel takes
                 // human time; a sub-second .userCancelled with no sheet is the
                 // StoreKit Testing regression described at the top of the file.
-                logger.notice("purchase(\(productID)): userCancelled after \(elapsed, format: .fixed(precision: 2))s\(elapsed < 1 ? " — too fast for a real cancel; StoreKit Testing likely never presented a sheet" : "")")
+                logger.notice("purchase(\(productID)): userCancelled after \(elapsed, format: .fixed(precision: 2))s\(elapsed < 1 ? " (too fast for a real cancel; StoreKit Testing likely never presented a sheet)" : "")")
             case .pending:
                 logger.notice("purchase(\(productID)): pending")
                 lastError = "Purchase is pending approval (Ask to Buy, parental controls, or a required update) and hasn't completed yet. Check back once it's approved."
@@ -166,7 +166,7 @@ final class PurchaseManager: ObservableObject {
     // StoreKit just handed us (Apple forums 820813 / 823454: it sometimes emits
     // nothing until a sync or reboot). If refreshEntitlements() didn't see this
     // transaction, apply it directly so the UI unlocks now instead of on some
-    // later launch — the transaction is already verified, so it is authoritative.
+    // later launch: the transaction is already verified, so it is authoritative.
     private func applyIfMissing(_ transaction: Transaction) {
         guard transaction.revocationDate == nil else { return }
         switch transaction.productID {
@@ -200,7 +200,7 @@ final class PurchaseManager: ObservableObject {
     }
 
     private func publish(unlocked: Bool, trialStart: Date?) {
-        // Only assign (and thus only publish) on an actual change — @Published fires
+        // Only assign (and thus only publish) on an actual change: @Published fires
         // objectWillChange on every assignment regardless of equality, and this method
         // runs on every launch/foreground even when nothing changed (e.g. no purchase
         // yet). An unconditional reassignment re-renders SettingsView at an arbitrary

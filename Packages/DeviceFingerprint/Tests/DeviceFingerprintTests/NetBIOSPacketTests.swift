@@ -24,7 +24,7 @@ final class NetBIOSPacketTests: XCTestCase {
         // nbstat.nse) all send NUL padding. Windows compares the full
         // 16-byte encoded name and may silently not answer a space-padded
         // query at all, even though Samba tolerates it by trimming trailing
-        // spaces. NUL (0x00) nibble-encodes to 0x41,0x41 ('A','A') — distinct
+        // spaces. NUL (0x00) nibble-encodes to 0x41,0x41 ('A','A'), distinct
         // from space (0x20), which would encode to 0x43,0x41 ('C','A').
         for pairIndex in 1..<16 {
             let offset = 13 + pairIndex * 2
@@ -46,13 +46,13 @@ final class NetBIOSPacketTests: XCTestCase {
     // MARK: - Reply fixture builder
     //
     // Assembles a well-formed-looking NBSTAT NODE STATUS RESPONSE:
-    //   12-byte header (ANCOUNT=1, RCODE=0 — a real reply, not a stray
+    //   12-byte header (ANCOUNT=1, RCODE=0; a real reply, not a stray
     //   datagram that merely happens to be the right length)
-    // + 34-byte question/answer name field (content irrelevant — decode()
+    // + 34-byte question/answer name field (content irrelevant; decode()
     //   never parses it)
     // + TYPE/CLASS/TTL/RDLENGTH (10 bytes; TYPE=NBSTAT=0x0021)
     // + NUM_NAMES (1 byte)
-    // + whatever `afterNumNames` bytes the test supplies — the real reply
+    // + whatever `afterNumNames` bytes the test supplies. The real reply
     //   has NUM_NAMES * 18-byte NODE_NAME entries there, THEN the 6-byte
     //   UNIT_ID (MAC), per RFC 1002 §4.2.18.
     private func makeReplyBytes(numNames: UInt8, afterNumNames: [UInt8]) -> [UInt8] {
@@ -82,12 +82,12 @@ final class NetBIOSPacketTests: XCTestCase {
 
     func test_decodesMacFromAdapterStatusReply_withZeroRegisteredNames() {
         // NUM_NAMES = 0 is the boundary case where a fixed offset happens
-        // to be correct — a real host essentially never reports this
+        // to be correct; a real host essentially never reports this
         // (Windows typically registers 3-7 names), but it must still work.
         let bytes = makeReplyBytes(numNames: 0, afterNumNames: [0xFC, 0xEC, 0xDA, 0x01, 0x02, 0x03])
         let reply = NetBIOSPacket.decode(Data(bytes))
         XCTAssertEqual(reply?.mac, "fc:ec:da:01:02:03")
-        // decode() never populates the name field — documented behavior, not
+        // decode() never populates the name field: documented behavior, not
         // just an omission, so pin it down explicitly rather than leaving it
         // to whatever the struct's default happens to be.
         XCTAssertNil(reply?.name)
@@ -116,7 +116,7 @@ final class NetBIOSPacketTests: XCTestCase {
 
     func test_implausibleNumNames_packetTooShortToContainThem_returnsNil() {
         // NUM_NAMES = 0xFF implies macOffset = 57 + 18*255 = 4647, but the
-        // packet only has a handful of trailing bytes — must return nil,
+        // packet only has a handful of trailing bytes; must return nil,
         // not crash or read garbage.
         let bytes = makeReplyBytes(numNames: 0xFF, afterNumNames: [0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF])
         XCTAssertNil(NetBIOSPacket.decode(Data(bytes)))
@@ -125,7 +125,7 @@ final class NetBIOSPacketTests: XCTestCase {
     func test_truncatedPartwayThroughNodeNameArray_returnsNil() {
         // NUM_NAMES = 2 (so macOffset = 57 + 36 = 93 is expected), but the
         // packet ends partway through the very first 18-byte NODE_NAME
-        // entry — must return nil, not read past the end or misinterpret
+        // entry; must return nil, not read past the end or misinterpret
         // whatever partial bytes are present as the MAC.
         var afterNumNames = nodeNameEntry("PARTIAL")
         afterNumNames = Array(afterNumNames.prefix(10)) // truncate mid-entry
@@ -148,7 +148,7 @@ final class NetBIOSPacketTests: XCTestCase {
     }
 
     func test_packetExactlyAtMacBoundary_decodesSuccessfully() {
-        // Exactly macOffset + 6 bytes — the tightest buffer that must still succeed.
+        // Exactly macOffset + 6 bytes: the tightest buffer that must still succeed.
         let bytes = makeReplyBytes(numNames: 0, afterNumNames: [0xFC, 0xEC, 0xDA, 0x01, 0x02, 0x03])
         let reply = NetBIOSPacket.decode(Data(bytes))
         XCTAssertEqual(reply?.mac, "fc:ec:da:01:02:03")
@@ -168,14 +168,14 @@ final class NetBIOSPacketTests: XCTestCase {
 
     func test_nonZeroRCODE_returnsNil() {
         var bytes = makeReplyBytes(numNames: 0, afterNumNames: [0xFC, 0xEC, 0xDA, 0x01, 0x02, 0x03])
-        bytes[3] = 0x03 // RCODE = 3 (name error) — a failure response, not a real answer
+        bytes[3] = 0x03 // RCODE = 3 (name error), a failure response, not a real answer
         XCTAssertNil(NetBIOSPacket.decode(Data(bytes)))
     }
 
     func test_wrongANCOUNT_returnsNil() {
         var bytes = makeReplyBytes(numNames: 0, afterNumNames: [0xFC, 0xEC, 0xDA, 0x01, 0x02, 0x03])
         bytes[6] = 0x00
-        bytes[7] = 0x00 // ANCOUNT = 0 — no answer RR present
+        bytes[7] = 0x00 // ANCOUNT = 0: no answer RR present
         XCTAssertNil(NetBIOSPacket.decode(Data(bytes)))
     }
 

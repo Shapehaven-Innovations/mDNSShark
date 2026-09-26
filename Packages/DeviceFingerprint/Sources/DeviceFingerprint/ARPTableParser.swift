@@ -7,7 +7,7 @@ import Darwin
 /// `PF_ROUTE`/`NET_RT_FLAGS` sysctl (the same table `arp -a` and
 /// `netstat -rn` walk). Real link-layer addresses are only non-nil on
 /// iOS 27+ with the undocumented `com.apple.developer.networking.topology-observation`
-/// entitlement — see todo.md item 4. On iOS 18-26, or without the
+/// entitlement; see todo.md item 4. On iOS 18-26, or without the
 /// entitlement, the kernel still returns an entry per neighbor but zeroes
 /// the link-layer bytes, so `macAddress` comes back nil and callers fall
 /// through to the existing NetBIOS/vendor-discovery MAC sources unchanged.
@@ -23,7 +23,7 @@ public struct ARPTableEntry: Equatable {
 
 /// Decodes the raw buffer a `NET_RT_FLAGS`/`RTF_LLINFO` routing-socket
 /// sysctl returns. Pure and synchronous so it can be exercised with
-/// synthetic buffers in tests — the actual `sysctl(2)` call lives in
+/// synthetic buffers in tests; the actual `sysctl(2)` call lives in
 /// `ARPTableReader`.
 ///
 /// Deliberately does NOT reference the real `rt_msghdr`/`sockaddr_inarp`
@@ -31,7 +31,7 @@ public struct ARPTableEntry: Equatable {
 /// `<net/route.h>` (and therefore the actual kernel wire format) is
 /// identical across every Darwin platform: the iOS SDK's module map hides
 /// those declarations from Swift (confirmed by typechecking against
-/// `-sdk iphonesimulator` — `rt_msghdr`/`sockaddr_inarp` and the route
+/// `-sdk iphonesimulator`: `rt_msghdr`/`sockaddr_inarp` and the route
 /// constants fail to resolve there, while `sockaddr_dl`/`AF_LINK`/
 /// `CTL_NET`/`PF_ROUTE`/`NET_RT_FLAGS` do not), so code that imports the
 /// real types builds fine on macOS (where this package's tests run) but
@@ -42,14 +42,14 @@ public struct ARPTableEntry: Equatable {
 public enum ARPTableParser {
     /// `struct rt_msghdr { u_short rtm_msglen; u_char rtm_version; u_char
     /// rtm_type; u_short rtm_index; int rtm_flags; int rtm_addrs; ... }`
-    /// — `rtm_flags`/`rtm_addrs` sit at offsets 8/12 (2 bytes of padding
+    /// puts `rtm_flags`/`rtm_addrs` at offsets 8/12 (2 bytes of padding
     /// before the first 4-byte-aligned `int` field), and the whole header
     /// (through the trailing `rt_metrics`) is 92 bytes.
     private static let headerSize = 92
     private static let rtmMsglenOffset = 0
     private static let rtmFlagsOffset = 8
     private static let rtmAddrsOffset = 12
-    /// `RTF_LLINFO` (0x400) — not `private`: `ARPTableReader` needs the same
+    /// `RTF_LLINFO` (0x400). Not `private`: `ARPTableReader` needs the same
     /// value for the sysctl MIB itself, and it's hidden from the iOS SDK
     /// the same way the other route constants above are.
     static let rtfLLINFO: Int32 = 0x400
@@ -59,7 +59,7 @@ public enum ARPTableParser {
     private static let rtaGATEWAY: Int32 = 1 << 1
 
     /// Rounds a `sockaddr`'s `sa_len` up to the routing socket's 4-byte
-    /// address alignment (`ROUNDUP` in BSD's route.c / arp.c) — each
+    /// address alignment (`ROUNDUP` in BSD's route.c / arp.c): each
     /// address packed after an `rt_msghdr` consumes this many bytes
     /// regardless of its own reported length.
     static func roundedLength(_ len: Int) -> Int {
@@ -120,7 +120,7 @@ public enum ARPTableParser {
     }
 
     /// `sockaddr_inarp` shares `sockaddr_in`'s layout for its first fields
-    /// (`sin_len`, `sin_family`, `sin_port`, `sin_addr`) — the IPv4 address
+    /// (`sin_len`, `sin_family`, `sin_port`, `sin_addr`), so the IPv4 address
     /// is always the 4 bytes starting at offset 4.
     private static func readIPv4(_ bytes: [UInt8], at offset: Int) -> String? {
         guard offset + 8 <= bytes.count else { return nil }

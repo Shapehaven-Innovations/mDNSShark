@@ -3,7 +3,7 @@ import SwiftUI
 
 struct DeviceDetailView: View {
     @EnvironmentObject var coordinator: AppCoordinator
-    // Navigation-time snapshot. Only a fallback — see `device` below.
+    // Navigation-time snapshot. Only a fallback; see `device` below.
     private let snapshot: DiscoveredDevice
 
     init(device: DiscoveredDevice) { snapshot = device }
@@ -11,15 +11,15 @@ struct DeviceDetailView: View {
     /// The live row for this device, re-read from the coordinator on every
     /// body evaluation, with the current security findings applied.
     ///
-    /// Reading `coordinator` here — rather than rendering whatever value
-    /// the parent passed in — is what keeps an already-pushed detail
+    /// Reading `coordinator` here (rather than rendering whatever value
+    /// the parent passed in) is what keeps an already-pushed detail
     /// screen updating as enrichment streams in. `@EnvironmentObject`
     /// registers a dependency on `coordinator.objectWillChange`, so any
     /// devices/findings mutation re-runs this body. A parent-supplied
     /// value alone cannot: SwiftUI decides whether to re-run a child's
     /// body by comparing the old and new view values field-by-field using
     /// each field's `Equatable`, and `DiscoveredDevice ==` compares only
-    /// `id` — so a fresh copy carrying a newly-discovered MAC/manufacturer/
+    /// `id`, so a fresh copy carrying a newly-discovered MAC/manufacturer/
     /// OS diffs as "unchanged" and is silently dropped, leaving the screen
     /// stuck on "Unknown". The snapshot is used only if the row has since
     /// left the live list.

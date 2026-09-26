@@ -28,7 +28,7 @@ final class ProbeConcurrencyLimiterTests: XCTestCase {
     /// waiter, and only the waiter's own re-entry into the actor increments
     /// `current` again), there was a window between a waiter being resumed
     /// and it actually re-entering the actor where another queued
-    /// `acquire()` could also observe a free slot — transiently exceeding
+    /// `acquire()` could also observe a free slot, transiently exceeding
     /// `maxConcurrent`. Unlike the single-burst test above, this sustains
     /// contention across many acquire/release cycles with more callers than
     /// the cap and a hold time long enough that callers reliably queue as

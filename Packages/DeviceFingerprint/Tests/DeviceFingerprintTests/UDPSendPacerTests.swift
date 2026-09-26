@@ -44,7 +44,7 @@ final class UDPSendPacerTests: XCTestCase {
     func test_cancelledCaller_returnsPromptlyWithoutBusySpinning() async {
         // A generous spacing so that, if the old busy-spin bug were present,
         // a cancelled caller would burn CPU in a tight loop for roughly this
-        // long before finally returning — making the regression obvious.
+        // long before finally returning, making the regression obvious.
         let pacer = UDPSendPacer(minimumSpacing: .milliseconds(200))
         let clock = ContinuousClock()
 
@@ -70,7 +70,7 @@ final class UDPSendPacerTests: XCTestCase {
             for await elapsed in group {
                 XCTAssertLessThan(
                     elapsed, .milliseconds(50),
-                    "cancelled waitTurn() call took \(elapsed) — should return almost immediately, not busy-spin until its slot"
+                    "cancelled waitTurn() call took \(elapsed); should return almost immediately, not busy-spin until its slot"
                 )
             }
         }
@@ -80,7 +80,7 @@ final class UDPSendPacerTests: XCTestCase {
         let batchElapsed = clock.now - batchStart
         XCTAssertLessThan(
             batchElapsed, .milliseconds(100),
-            "cancelled batch took \(batchElapsed) — suggests busy-spinning instead of an immediate cancellation return"
+            "cancelled batch took \(batchElapsed); suggests busy-spinning instead of an immediate cancellation return"
         )
     }
 }

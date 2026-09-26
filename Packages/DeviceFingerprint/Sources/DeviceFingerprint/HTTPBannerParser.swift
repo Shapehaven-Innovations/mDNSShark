@@ -17,7 +17,7 @@ public struct HTTPBannerInfo {
 /// `<title>`, and the `realm=` portion of a `WWW-Authenticate:` header
 /// (router/IoT admin-UI login prompts frequently put the vendor/model there).
 ///
-/// Input is untrusted bytes straight off the LAN — a device can send
+/// Input is untrusted bytes straight off the LAN: a device can send
 /// anything, truncated mid-header, non-UTF8, or not HTTP at all. Every code
 /// path here must degrade to nil fields rather than crash, same discipline
 /// as `SSDPDeviceDescription.parse` and `guessFromBanner`.

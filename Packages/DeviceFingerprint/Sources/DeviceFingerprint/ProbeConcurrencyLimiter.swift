@@ -1,6 +1,6 @@
 
 /// Caps total simultaneous in-flight operations across every caller,
-/// regardless of what kind of work each one does — the enrichment
+/// regardless of what kind of work each one does. The enrichment
 /// coordinator shares ONE instance across all five probe types so the total
 /// outbound traffic never exceeds `maxConcurrent`, no matter how many IPs
 /// or probe kinds are running at once.
@@ -14,7 +14,7 @@ public actor ProbeConcurrencyLimiter {
     }
 
     // Hand-off semantics: releasing directly to a waiter never touches
-    // `current` at all — the slot count doesn't change, it just changes
+    // `current` at all: the slot count doesn't change, it just changes
     // hands atomically within the same actor-isolated call. Without this, a
     // waiter's own `current += 1` only executes once it actually re-enters
     // the actor after being resumed; in the window between the resume call

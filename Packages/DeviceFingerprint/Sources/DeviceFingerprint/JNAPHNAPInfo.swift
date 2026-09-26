@@ -2,7 +2,7 @@ import Foundation
 
 /// Parsed identity fields from either a Linksys JNAP (`POST /JNAP/`, JSON) or
 /// an HNAP (`POST /HNAP1/`, SOAP/XML) device-info response. Same wire-level
-/// idea as `SSDPDescriptionInfo` — the device answering its own vendor API
+/// idea as `SSDPDescriptionInfo`: the device answering its own vendor API
 /// directly, so this is ground-truth tier, not a guess.
 public struct JNAPHNAPInfo {
     public let vendorName: String?
@@ -14,7 +14,7 @@ public struct JNAPHNAPInfo {
 public enum JNAPHNAPParser {
     /// Parses a JNAP `core/GetDeviceInfo` JSON response body:
     /// `{"result":"OK","output":{"manufacturer":"Linksys","modelNumber":"MX5500","description":"...","firmwareVersion":"..."}}`.
-    /// Requires `result == "OK"` — this result is merged as ground truth
+    /// Requires `result == "OK"`: this result is merged as ground truth
     /// (unconditionally overrides weaker sources), so it's worth rejecting
     /// anything the device itself didn't report success on, rather than
     /// accepting any 200 response that happens to contain JSON shaped like
@@ -38,7 +38,7 @@ public enum JNAPHNAPParser {
     /// Parses an HNAP `GetDeviceSettings` SOAP/XML response body. Field names
     /// vary a little across vendors, so this looks for the common ones seen
     /// in the wild (`VendorName`/`ModelName`/`ModelDescription`/
-    /// `FirmwareVersion`). Deliberately does NOT fall back to `DeviceName` —
+    /// `FirmwareVersion`). Deliberately does NOT fall back to `DeviceName`:
     /// that field is the user-editable host name ("Living Room"), not a
     /// model, and this result is merged as ground truth so a wrong value
     /// there would silently override real data. Requires

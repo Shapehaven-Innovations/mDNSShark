@@ -48,7 +48,7 @@ class PortScanner {
 
     // Thread-safe latch recording whether a connection ever reached `.ready`.
     // Written from the connection's stateUpdateHandler callback context, read
-    // from the timeout closure's context — those can run concurrently, hence
+    // from the timeout closure's context; those can run concurrently, hence
     // the same serial-queue-guarded pattern as `Flag`.
     private class ReadyTracker {
         private var ready = false
@@ -73,7 +73,7 @@ class PortScanner {
     private static let httpPlainPorts: Set<Int> = [80, 8080]
     /// HTTPS-shaped ports: same request, but over a TLS session.
     private static let httpTLSPorts: Set<Int> = [443, 8443]
-    /// Union of the above — every port for which we actively send a
+    /// Union of the above: every port for which we actively send a
     /// request instead of just listening for the remote side to speak
     /// first. Deliberately excludes 22/23/6789/7442/7447: SSH/telnet speak
     /// first on their own, and the UniFi-specific ports (6789/7442/7447)
@@ -88,7 +88,7 @@ class PortScanner {
 
         // Defense in depth: this method's only current caller (`scan`) is
         // only ever reached via DeviceEnrichmentCoordinator.enrich, which
-        // already refuses a non-LAN-local `ip` before firing any probe —
+        // already refuses a non-LAN-local `ip` before firing any probe,
         // but the certificate-validation bypass below is dangerous enough
         // that it shouldn't depend on staying correct-by-convention at a
         // call site two files away. If `ip` isn't LAN-local, skip the
@@ -103,7 +103,7 @@ class PortScanner {
         let tlsOptions = NWProtocolTLS.Options()
         // Certificate validation is intentionally disabled here. This is a
         // LAN-only banner-grab against a device the user explicitly chose
-        // to scan — the goal is only "read back whatever this admin UI
+        // to scan; the goal is only "read back whatever this admin UI
         // sends", not to establish a trusted channel. Router/IoT admin
         // HTTPS UIs are overwhelmingly self-signed, so verifying the chain
         // would just make this fail against almost every real target. This
@@ -119,17 +119,17 @@ class PortScanner {
         // Accept legacy TLS versions too. Before this active-banner-grab
         // change, ANY port that completed the TCP handshake reached
         // `.ready` and got recorded as open in scan()'s timeout closure
-        // (`banner: nil` if nothing else came back) — that closure's
+        // (`banner: nil` if nothing else came back); that closure's
         // comment literally says this "confirms a web UI on 443 even
         // without a grabbable banner." Now that 443/8443 go through a real
         // TLS handshake, a connection whose TCP handshake succeeds but
         // whose TLS handshake then fails lands in `.failed(.tls(...))`
         // instead, and scan()'s existing `.failed`/`.waiting` branch treats
-        // that exactly like a closed port — silently dropping a genuinely
+        // that exactly like a closed port, silently dropping a genuinely
         // open port out of `openPorts`. Embedded/router/IoT firmware
         // running TLS-1.0/1.1-only stacks is common enough that this would
         // otherwise be the most likely way to hit that gap, so lower the
-        // minimum accepted version to close it cheaply — matching the
+        // minimum accepted version to close it cheaply, matching the
         // "LAN-local reconnaissance of devices we don't control, not a
         // trust decision" posture already established for the
         // cert-validation bypass above.
@@ -137,12 +137,12 @@ class PortScanner {
         // This does not fully close the gap: a connection that fails its
         // TLS handshake for any *other* reason (e.g. a plain-HTTP service
         // accidentally listening on 8443, not TLS at all) still lands in
-        // `.failed(.tls(...))` and is still treated as closed — an
+        // `.failed(.tls(...))` and is still treated as closed: an
         // accepted, known trade-off of moving to real TLS connections, not
         // a bug. Fixing that fully would mean distinguishing a TLS-specific
         // failure from a TCP-level one inside scan()'s protected
-        // `.failed`/`.waiting` branch — the same state machine that had a
-        // hard-won concurrency bug fixed in it previously — so that's left
+        // `.failed`/`.waiting` branch (the same state machine that had a
+        // hard-won concurrency bug fixed in it previously), so that's left
         // as a separate, separately-reviewed follow-up rather than bundled
         // into this fix.
         sec_protocol_options_set_min_tls_protocol_version(
@@ -156,12 +156,12 @@ class PortScanner {
     /// Turns whatever bytes came back from an HTTP-shaped port into a
     /// banner string for `guessFromBanner`'s substring matching. Leads with
     /// the parsed Server/Title/WWW-Authenticate realm (readable, and often
-    /// the whole answer) — only widening to the full raw page body when
+    /// the whole answer), only widening to the full raw page body when
     /// that narrow text alone doesn't already identify a manufacturer or
     /// OS. Blending in the raw body unconditionally would widen every
     /// vendor substring check (including risky ones like a bare "asus") to
-    /// arbitrary page content — a JS bundle URL, ad script, or footer text
-    /// that happens to contain a vendor's name — for every device, not just
+    /// arbitrary page content (a JS bundle URL, ad script, or footer text
+    /// that happens to contain a vendor's name) for every device, not just
     /// the ones that actually need it. Confirmed on real hardware: a
     /// GL.iNet GL-MT6000 reports a fully generic `Server: nginx/1.26.1` and
     /// `<title>Admin Panel</title>` (narrow guess finds nothing), with its
@@ -220,12 +220,12 @@ class PortScanner {
                     readyTracker.markReady()
 
                     if isHTTPShaped {
-                        // HTTP servers wait for the client to speak first —
+                        // HTTP servers wait for the client to speak first;
                         // unlike SSH/telnet below, nothing arrives here
                         // unprompted, so send a minimal GET before reading.
                         let request = "GET / HTTP/1.1\r\nHost: \(ip)\r\nConnection: close\r\n\r\n"
                         connection.send(content: Data(request.utf8), completion: .contentProcessed { _ in
-                            // Proceed to receive regardless of send outcome —
+                            // Proceed to receive regardless of send outcome:
                             // a send error just means the read below will
                             // most likely time out with no data, which the
                             // timeout closure already handles via
@@ -249,7 +249,7 @@ class PortScanner {
                     }
                 case .failed, .waiting:
                     // NWConnection reports a LAN connection-refused as
-                    // `.waiting(error)`, not `.failed` — treat both as a
+                    // `.waiting(error)`, not `.failed`; treat both as a
                     // closed port and resolve immediately rather than
                     // burning the full per-port timeout.
                     //
@@ -269,7 +269,7 @@ class PortScanner {
                 if flag.setCompleted() {
                     // The port accepted a connection but never spoke first;
                     // still record it as open (banner: nil) rather than
-                    // silently dropping it — e.g. confirms a web UI on 443
+                    // silently dropping it. This confirms, for example, a web UI on 443
                     // even without a grabbable banner.
                     if readyTracker.wasReady() {
                         resultsQueue.sync { results.append(ScannedPort(port: port, banner: nil)) }

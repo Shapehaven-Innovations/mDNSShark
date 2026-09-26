@@ -27,7 +27,7 @@ import os
 /// rather than a field NWConnection exposes directly.
 ///
 /// This is the WEAKEST signal in the whole enrichment pipeline (see
-/// `guessOSFamily`'s doc comment) — it must never crash or hang, but a nil
+/// `guessOSFamily`'s doc comment): it must never crash or hang, but a nil
 /// result here is expected and common (most hosts don't run NetBIOS at all).
 final class TTLProbe {
     private let logger = Logger(subsystem: "com.mDNSShark", category: "TTLProbe")
@@ -112,7 +112,7 @@ final class TTLProbe {
     ///   function would silently always return nil.
     /// - The payload byte does sit immediately after the header with no
     ///   extra padding, i.e. at `offset + MemoryLayout<cmsghdr>.size` (12 on
-    ///   64-bit Darwin) — confirmed byte-for-byte against a known TTL value
+    ///   64-bit Darwin); confirmed byte-for-byte against a known TTL value
     ///   placed in the control buffer.
     /// - Successive `cmsghdr` records are NOT laid back-to-back at raw
     ///   `cmsg_len` - the kernel pads each record's length up before the

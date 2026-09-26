@@ -2,12 +2,12 @@ import Foundation
 
 /// Cheap, curated manufacturer-name -> likely-OS-family inference, shared
 /// by `guessFromBanner` (banner-text-derived manufacturer) and `merge()`
-/// (any-source-derived manufacturer — including an OUI lookup, which can
+/// (any-source-derived manufacturer, including an OUI lookup, which can
 /// resolve to any of thousands of unrelated companies: laptops, phones,
 /// printers, etc).
 ///
 /// Deliberately scoped to router/AP/NAS-class vendors only, and safe to
-/// call with ANY manufacturer string for exactly that reason — it returns
+/// call with ANY manufacturer string for exactly that reason: it returns
 /// nil for anything not in this curated list rather than guessing at
 /// vendors where "embedded Linux" would be a wrong assumption (e.g.
 /// "Apple, Inc.", "Dell Inc.", "Samsung Electronics" are all real OUI

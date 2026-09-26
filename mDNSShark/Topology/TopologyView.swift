@@ -163,7 +163,7 @@ struct TopologyView: View {
             .navigationBarHidden(true)
             .navigationDestination(isPresented: $navigateToDetail) {
                 // Looked up from the raw (unfiltered, uncapped) devices
-                // array, not `nodes` — `nodes` drops out-of-filter/beyond
+                // array, not `nodes`: `nodes` drops out-of-filter/beyond
                 // top-10 devices, and a filter change or new device joining
                 // while this detail view is open must not blank it out.
                 // No findings overlay here: DeviceDetailView re-reads the

@@ -6,9 +6,9 @@ import os
 /// points to and parses it. LAN-local, so a short timeout is appropriate.
 ///
 /// Privacy/security: this fetch must never leave the LAN. An SSDP
-/// `LOCATION` header is attacker-controlled — any device on the LAN can send
+/// `LOCATION` header is attacker-controlled: any device on the LAN can send
 /// an SSDP reply with an arbitrary `LOCATION` value, including one pointing
-/// at a public-internet host — which would conflict with this app's "no
+/// at a public-internet host, which would conflict with this app's "no
 /// external servers involved" privacy claim. Before fetching we require the
 /// URL's host to be a literal private/link-local/loopback IP address, and we
 /// block HTTP redirects so a LAN-local starting URL can't redirect the
@@ -41,9 +41,9 @@ final class SSDPDescriptionFetcher {
 
     /// True only if `host` is a literal IPv4/IPv6 address in a private,
     /// link-local, or loopback range:
-    /// IPv4 — 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 (RFC 1918),
+    /// IPv4: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 (RFC 1918),
     ///        169.254.0.0/16 (link-local), 127.0.0.0/8 (loopback).
-    /// IPv6 — ::1 (loopback), fe80::/10 (link-local), fc00::/7 (unique local).
+    /// IPv6: ::1 (loopback), fe80::/10 (link-local), fc00::/7 (unique local).
     ///
     /// A non-literal hostname is rejected rather than resolved: trusting a
     /// DNS lookup here would be subject to DNS rebinding (a hostname that

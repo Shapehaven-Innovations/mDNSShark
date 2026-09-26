@@ -6,17 +6,17 @@ import os
 /// Waits for iOS's Local Network Privacy decision to resolve before the
 /// app's very first automatic scan fires.
 ///
-/// Apple gives no API to directly query this permission's state — the
+/// Apple gives no API to directly query this permission's state: the
 /// system alert only appears in response to real local-network traffic,
 /// and any local-network operation that races ahead of the user's answer
 /// gets an instant, non-retried denial (`EHOSTUNREACH` on a raw BSD
 /// socket, `NWPathKey=unsatisfied (Local network prohibited)` on
-/// NWConnection/URLSession) rather than being queued — so a probe caught
+/// NWConnection/URLSession) rather than being queued, so a probe caught
 /// in that window fails for good, not just until the user taps Allow.
 ///
 /// Found via a live device bug: `AppCoordinator.init()` used to fire the
 /// real scan immediately on launch, which is structurally guaranteed to
-/// lose this race on a fresh install — the permission alert can't be
+/// lose this race on a fresh install: the permission alert can't be
 /// answered before the scan's own traffic is what causes it to render in
 /// the first place.
 ///
@@ -26,7 +26,7 @@ import os
 /// means the decision resolved as granted; the browser reporting DNS-SD's
 /// `kDNSServiceErr_PolicyDenied` via `.waiting`, confirmed still true after
 /// a short debounce, means it resolved as denied. A raw multicast
-/// `NWConnection` canary was tried first and rejected — it's gated behind
+/// `NWConnection` canary was tried first and rejected: it's gated behind
 /// `com.apple.developer.networking.multicast` (currently unapproved, see
 /// todo.md), so it would never reach `.ready` and would always hit the
 /// timeout below, defeating the point. Bonjour APIs need no such
@@ -34,7 +34,7 @@ import os
 enum LocalNetworkPermissionGate {
     private static let logger = Logger(subsystem: "com.mDNSShark", category: "LocalNetworkPermissionGate")
 
-    /// A service type used only by this preflight check — never advertised
+    /// A service type used only by this preflight check, never advertised
     /// or browsed anywhere else in the app. Must be listed in
     /// `NSBonjourServices` in Info.plist. `NetworkScanner.processBrowseResults`
     /// also explicitly excludes this type so it can never surface as a fake
@@ -45,7 +45,7 @@ enum LocalNetworkPermissionGate {
     /// as a final "denied" answer. `kDNSServiceErr_PolicyDenied` is
     /// Apple-documented as the signal for a denied decision, but nothing
     /// rules out it also appearing transiently while the alert is still
-    /// pending/unanswered — resolving on the very first sighting would
+    /// pending/unanswered; resolving on the very first sighting would
     /// reproduce the exact race this file exists to prevent, just via the
     /// denied path instead of no gate at all. Re-checking `newBrowser.state`
     /// after this delay confirms it's a real, settled denial rather than a
@@ -57,7 +57,7 @@ enum LocalNetworkPermissionGate {
     /// ignores/dismisses the alert never blocks the scanner forever.
     ///
     /// Call once, at launch, before the automatic first scan. Not meant to
-    /// gate the manual "Scan" button — by the time a user can tap that,
+    /// gate the manual "Scan" button: by the time a user can tap that,
     /// the app is already visible and this has already had its chance to
     /// resolve.
     static func waitForDecision(timeout: TimeInterval = 30) async {
@@ -85,7 +85,7 @@ enum LocalNetworkPermissionGate {
             do {
                 newListener = try NWListener(using: .tcp)
             } catch {
-                // Can't even set up the local check — fail open immediately
+                // Can't even set up the local check: fail open immediately
                 // rather than block a real scan on a broken preflight.
                 logger.error("LocalNetworkPermissionGate: NWListener setup failed: \(error.localizedDescription, privacy: .public)")
                 resumeOnce("listener-setup-failed")
@@ -96,7 +96,7 @@ enum LocalNetworkPermissionGate {
             newListener.stateUpdateHandler = { state in
                 if case .failed(let error) = state {
                     // Without a working listener, "granted" can only ever
-                    // be detected by the browser finding it — with no
+                    // be detected by the browser finding it; with no
                     // listener, that path is dead, so this would otherwise
                     // silently sit until the full timeout on every launch,
                     // even on an already-granted device. Fail open instead.
@@ -125,12 +125,12 @@ enum LocalNetworkPermissionGate {
                             resumeOnce("denied")
                         }
                         // Otherwise the state moved on (granted, or still
-                        // genuinely undetermined) — let the normal handlers
+                        // genuinely undetermined); let the normal handlers
                         // or the timeout resolve it instead.
                     }
                 }
                 // Any other `.waiting` just means the decision is still
-                // undetermined (or a transient, unrelated condition) —
+                // undetermined (or a transient, unrelated condition);
                 // keep waiting rather than treating it as final.
             }
             newBrowser.start(queue: .main)

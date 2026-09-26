@@ -16,7 +16,7 @@ struct SettingsView: View {
 
     // TLS sheet / warning state
     // A single item-driven sheet instead of four chained .sheet(isPresented:) modifiers
-    // on the same view — that pattern flashes and auto-dismisses the first presentation
+    // on the same view: that pattern flashes and auto-dismisses the first presentation
     // on iOS (SwiftUI only reliably tracks one presentation per view identity).
     @State private var activeSheet: TLSSheet?
     @AppStorage("hasSeenTLSWarning") private var hasSeenTLSWarning = false
@@ -49,14 +49,14 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.large)
             .onAppear {
                 // dropCount/lastDropReason are written by the PacketTunnel
-                // extension process, not this one — @State only captures
+                // extension process, not this one; @State only captures
                 // their value at view init, so re-read on every appearance
                 // or reopening Settings after a test always shows stale data.
                 dropCount = SharedSettings.tlsInterceptorDropCount
                 lastDropReason = SharedSettings.tlsInterceptorLastError
             }
             // Presentation modifiers (.sheet/.alert) must live on the List, not on a
-            // Section inside it — List's row machinery (_VariadicView) enumerates a
+            // Section inside it: List's row machinery (_VariadicView) enumerates a
             // Section's children and reapplies ambient modifiers to each one, so a
             // .sheet attached to a Section opens one PresentationHostingController per
             // row simultaneously. Only the first succeeds; the rest fail with "already
@@ -188,7 +188,7 @@ struct SettingsView: View {
                 Text("Your free trial has ended.")
                     .font(.caption)
                     .foregroundColor(AppColors.warning)
-                Button("Unlock TLS Inspection — \(purchase.unlockPrice)") {
+                Button("Unlock TLS Inspection for \(purchase.unlockPrice)") {
                     guard !purchaseInFlight else { return }
                     purchaseInFlight = true
                     Task {
@@ -549,7 +549,7 @@ private struct TLSWarningSheet: View {
                     .font(.largeTitle)
                     .foregroundColor(AppColors.warning)
                 Text("Before enabling TLS Inspection").font(.headline)
-                Text("mDNSShark will act as a TLS proxy for all HTTPS traffic.\n\n• Your CA certificate must be installed and trusted in iOS Settings → General → VPN & Device Management.\n• Add certificate-pinned apps (banking, health) to the Bypass List or they will fail.\n• QUIC (HTTP/3) traffic is blocked while this is on, so sites fall back to regular HTTPS that can actually be inspected — some sites may feel slightly slower.\n• See the README for full setup steps.")
+                Text("mDNSShark will act as a TLS proxy for all HTTPS traffic.\n\n• Your CA certificate must be installed and trusted in iOS Settings → General → VPN & Device Management.\n• Add certificate-pinned apps (banking, health) to the Bypass List or they will fail.\n• QUIC (HTTP/3) traffic is blocked while this is on, so sites fall back to regular HTTPS that can actually be inspected. Some sites may feel slightly slower.\n• See the README for full setup steps.")
                     .font(.body)
                     .multilineTextAlignment(.center)
                     .padding()

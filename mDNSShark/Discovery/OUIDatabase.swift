@@ -13,7 +13,7 @@ class OUIDatabase {
     private init() {
         guard let url = Bundle.main.url(forResource: "oui-database", withExtension: "txt"),
               let text = try? String(contentsOf: url, encoding: .utf8) else {
-            logger.fault("OUIDatabase: bundled oui-database.txt missing or unreadable — manufacturer lookups will return nil")
+            logger.fault("OUIDatabase: bundled oui-database.txt missing or unreadable; manufacturer lookups will return nil")
             self.dataset = OUIDataset(text: "")
             return
         }

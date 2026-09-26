@@ -23,7 +23,7 @@ final class SecurityViewModel: ObservableObject {
     /// Identifies the most recently STARTED `assess()` call. `$devices`
     /// publishes constantly mid-scan (every enrichment result updates it),
     /// and `AppCoordinator` spawns an independent, uncancelled `Task` per
-    /// publish — with no ordering guarantee between them, an early call
+    /// publish. With no ordering guarantee between them, an early call
     /// (snapshotted before a device's open ports were known) can finish
     /// AFTER a later, fully-enriched call and silently overwrite `findings`
     /// with a stale, incomplete result. `assess()` checks this token before

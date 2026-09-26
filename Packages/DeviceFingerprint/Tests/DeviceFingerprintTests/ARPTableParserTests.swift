@@ -125,7 +125,7 @@ final class ARPTableParserTests: XCTestCase {
 
     func test_parse_truncatedMessage_msgLenExceedsBufferBounds_stopsWithoutCrashing() {
         var buffer = makeEntry(ip: (192, 168, 1, 5), mac: [0x01, 0x02, 0x03, 0x04, 0x05, 0x06])
-        buffer.removeLast(4) // truncate — rtm_msglen now overstates what's actually present
+        buffer.removeLast(4) // truncate: rtm_msglen now overstates what's actually present
         XCTAssertTrue(ARPTableParser.parse(Data(buffer)).isEmpty)
     }
 }

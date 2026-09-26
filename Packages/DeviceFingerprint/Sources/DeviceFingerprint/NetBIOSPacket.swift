@@ -7,7 +7,7 @@ public struct NetBIOSReply {
 
 /// Encoder/decoder for a NetBIOS Name Service NBSTAT query/response
 /// (UDP port 137). The adapter-status reply's "unit ID" field is the
-/// interface's MAC address — a source the Ubiquiti-focused probes don't
+/// interface's MAC address, a source the Ubiquiti-focused probes don't
 /// cover (Windows machines, many NAS boxes).
 public enum NetBIOSPacket {
     public static func nbstatQuery() -> Data {
@@ -19,11 +19,11 @@ public enum NetBIOSPacket {
             0x00, 0x00, // authority RRs
             0x00, 0x00  // additional RRs
         ]
-        // Encoded name: "*" padded to 16 BYTES WITH NUL (0x00), not spaces —
+        // Encoded name: "*" padded to 16 BYTES WITH NUL (0x00), not spaces:
         // the RFC 1001/1002 wildcard NBSTAT query name. Samba tolerates
         // space-padding (it trims trailing spaces), but Windows compares the
         // full 16-byte encoded name and may not answer at all to a
-        // space-padded query — silently failing on exactly the platform
+        // space-padded query, silently failing on exactly the platform
         // this probe exists to identify. `nbtstat`, `nmblookup`, and nmap's
         // `nbstat.nse` all send NUL padding.
         var nameBytes: [UInt8] = [UInt8(ascii: "*")]
@@ -57,7 +57,7 @@ public enum NetBIOSPacket {
         // 56) is followed by NUM_NAMES * 18-byte NODE_NAME entries, and ONLY
         // THEN the 6-byte UNIT_ID (MAC). A fixed offset is only correct when
         // NUM_NAMES == 0, which real hosts essentially never report (Windows
-        // typically registers 3-7 names under multiple suffixes) — reading a
+        // typically registers 3-7 names under multiple suffixes); reading a
         // fixed offset against a real reply silently decodes bytes from
         // inside the host's own NetBIOS name as if they were a MAC address.
         let numNames = Int(bytes[56])

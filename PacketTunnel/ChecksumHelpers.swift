@@ -1,6 +1,6 @@
 // PacketTunnel/ChecksumHelpers.swift
 // Shared by PacketForwarder.swift (plain TCP/UDP relay) and TLSInterceptor.swift
-// (TLS-intercepted relay) — both build raw IPv4/TCP/UDP packets by hand and both
+// (TLS-intercepted relay): both build raw IPv4/TCP/UDP packets by hand and both
 // need the same wire-format checksum math. Extracted here instead of duplicated
 // after the plain relay was found to have the same zero-checksum defect the
 // TLS-intercepted path was fixed for (see todo.md item 1).

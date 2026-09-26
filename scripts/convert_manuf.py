@@ -5,7 +5,7 @@
 # long name; prefix may carry a `/nn` CIDR-style suffix for MA-M/MA-S
 # sub-blocks) into the plain `prefix<TAB>vendor` format OUIDataset.parse
 # expects. Only plain 24-bit (6 hex digit, no "/nn" suffix) MA-L prefixes
-# are kept — that covers all 47 of Ubiquiti's blocks and the vast
+# are kept; that covers all 47 of Ubiquiti's blocks and the vast
 # majority of real-world devices this app will ever see; finer-grained
 # MA-M/MA-S sub-allocations are out of scope by design (see spec).
 import sys

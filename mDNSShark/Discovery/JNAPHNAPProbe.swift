@@ -5,13 +5,13 @@ import os
 /// Tries Linksys JNAP first (`POST /JNAP/`, JSON), then falls back to HNAP
 /// (`POST /HNAP1/`, SOAP/XML) if JNAP doesn't answer. JNAP covers newer
 /// Linksys hardware (Velop mesh included); HNAP covers older Linksys and
-/// some D-Link. Both are the device answering its own vendor API directly —
+/// some D-Link. Both are the device answering its own vendor API directly, the
 /// same ground-truth tier as `UbiquitiDiscoveryProbe`/`ASUSDiscoveryProbe`,
 /// not a guess.
 ///
 /// Mirrors `SSDPDescriptionFetcher`'s LAN-only discipline: `ip` here is
 /// always a literal address from the local subnet scan (never a URL header),
-/// but the same `isLANLocalAddress` guard is applied for defense in depth —
+/// but the same `isLANLocalAddress` guard is applied for defense in depth:
 /// every enrichment path validates its own target before sending.
 final class JNAPHNAPProbe {
     private let logger = Logger(subsystem: "com.mDNSShark", category: "JNAPHNAPProbe")
@@ -26,7 +26,7 @@ final class JNAPHNAPProbe {
         // isLANLocalAddress's own IPv6 support doesn't handle end-to-end
         // yet. Rejecting explicitly here (rather than letting the URL
         // fail to construct silently) keeps this an informed limitation,
-        // not a silent no-op — the UDP probes make the same IPv4-only
+        // not a silent no-op; the UDP probes make the same IPv4-only
         // call via inet_pton(AF_INET).
         guard !ip.contains(":") else {
             logger.debug("JNAPHNAPProbe: IPv6 not yet supported, skipping \(ip, privacy: .public)")

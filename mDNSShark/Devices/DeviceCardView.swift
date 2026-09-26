@@ -20,7 +20,7 @@ struct DeviceCardView: View {
                              color: badgeColor)
                 }
                 Divider()
-                // alignment: .leading — LazyVGrid defaults to .center, which
+                // alignment: .leading: LazyVGrid defaults to .center, which
                 // centers each cell's VStack independently within its column
                 // using that VStack's own intrinsic width. MAC ("0c:ea:14:...",
                 // 17 chars) and OS ("Linux (embedded, likely...)", wider pre-

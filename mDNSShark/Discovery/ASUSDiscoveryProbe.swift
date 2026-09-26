@@ -8,18 +8,18 @@ import os
 /// `UbiquitiDiscoveryProbe`'s technique.
 ///
 /// Unlike Ubiquiti's discovery protocol, ASUS's `infosvr` (per its
-/// `sendInfo()` in `infosvr.c`) replies to `255.255.255.255` — a broadcast,
-/// not a unicast reply to the requester's address — even though the request
+/// `sendInfo()` in `infosvr.c`) replies to `255.255.255.255` (a broadcast,
+/// not a unicast reply to the requester's address), even though the request
 /// itself was sent unicast. Modern firmware still targets the requester's
 /// source *port*, so the same socket's `recv()` below does pick the reply
 /// up, but only because receiving broadcast-destined datagrams on iOS
 /// requires the `com.apple.developer.networking.multicast` entitlement.
 /// **2026-09-20: currently commented out** in both
 /// `mDNSShark.entitlements`/`mDNSSharkDebug.entitlements` pending Apple
-/// approval (blocked Release signing otherwise — see todo.md), so this
+/// approval (blocked Release signing otherwise; see todo.md), so this
 /// probe fires every scan but cannot possibly succeed right now; without it
 /// the OS sandbox drops the incoming datagram before it ever
-/// reaches this socket, silently, with no error surfaced here — this method
+/// reaches this socket, silently, with no error surfaced here. This method
 /// will just always return nil against real ASUS hardware in that case, not
 /// merely "not find" the ASUS probe. See the discovery-probe report at
 /// `.superpowers/sdd/phase2-protocols/asus-report.md` for the remaining

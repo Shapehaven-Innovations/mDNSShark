@@ -177,7 +177,7 @@ final class DeviceEnrichmentTests: XCTestCase {
 
     func test_enrichmentSource_currentRawValueOrdering() {
         // Documents the actual declaration order (and therefore precedence)
-        // as of this file's writing — catches an accidental reordering that
+        // as of this file's writing; catches an accidental reordering that
         // would silently change precedence without any other test noticing.
         XCTAssertEqual(EnrichmentSource.ubiquitiDiscovery.rawValue, 0)
         XCTAssertEqual(EnrichmentSource.asusDiscovery.rawValue, 1)
@@ -195,7 +195,7 @@ final class DeviceEnrichmentTests: XCTestCase {
         XCTAssertTrue(EnrichmentSource.asusDiscovery < EnrichmentSource.ouiLookup)
         XCTAssertTrue(EnrichmentSource.jnapHnapDiscovery < EnrichmentSource.ouiLookup)
         // arpTableLookup is a real per-IP link-layer read (not a guess), but
-        // deliberately NOT ground truth — the device didn't tell us about
+        // deliberately NOT ground truth: the device didn't tell us about
         // itself, and the entitlement it depends on is undocumented and
         // unconfirmed-reliable (todo.md item 4). It still outranks
         // ouiLookup/ssdpDescription/portBanner/ttlGuess for `mac` since,
