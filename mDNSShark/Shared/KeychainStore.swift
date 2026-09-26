@@ -119,29 +119,49 @@ enum KeychainStore {
     }
 
     static func loadLeafIdentity(domain: String) -> SecIdentity? {
-        // Step 1: load the cert by its label (reliable - we set this explicitly).
-        let certQuery: [String: Any] = [
-            kSecClass as String:           kSecClassCertificate,
-            kSecAttrLabel as String:       leafLabel(domain),
-            kSecAttrAccessGroup as String: accessGroup,
-            kSecReturnRef as String:       true
-        ]
-        var certResult: CFTypeRef?
-        guard SecItemCopyMatching(certQuery as CFDictionary, &certResult) == errSecSuccess,
-              certResult != nil else { return nil }
-        let cert = certResult as! SecCertificate
+        // iOS forms a digital identity by matching the private key's
+        // kSecAttrApplicationLabel (klbl, = the public-key hash) with the
+        // certificate's kSecAttrPublicKeyHash (pkhh). See Apple's "SecItem:
+        // Pitfalls and Best Practices" (developer.apple.com/forums/thread/724013)
+        // and thread 748892. The reliable way to retrieve that identity on iOS
+        // is to query kSecClassIdentity by that same public-key hash.
+        //
+        // The previous approach (kSecClassIdentity + kSecMatchItemList: [cert])
+        // is unreliable on iOS: passing a bare certificate ref in the match list
+        // of an identity query does not resolve the paired key and returns
+        // errSecItemNotFound even though the identity has been formed correctly.
 
-        // Step 2: resolve the identity that pairs this cert with its private key.
-        // kSecMatchItemList is more reliable than label-matching kSecClassIdentity on iOS.
+        // Step 1: load the stored leaf private key by its application tag and read
+        // the public-key hash iOS assigned to it (kSecAttrApplicationLabel). This
+        // is the exact value iOS uses to correlate the key with the certificate.
+        let keyQuery: [String: Any] = [
+            kSecClass as String:              kSecClassKey,
+            kSecAttrApplicationTag as String: leafTag(domain),
+            kSecAttrKeyClass as String:       kSecAttrKeyClassPrivate,
+            kSecAttrAccessGroup as String:    accessGroup,
+            kSecReturnRef as String:          true
+        ]
+        var keyResult: CFTypeRef?
+        guard SecItemCopyMatching(keyQuery as CFDictionary, &keyResult) == errSecSuccess,
+              let keyRef = keyResult else { return nil }
+        let privKey = keyRef as! SecKey
+        guard let keyAttrs = SecKeyCopyAttributes(privKey) as? [String: Any],
+              let pubKeyHash = keyAttrs[kSecAttrApplicationLabel as String] as? Data else {
+            return nil
+        }
+
+        // Step 2: retrieve the identity by that public-key hash. Because the cert
+        // was stored with a matching pkhh, iOS resolves the cert+key pair here.
         let idQuery: [String: Any] = [
-            kSecClass as String:           kSecClassIdentity,
-            kSecMatchItemList as String:   [cert] as CFArray,
-            kSecAttrAccessGroup as String: accessGroup,
-            kSecReturnRef as String:       true
+            kSecClass as String:                kSecClassIdentity,
+            kSecAttrApplicationLabel as String: pubKeyHash,
+            kSecAttrAccessGroup as String:      accessGroup,
+            kSecReturnRef as String:            true
         ]
         var idResult: CFTypeRef?
-        guard SecItemCopyMatching(idQuery as CFDictionary, &idResult) == errSecSuccess else { return nil }
-        return (idResult as! SecIdentity)
+        guard SecItemCopyMatching(idQuery as CFDictionary, &idResult) == errSecSuccess,
+              let idRef = idResult else { return nil }
+        return (idRef as! SecIdentity)
     }
 
     static func deleteLeafItems(domain: String) {

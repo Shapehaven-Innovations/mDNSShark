@@ -126,11 +126,6 @@ final class PacketCaptureManager: ObservableObject {
                 let proto = NETunnelProviderProtocol()
                 proto.providerBundleIdentifier = Self.expectedProviderBundleIdentifier
                 proto.serverAddress = "127.0.0.1"
-                // See SharedSettings.includeAllNetworksInCapture (todo.md item 1) —
-                // this is the actual switch (a property of the tunnel's saved
-                // NEVPNProtocol config, not something the extension can set on
-                // itself via NEPacketTunnelNetworkSettings at startTunnel time).
-                proto.includeAllNetworks = SharedSettings.includeAllNetworksInCapture
                 manager.protocolConfiguration = proto
                 manager.localizedDescription = "Packet Capture Tunnel"
                 manager.isEnabled = true
@@ -160,10 +155,6 @@ final class PacketCaptureManager: ObservableObject {
             }
 
             existing.isEnabled = true
-            // Re-applied every startCapture(), not just at creation, so a
-            // Settings change to includeAllNetworksInCapture takes effect
-            // on next capture start even when reusing a saved config.
-            existingProto?.includeAllNetworks = SharedSettings.includeAllNetworksInCapture
             existing.saveToPreferences { error in
                 if let error { completion(error); return }
                 existing.loadFromPreferences { error in

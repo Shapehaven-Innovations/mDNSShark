@@ -31,6 +31,15 @@ final class PacketForwarder {
     /// enough latency to break the device scanner's short probe timeouts.
     private let signposter = OSSignposter(subsystem: "com.mDNSShark.PacketTunnel", category: "relay")
 
+    /// Diagnostic logging for the HTTPS-hang investigation (todo.md item 1).
+    /// Lives here rather than in TLSSession because this is the only place
+    /// that sees the device's *non-payload* TCP packets on an intercepted
+    /// flow — the empty ACK that completes the handshake, SYN retransmits,
+    /// RST/FIN — which `TLSSession.receive` never gets (it only receives
+    /// payload bytes). Same subsystem as the signposter and TLSSession so a
+    /// single Console filter shows everything.
+    private let logger = Logger(subsystem: "com.mDNSShark.PacketTunnel", category: "forwarder")
+
     init(flow: NEPacketTunnelFlow,
          onDecryptedHTTPS: ((Data, String) -> Void)? = nil,
          onPacket: @escaping PacketHandler) {
@@ -43,10 +52,15 @@ final class PacketForwarder {
         running = true
         if SharedSettings.tlsInspectionEnabled && !SharedSettings.tlsInspectionUnlocked {
             SharedSettings.tlsInterceptorLastError = "TLS inspection is off - unlock it in Settings"
+            logger.debug("forwarder start: TLS inspection enabled but NOT unlocked — 443 flows take the plain relay path")
         } else if SharedSettings.tlsInspectionEnabled && KeychainStore.loadCAKey() != nil {
             tlsInterceptor = TLSInterceptor()
+            logger.debug("forwarder start: TLSInterceptor active — 443 SYNs will be intercepted")
         } else if SharedSettings.tlsInspectionEnabled {
             SharedSettings.tlsInterceptorLastError = "TLS inspection is off - CA key not found in keychain"
+            logger.debug("forwarder start: TLS inspection enabled but CA key not found in keychain (extension process) — plain relay path")
+        } else {
+            logger.debug("forwarder start: TLS inspection disabled — plain relay path for everything")
         }
         scheduleCleanup()
     }
@@ -176,6 +190,13 @@ final class PacketForwarder {
         let dataOffset = Int(bytes[ihl + 12] >> 4) * 4
         let payloadStart = ihl + dataOffset
         let key = SessionKey(srcPort: srcPort, dstIP: dstIP, dstPort: dstPort, proto: 6)
+        // tcpAck is only read by the diagnostic log lines below; tcpSeq is
+        // also passed to interceptor.deliver so TLSSession can detect
+        // retransmits/reordering instead of blindly trusting payload order.
+        let tcpSeq = UInt32(bytes[ihl+4]) << 24 | UInt32(bytes[ihl+5]) << 16
+                   | UInt32(bytes[ihl+6]) << 8  | UInt32(bytes[ihl+7])
+        let tcpAck = UInt32(bytes[ihl+8]) << 24 | UInt32(bytes[ihl+9]) << 16
+                   | UInt32(bytes[ihl+10]) << 8 | UInt32(bytes[ihl+11])
 
         let payload = payloadStart < ipPacket.count
             ? ipPacket.subdata(in: payloadStart..<ipPacket.count)
@@ -190,12 +211,44 @@ final class PacketForwarder {
 
             // If this session is owned by TLSInterceptor, deliver data there.
             if let interceptor = self.tlsInterceptor, interceptor.hasSession(for: key) {
+                let flowTag = "\(srcIP):\(srcPort)→\(dstIP):\(dstPort)"
                 if isFIN || isRST {
+                    // RST right after our SYN-ACK = the device's TCP stack
+                    // received the SYN-ACK (so checksums passed) but rejected
+                    // it (bad ack number, or no listening socket anymore).
+                    // RST/FIN minutes later = the device's own timer gave up.
+                    self.logger.debug("[\(flowTag, privacy: .public)] device sent \(isRST ? "RST" : "FIN", privacy: .public) flags=0x\(String(tcpFlags, radix: 16), privacy: .public) seq=\(tcpSeq) ack=\(tcpAck) — closing intercept session")
                     interceptor.closeSession(for: key)
+                } else if isSYN {
+                    // A repeated SYN on a key that already has a session means
+                    // the device never accepted our SYN-ACK and is retrying
+                    // the handshake — the checksum (or something else in the
+                    // synthetic packet) is still being rejected. Previously
+                    // only logged, never retried, so a rejected SYN-ACK left
+                    // the flow permanently wedged even after fixes (checksum,
+                    // MSS) that would have made a retry succeed.
+                    self.logger.debug("[\(flowTag, privacy: .public)] device RETRANSMITTED SYN (isn=\(tcpSeq)) — resending SYN-ACK")
+                    interceptor.resendSYNACK(for: key)
                 } else if !payload.isEmpty {
-                    interceptor.deliver(payload, for: key)
+                    interceptor.deliver(payload, seq: tcpSeq, for: key)
+                } else {
+                    // Pure ACK. The first one is the handshake's third packet —
+                    // direct proof the SYN-ACK was accepted even if Safari
+                    // never sends a ClientHello. Later ones show how far the
+                    // device has acknowledged our data (compare `ack` against
+                    // the seq in TLSSession's "first write to device" line).
+                    self.logger.debug("[\(flowTag, privacy: .public)] device pure ACK flags=0x\(String(tcpFlags, radix: 16), privacy: .public) seq=\(tcpSeq) ack=\(tcpAck)")
                 }
                 return
+            }
+
+            // Plain relay never sends a SYN-ACK, so any SYN reaching it for
+            // a web port will hang from the device's point of view. Logged
+            // for 80/443 only: a port-80 SYN appearing right after Safari's
+            // "Continue" tap is Safari's HTTPS→HTTP fallback; a 443 SYN here
+            // means the interceptor is nil or the dnsCache bypass matched.
+            if isSYN && self.sessions[key] == nil && (dstPort == 80 || dstPort == 443) {
+                self.logger.debug("[\(srcIP, privacy: .public):\(srcPort)→\(dstIP, privacy: .public):\(dstPort)] SYN on plain relay path (no SYN-ACK is ever sent here) interceptorActive=\(self.tlsInterceptor != nil)")
             }
 
             if isFIN || isRST {
@@ -224,12 +277,14 @@ final class PacketForwarder {
         // IP-level bypass: check if we've seen this IP resolve to a bypassed hostname
         if let hostname = dnsCache[key.dstIP],
            SharedSettings.tlsBypassList.contains(where: { hostname.hasSuffix($0) }) {
+            logger.debug("[\(srcIP, privacy: .public):\(key.srcPort)→\(key.dstIP, privacy: .public):443] not intercepting: dnsCache says \(hostname, privacy: .public) is bypassed")
             return false
         }
         // Extract client ISN from the SYN packet (sequence number field in TCP header)
         let ihl = Int(bytes[0] & 0x0F) * 4
         let clientISN = UInt32(bytes[ihl+4]) << 24 | UInt32(bytes[ihl+5]) << 16
                       | UInt32(bytes[ihl+6]) << 8  | UInt32(bytes[ihl+7])
+        logger.debug("[\(srcIP, privacy: .public):\(key.srcPort)→\(key.dstIP, privacy: .public):443] intercepting SYN isn=\(clientISN) dnsCache=\(self.dnsCache[key.dstIP] ?? "<no DNS seen for this IP>", privacy: .public)")
         interceptor.openSession(
             key: key, srcIP: srcIP, dstIP: key.dstIP,
             clientISN: clientISN, flow: flow,
@@ -299,6 +354,18 @@ final class PacketForwarder {
 
     // MARK: - Packet construction
 
+    // Both builders below patch in real IPv4 header + UDP/TCP checksums —
+    // previously left as 0x0000. TLSInterceptor.swift's synthetic packets had
+    // the same defect and fixing it there is what got a real device to accept
+    // a synthetic SYN-ACK at all; this plain relay path builds packets the
+    // same way (raw bytes into flow.writePackets) and was never fixed
+    // alongside it. UDP's own checksum field is spec-allowed to be zero
+    // ("no checksum computed", RFC 768) and this relay evidently still works
+    // for UDP without it (DNS through it has been observed working), but the
+    // IPv4 header checksum has no such allowance, and a real checksum is
+    // never wrong to send. TCP's seq(approx)/ack(0, approx) semantics are
+    // unchanged here — that's the separate, larger, not-yet-fixed handshake
+    // gap tracked in todo.md item 1, out of scope for a checksum fix.
     private func buildIPv4UDPPacket(srcIP: String, dstIP: String,
                                      srcPort: UInt16, dstPort: UInt16,
                                      payload: Data) -> Data {
@@ -313,16 +380,28 @@ final class PacketForwarder {
         p.appendBE16(0x4000)                // Don't fragment
         p.append(64)                        // TTL
         p.append(17)                        // protocol: UDP
-        p.appendBE16(0x0000)               // checksum (0 = not computed)
+        p.appendBE16(0x0000)               // IP header checksum, patched below
         p.append(ipOctets: srcIP)
         p.append(ipOctets: dstIP)
         // UDP header
         p.appendBE16(srcPort)
         p.appendBE16(dstPort)
         p.appendBE16(udpLen)
-        p.appendBE16(0x0000)               // checksum
+        p.appendBE16(0x0000)               // UDP checksum, patched below
         p.append(payload)
-        return p
+
+        var bytes = [UInt8](p)
+        let ipChecksum = PacketChecksum.internetChecksum(bytes[0..<20])
+        bytes[10] = UInt8(ipChecksum >> 8); bytes[11] = UInt8(ipChecksum & 0xFF)
+
+        var pseudoHeader = PacketChecksum.ipv4Bytes(srcIP) + PacketChecksum.ipv4Bytes(dstIP)
+        pseudoHeader += [0x00, 17]
+        pseudoHeader += [UInt8(udpLen >> 8), UInt8(udpLen & 0xFF)]
+        var udpChecksum = PacketChecksum.internetChecksum(pseudoHeader + bytes[20...])
+        if udpChecksum == 0x0000 { udpChecksum = 0xFFFF }  // RFC 768: 0 means "no checksum"
+        bytes[26] = UInt8(udpChecksum >> 8); bytes[27] = UInt8(udpChecksum & 0xFF)
+
+        return Data(bytes)
     }
 
     private func buildIPv4TCPPacket(srcIP: String, dstIP: String,
@@ -339,7 +418,7 @@ final class PacketForwarder {
         p.appendBE16(0x4000)
         p.append(64)
         p.append(6)                         // protocol: TCP
-        p.appendBE16(0x0000)
+        p.appendBE16(0x0000)               // IP header checksum, patched below
         p.append(ipOctets: srcIP)
         p.append(ipOctets: dstIP)
         // TCP header
@@ -350,10 +429,21 @@ final class PacketForwarder {
         p.append(0x50)                      // data offset = 5 (20 bytes)
         p.append(0x18)                      // flags: PSH + ACK
         p.appendBE16(65535)                 // window size
-        p.appendBE16(0x0000)               // checksum
+        p.appendBE16(0x0000)               // TCP checksum, patched below
         p.appendBE16(0x0000)               // urgent pointer
         p.append(payload)
-        return p
+
+        var bytes = [UInt8](p)
+        let ipChecksum = PacketChecksum.internetChecksum(bytes[0..<20])
+        bytes[10] = UInt8(ipChecksum >> 8); bytes[11] = UInt8(ipChecksum & 0xFF)
+
+        var pseudoHeader = PacketChecksum.ipv4Bytes(srcIP) + PacketChecksum.ipv4Bytes(dstIP)
+        pseudoHeader += [0x00, 6]
+        pseudoHeader += [UInt8(tcpLen >> 8), UInt8(tcpLen & 0xFF)]
+        let tcpChecksum = PacketChecksum.internetChecksum(pseudoHeader + bytes[20...])
+        bytes[36] = UInt8(tcpChecksum >> 8); bytes[37] = UInt8(tcpChecksum & 0xFF)
+
+        return Data(bytes)
     }
 
     private func cacheDNSResponse(_ udpPayload: Data) {

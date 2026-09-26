@@ -70,26 +70,6 @@ enum SharedSettings {
 
     static let allProtocols: Set<String> = ["DNS", "mDNS", "HTTPS", "HTTP", "TCP", "UDP", "ICMP"]
 
-    /// Off by default — matches the tunnel's existing, unexamined behavior
-    /// exactly (`includeAllNetworks` was previously just never set). Read by
-    /// `PacketCaptureManager.configureVPN` (app side, at Start Capture time —
-    /// NOT inside the `PacketTunnelProvider` extension) to set
-    /// `includeAllNetworks` on the saved `NETunnelProviderProtocol`/
-    /// `NEVPNProtocol` config, which per Apple/DTS is likely required to
-    /// route same-subnet LAN traffic through the tunnel at all (todo.md item
-    /// 1) — but doing so also puts every LAN packet, not just scan probes,
-    /// through `PacketForwarder`'s relay path, which is the other open
-    /// question in that item (added relay latency vs. the scanner's short
-    /// probe timeouts). Exists so dev can flip it from Settings to run the
-    /// capture-on/capture-off on-device A/B test item 1 calls for, without a
-    /// code change — stop capture, toggle, start capture again (only takes
-    /// effect on the next `startCapture()`, since it's read when the VPN
-    /// config is saved, not while the tunnel is already running).
-    static var includeAllNetworksInCapture: Bool {
-        get { suite.bool(forKey: "includeAllNetworksInCapture") }
-        set { suite.set(newValue, forKey: "includeAllNetworksInCapture") }
-    }
-
     static var tlsInterceptorLastError: String {
         get { suite.string(forKey: "tlsInterceptorLastError") ?? "" }
         set { suite.set(newValue, forKey: "tlsInterceptorLastError") }

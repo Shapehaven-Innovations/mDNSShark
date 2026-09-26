@@ -22,6 +22,7 @@ struct SettingsView: View {
     @AppStorage("hasSeenTLSWarning") private var hasSeenTLSWarning = false
     @State private var purchaseInFlight = false
     @State private var dropCount: Int = SharedSettings.tlsInterceptorDropCount
+    @State private var lastDropReason: String = SharedSettings.tlsInterceptorLastError
 
     // Bypass list
     @State private var bypassList: [String] = SharedSettings.tlsBypassList
@@ -33,7 +34,6 @@ struct SettingsView: View {
 
     // Capture filters
     @State private var activeFilters: Set<String> = SharedSettings.captureFilterProtocols
-    @State private var includeAllNetworks: Bool = SharedSettings.includeAllNetworksInCapture
 
     var body: some View {
         NavigationView {
@@ -43,11 +43,18 @@ struct SettingsView: View {
                 bypassListSection
                 dnsSection
                 captureFiltersSection
-                captureRoutingSection
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
+            .onAppear {
+                // dropCount/lastDropReason are written by the PacketTunnel
+                // extension process, not this one — @State only captures
+                // their value at view init, so re-read on every appearance
+                // or reopening Settings after a test always shows stale data.
+                dropCount = SharedSettings.tlsInterceptorDropCount
+                lastDropReason = SharedSettings.tlsInterceptorLastError
+            }
             // Presentation modifiers (.sheet/.alert) must live on the List, not on a
             // Section inside it — List's row machinery (_VariadicView) enumerates a
             // Section's children and reapplies ambient modifiers to each one, so a
@@ -63,12 +70,16 @@ struct SettingsView: View {
                 case .tlsWarning:   tlsWarningSheet
                 }
             }
-            .alert("Import Error", isPresented: .constant(showImportError != nil),
-                   actions: { Button("OK") { showImportError = nil } },
-                   message: { Text(showImportError ?? "") })
-            .alert("Store Error", isPresented: .constant(purchase.lastError != nil),
-                   actions: { Button("OK") { purchase.lastError = nil } },
-                   message: { Text(purchase.lastError ?? "") })
+            .alert("Import Error", isPresented: Binding(
+                get: { showImportError != nil },
+                set: { if !$0 { showImportError = nil } }
+            ), actions: { Button("OK") { showImportError = nil } },
+               message: { Text(showImportError ?? "") })
+            .alert("Store Error", isPresented: Binding(
+                get: { purchase.lastError != nil },
+                set: { if !$0 { purchase.lastError = nil } }
+            ), actions: { Button("OK") { purchase.lastError = nil } },
+               message: { Text(purchase.lastError ?? "") })
         }
     }
 
@@ -134,6 +145,11 @@ struct SettingsView: View {
                     Text("\(dropCount) connection(s) dropped during TLS inspection")
                         .font(.caption)
                         .foregroundColor(AppColors.warning)
+                    if !lastDropReason.isEmpty {
+                        Text("Last: \(lastDropReason)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
             } else {
                 tlsGateView
@@ -431,24 +447,6 @@ struct SettingsView: View {
                     }
                 ))
             }
-        }
-    }
-
-    // Experimental — see SharedSettings.includeAllNetworksInCapture. Off by
-    // default (matches today's behavior). Only takes effect on the next
-    // Start Capture, since it's part of the tunnel's saved VPN config, not
-    // something changeable while a capture is already running.
-    private var captureRoutingSection: some View {
-        Section {
-            Toggle("Include LAN traffic in capture", isOn: Binding(
-                get: { includeAllNetworks },
-                set: { val in
-                    includeAllNetworks = val
-                    SharedSettings.includeAllNetworksInCapture = val
-                }
-            ))
-        } footer: {
-            Text("Experimental. May route all same-subnet LAN traffic through the capture relay, which can add latency to scans running at the same time. Takes effect the next time you start a capture.")
         }
     }
 }
