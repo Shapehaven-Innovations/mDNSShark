@@ -54,7 +54,7 @@ final class PacketForwarder {
             SharedSettings.tlsInterceptorLastError = "TLS inspection is off - unlock it in Settings"
             logger.debug("forwarder start: TLS inspection enabled but NOT unlocked — 443 flows take the plain relay path")
         } else if SharedSettings.tlsInspectionEnabled && KeychainStore.loadCAKey() != nil {
-            tlsInterceptor = TLSInterceptor()
+            tlsInterceptor = TLSInterceptor(onPacket: onPacket)
             logger.debug("forwarder start: TLSInterceptor active — 443 SYNs will be intercepted")
         } else if SharedSettings.tlsInspectionEnabled {
             SharedSettings.tlsInterceptorLastError = "TLS inspection is off - CA key not found in keychain"
@@ -117,6 +117,27 @@ final class PacketForwarder {
 
         queue.async { [weak self] in
             guard let self, self.running else { return }
+
+            // QUIC/HTTP-3 runs over UDP:443 by convention and is plain UDP
+            // to this relay — TLSInterceptor never sees it. Whenever a
+            // client can use it, it races against our TLS-intercepted TCP
+            // path and wins almost every time (QUIC needs no synthetic
+            // handshake, no local listener/bridge, no separate upstream TLS
+            // negotiation), so TLS Inspection silently inspects nothing for
+            // QUIC-capable destinations. Confirmed on-device:
+            // accounts.google.com's TCP+TLS attempt got cancelled ~115ms
+            // after its ClientHello, right as a parallel QUIC connection to
+            // the same IP finished its own handshake. Dropping UDP:443
+            // outright — silently, no ICMP/rejection — while interception
+            // can actually happen forces the QUIC-to-TCP fallback every
+            // real HTTP/3 client already implements for exactly this
+            // "middlebox silently drops UDP" case; the same technique real
+            // TLS-inspecting proxies use. Gated on tlsInterceptor being
+            // non-nil (checked here, same as forwardTCP, since it's only
+            // mutated on this queue), not just the settings toggle, so this
+            // never fires unless interception can actually happen.
+            if dstPort == 443, self.tlsInterceptor != nil { return }
+
             let session = self.sessions[key] ?? self.createUDPSession(key: key, srcIP: srcIP, srcPort: srcPort)
             session.lastActivity = Date()
             session.connection.send(content: payload, completion: .idempotent)
@@ -213,12 +234,29 @@ final class PacketForwarder {
             if let interceptor = self.tlsInterceptor, interceptor.hasSession(for: key) {
                 let flowTag = "\(srcIP):\(srcPort)→\(dstIP):\(dstPort)"
                 if isFIN || isRST {
+                    // Darwin's TCP stack routinely coalesces a final write
+                    // with the FIN into one segment (write-then-close), so
+                    // this branch being checked ahead of the payload one
+                    // below must not just drop that payload — it's often the
+                    // last chunk of a request/response. And the FIN's own
+                    // sequence number in that case is tcpSeq + payload.count,
+                    // not tcpSeq itself (the FIN consumes the sequence slot
+                    // right after the data, same as a bare FIN consumes the
+                    // slot it's sent at) — passing bare tcpSeq here acked one
+                    // segment short of what the device's kernel expects,
+                    // reproducing the same "device retransmits its FIN
+                    // forever" bug deviceFINSeq was added to fix, just for
+                    // the coalesced case instead of the bare-FIN one.
+                    if !payload.isEmpty {
+                        interceptor.deliver(payload, seq: tcpSeq, for: key)
+                    }
+                    let finSeq = tcpSeq &+ UInt32(payload.count)
                     // RST right after our SYN-ACK = the device's TCP stack
                     // received the SYN-ACK (so checksums passed) but rejected
                     // it (bad ack number, or no listening socket anymore).
                     // RST/FIN minutes later = the device's own timer gave up.
-                    self.logger.debug("[\(flowTag, privacy: .public)] device sent \(isRST ? "RST" : "FIN", privacy: .public) flags=0x\(String(tcpFlags, radix: 16), privacy: .public) seq=\(tcpSeq) ack=\(tcpAck) — closing intercept session")
-                    interceptor.closeSession(for: key)
+                    self.logger.debug("[\(flowTag, privacy: .public)] device sent \(isRST ? "RST" : "FIN", privacy: .public) flags=0x\(String(tcpFlags, radix: 16), privacy: .public) seq=\(tcpSeq) ack=\(tcpAck) payload=\(payload.count) — closing intercept session")
+                    interceptor.closeSession(for: key, deviceFINSeq: isFIN ? finSeq : nil)
                 } else if isSYN {
                     // A repeated SYN on a key that already has a session means
                     // the device never accepted our SYN-ACK and is retrying
@@ -512,7 +550,7 @@ final class PacketForwarder {
                 SharedSettings.tlsInterceptorLastError = "TLS inspection is off - unlock it in Settings"
             }
         } else if tlsInterceptor == nil && KeychainStore.loadCAKey() != nil {
-            tlsInterceptor = TLSInterceptor()
+            tlsInterceptor = TLSInterceptor(onPacket: onPacket)
         }
     }
 

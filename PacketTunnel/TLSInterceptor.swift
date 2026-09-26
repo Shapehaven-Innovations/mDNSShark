@@ -10,8 +10,18 @@ import os
 func parseSNI(from buffer: Data) -> String? {
     let bytes = [UInt8](buffer)
     guard bytes.count > 5, bytes[0] == 0x16 else { return nil }
-    let recLen = Int(bytes[3]) << 8 | Int(bytes[4])
-    guard bytes.count >= 5 + recLen else { return nil }
+    // Deliberately not requiring bytes.count >= 5 + recLen (the full
+    // declared TLS record length) here: a modern TLS 1.3 ClientHello with a
+    // post-quantum hybrid key-share extension routinely exceeds one TCP
+    // segment (e.g. a real 1554-byte ClientHello arriving as 1460 + 94
+    // bytes), and the SNI extension sits well before the end of the
+    // record — requiring the whole thing up front discarded a real,
+    // already-buffered SNI on every such ClientHello, silently falling
+    // back to dstIP. Every later field access below already has its own
+    // bounds check (`guard i + ... <= bytes.count`), so parsing just stops
+    // and returns nil if we genuinely don't have enough bytes yet to reach
+    // the SNI extension — no need for this to be checked twice, and this
+    // copy of the check was actively wrong for the truncated-buffer case.
     guard bytes[5] == 0x01 else { return nil }
     var i = 5 + 4
     guard i + 34 < bytes.count else { return nil }
@@ -65,18 +75,44 @@ final class LeafCertCache {
         guard let caKey = KeychainStore.loadCAKey() else {
             throw TLSInterceptorError.caKeyMissing
         }
+        // The leaf's issuer must be the CA certificate's subject, byte for
+        // byte — the device builds the chain from the leaf to the installed
+        // CA by that name.
+        guard let caCert = KeychainStore.loadCACert(),
+              let issuer = X509CertBuilder.subjectName(fromCertificateDER: SecCertificateCopyData(caCert) as Data)
+        else {
+            throw TLSInterceptorError.caCertMissing
+        }
         let tag = Data("mdns.leaf.\(domain)".utf8)
         SecItemDelete([
             kSecClass as String: kSecClassKey,
             kSecAttrApplicationTag as String: tag,
             kSecAttrAccessGroup as String: KeychainStore.accessGroup
         ] as CFDictionary)
+        // kSecAttrIsPermanent/ApplicationTag/AccessGroup are scoped under
+        // kSecPrivateKeyAttrs deliberately, not left at the top level: for
+        // SecKeyCreateRandomKey generating an EC key PAIR, top-level
+        // attributes apply to BOTH halves unless overridden per-half, which
+        // persists the public key to keychain too, under the exact same
+        // application tag as the private key. Two keychain items (one
+        // public, one private) sharing one tag is exactly the ambiguity
+        // that let identity lookup return the public half as if it were the
+        // signing key — confirmed on-device via LeafCertCache.verifyUsable:
+        // SecIdentityCopyPrivateKey reported kSecAttrKeyClass=0 (public;
+        // Security framework represents kSecAttrKeyClassPublic as the
+        // literal string "0" and Private as "1") and canSign=0, exactly
+        // matching a public key handed back in place of the private one.
+        // The public key here only ever needs to exist in memory long
+        // enough to embed in the leaf's SPKI below — it never needs its own
+        // keychain item.
         let keyAttrs: [String: Any] = [
-            kSecAttrKeyType as String:        kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrKeySizeInBits as String:  256,
-            kSecAttrIsPermanent as String:    true,
-            kSecAttrAccessGroup as String:    KeychainStore.accessGroup,
-            kSecAttrApplicationTag as String: tag
+            kSecAttrKeyType as String:       kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeySizeInBits as String: 256,
+            kSecPrivateKeyAttrs as String: [
+                kSecAttrIsPermanent as String:    true,
+                kSecAttrAccessGroup as String:    KeychainStore.accessGroup,
+                kSecAttrApplicationTag as String: tag
+            ]
         ]
         var cfErr: Unmanaged<CFError>?
         guard let leafPrivKey = SecKeyCreateRandomKey(keyAttrs as CFDictionary, &cfErr) else {
@@ -86,7 +122,7 @@ final class LeafCertCache {
             throw TLSInterceptorError.cannotExtractPublicKey
         }
         let certDER = try X509CertBuilder.buildLeafCert(
-            domain: domain, leafPublicKey: leafPubKey, caPrivateKey: caKey
+            domain: domain, leafPublicKey: leafPubKey, caPrivateKey: caKey, issuer: issuer
         )
         guard let cert = SecCertificateCreateWithData(nil, certDER as CFData) else {
             throw TLSInterceptorError.certCreationFailed
@@ -95,7 +131,58 @@ final class LeafCertCache {
         guard let id = KeychainStore.loadLeafIdentity(domain: domain) else {
             throw TLSInterceptorError.identityLookupFailed
         }
+        try Self.verifyUsable(id, expectedLeafDER: certDER, domain: domain)
         return id
+    }
+
+    /// The device-facing TLS server's first flight (ServerHello …
+    /// CertificateVerify … Finished) is produced as one unit, and
+    /// CertificateVerify needs an ECDSA-SHA256 signature from this identity's
+    /// private key. If that signature can't be produced, Network.framework
+    /// aborts while processing the ClientHello: the accepted connection's
+    /// receive completes with `-9858: handshake failed` while its state is
+    /// still `.preparing`, and not one byte reaches the device — the exact
+    /// on-device signature of the duckduckgo.com failure. Reproduced on macOS
+    /// with a `kSecClassIdentity` lookup that returned an identity whose key
+    /// was not the leaf's: same error, same state, no ServerHello; the same
+    /// keychain-backed key correctly paired with the leaf completed the
+    /// handshake. So check both things here, before the identity is cached:
+    /// the identity's certificate is byte-for-byte the leaf just minted, and
+    /// its private key signs the way boringssl will ask it to. A failure is
+    /// thrown with the detail (which certificate came back, why signing
+    /// failed) so runSession's catch records it in Settings via dropSession.
+    private static func verifyUsable(_ id: SecIdentity, expectedLeafDER: Data, domain: String) throws {
+        var certRef: SecCertificate?
+        SecIdentityCopyCertificate(id, &certRef)
+        guard let idCert = certRef else {
+            throw TLSInterceptorError.identityMismatch("identity for \(domain) has no certificate")
+        }
+        let idDER = SecCertificateCopyData(idCert) as Data
+        guard idDER == expectedLeafDER else {
+            let got = SecCertificateCopySubjectSummary(idCert) as String? ?? "<unreadable>"
+            throw TLSInterceptorError.identityMismatch(
+                "identity lookup for \(domain) returned certificate '\(got)' (\(idDER.count) B), not the minted leaf (\(expectedLeafDER.count) B)")
+        }
+        var keyRef: SecKey?
+        SecIdentityCopyPrivateKey(id, &keyRef)
+        guard let key = keyRef else {
+            throw TLSInterceptorError.identityKeyUnusable("identity for \(domain) has no private key")
+        }
+        let attrs = (SecKeyCopyAttributes(key) as? [String: Any]) ?? [:]
+        let keyClass = String(describing: attrs[kSecAttrKeyClass as String] ?? "?")
+        let canSign  = String(describing: attrs[kSecAttrCanSign as String] ?? "?")
+        let algorithm: SecKeyAlgorithm = .ecdsaSignatureDigestX962SHA256   // what boringssl asks for
+        guard SecKeyIsAlgorithmSupported(key, .sign, algorithm) else {
+            throw TLSInterceptorError.identityKeyUnusable(
+                "key for \(domain) reports ECDSA-SHA256 signing unsupported (keyClass=\(keyClass) canSign=\(canSign))")
+        }
+        var cfErr: Unmanaged<CFError>?
+        let digest = Data(count: 32)
+        guard SecKeyCreateSignature(key, algorithm, digest as CFData, &cfErr) != nil else {
+            let reason = cfErr.map { String(describing: $0.takeRetainedValue()) } ?? "unknown error"
+            throw TLSInterceptorError.identityKeyUnusable(
+                "test signature with key for \(domain) failed: \(reason) (keyClass=\(keyClass) canSign=\(canSign))")
+        }
     }
 
     func purge() {
@@ -112,17 +199,28 @@ final class LeafCertCache {
 
 enum TLSInterceptorError: Error, LocalizedError {
     case caKeyMissing
+    case caCertMissing
     case cannotExtractPublicKey
     case certCreationFailed
     case identityLookupFailed
+    // The identity the keychain handed back is not usable as a TLS server
+    // identity for this leaf: wrong certificate, or a private key that can't
+    // produce the ECDSA signature the handshake needs. See
+    // LeafCertCache.verifyUsable for why either one presents on device as
+    // "-9858: handshake failed" with the connection still `.preparing`.
+    case identityMismatch(String)
+    case identityKeyUnusable(String)
     case handshakeFailed(OSStatus)
     case upstreamFailed
     var errorDescription: String? {
         switch self {
         case .caKeyMissing:            return "CA private key not found in keychain"
+        case .caCertMissing:           return "CA certificate not found in keychain (or its subject could not be read)"
         case .cannotExtractPublicKey:  return "Cannot extract public key from leaf private key"
         case .certCreationFailed:      return "Failed to create leaf certificate"
         case .identityLookupFailed:    return "Cannot find SecIdentity for leaf cert+key pair"
+        case .identityMismatch(let d): return "Leaf identity mismatch: \(d)"
+        case .identityKeyUnusable(let d): return "Leaf identity key unusable: \(d)"
         case .handshakeFailed(let s):  return "TLS handshake failed (OSStatus \(s))"
         case .upstreamFailed:          return "Upstream TLS connection failed"
         }
@@ -138,6 +236,16 @@ final class TLSSession {
     let dstPort: UInt16
     let flow: NEPacketTunnelFlow
     let certCache: LeafCertCache
+    // Every packet-capture instrumentation call in this file previously went
+    // straight to `flow.writePackets`, never through PacketForwarder's
+    // `onPacket` — so none of our synthetic replies (SYN-ACK, ServerHello
+    // flight, ACKs, the teardown FIN) ever appeared in a device pcap, only
+    // the device's own outbound packets. That one-sided capture is what made
+    // the FIN-retransmit-storm investigation impossible to close from a pcap
+    // alone: we could prove what the device sent but never what we actually
+    // sent back. Optional so existing call sites/tests that don't wire it
+    // still compile; nil just means "don't capture," not "don't send."
+    var onPacket: PacketHandler?
 
     // `serverSeq` is the next sequence number we will send; `clientSeq` is
     // the next sequence number we expect from the device (i.e. our ack
@@ -185,8 +293,36 @@ final class TLSSession {
         get { stageLock.lock(); defer { stageLock.unlock() }; return _stage }
         set { stageLock.lock(); defer { stageLock.unlock() }; _stage = newValue }
     }
+    // Last non-ready state either bridge connection reported after
+    // runSession handed off to the receive chains. The receive callbacks
+    // only see a generic NWError when a connection dies; the state handler
+    // saw the specific one (e.g. the TLS alert code). Same threading as
+    // `stage`, same lock.
+    private var _lastBridgeFailure: String?
+    private var lastBridgeFailure: String? {
+        get { stageLock.lock(); defer { stageLock.unlock() }; return _lastBridgeFailure }
+        set { stageLock.lock(); defer { stageLock.unlock() }; _lastBridgeFailure = newValue }
+    }
     private var receiveCount = 0
     private var wroteFirstToDevice = false
+    // Set only when the real upstream server has actually sent back
+    // application data that we relayed toward the device — distinct from
+    // `stage == "decrypting"`, which flips true the moment the device's
+    // *request* is first decrypted and then never resets. Using stage alone
+    // in recordBridgeEnd meant any errorless upstream/device-facing EOF after
+    // that point was assumed to be a normal finished exchange even if zero
+    // response bytes had ever gone back — silently hiding a real stall (seen
+    // on-device: full handshake, request relayed, "Last:" stays blank, no
+    // response ever reaches Safari).
+    // Same lock as `stage`/`lastBridgeFailure`: written from
+    // receiveFromUpstream's completion (upstream connection's queue), read
+    // from recordBridgeEnd (reachable from either connection's completion,
+    // both on .global()) — an unguarded var here would be a real data race.
+    private var _upstreamRespondedWithData = false
+    private var upstreamRespondedWithData: Bool {
+        get { stageLock.lock(); defer { stageLock.unlock() }; return _upstreamRespondedWithData }
+        set { stageLock.lock(); defer { stageLock.unlock() }; _upstreamRespondedWithData = newValue }
+    }
     private let t0 = Date()
     private var elapsedMs: Int { Int(Date().timeIntervalSince(t0) * 1000) }
     private lazy var tag = "\(srcIP):\(key.srcPort)→\(dstIP):\(dstPort)"
@@ -195,6 +331,14 @@ final class TLSSession {
     private var proxyFD: Int32 = -1
     private var tlsListener: NWListener?
     private var upstream: NWConnection?
+    // The NWListener-accepted, device-facing connection receiveFromTLS reads
+    // from. close() must cancel this too, same as `upstream` — without it,
+    // a session that never sees a natural EOF on the device-facing side
+    // (e.g. the device gives up and RSTs instead of the loopback stream
+    // ending) leaves that connection's receive() pending forever: never
+    // cancelled, never erroring, leaking the connection and never reaching
+    // recordBridgeEnd from that side.
+    private var deviceTLSConn: NWConnection?
 
     var lastActivity = Date()
 
@@ -220,12 +364,20 @@ final class TLSSession {
         self.certCache = certCache
     }
 
+    // Single choke point for every synthetic packet this session sends to
+    // the device — see `onPacket`'s doc comment for why this exists.
+    private func sendToDevice(_ packet: Data) {
+        flow.writePackets([packet], withProtocols: [NSNumber(value: AF_INET)])
+        onPacket?(packet, .inbound, true)
+    }
+
     // MSS option advertised in our SYN-ACK: kind=2, len=4, value=1460 (0x05B4)
     // big-endian. Without it the device's kernel falls back to
     // tcp_mssdflt (512), which the pcap showed as a 1512-byte ClientHello
     // arriving in three 512-byte segments. 1460 is the standard Ethernet
     // value; the tunnel MTU is at least that, and the bytes never touch a
     // real wire anyway — they go straight into inboundBuffer.
+    private static let advertisedMSS = 1460
     private static let mssOption: Data = Data([0x02, 0x04, 0x05, 0xB4])
 
     // The ISN used for the SYN-ACK, fixed on the first call. A retransmitted
@@ -253,7 +405,7 @@ final class TLSSession {
             options: Self.mssOption
         )
         logger.debug("sendSYNACK to \(self.srcIP, privacy: .public):\(self.key.srcPort) for \(self.dstIP, privacy: .public):\(self.dstPort) seq=\(seq) ack=\(self.clientSeq) mss=1460")
-        flow.writePackets([packet], withProtocols: [NSNumber(value: AF_INET)])
+        sendToDevice(packet)
     }
 
     /// `seq` is the TCP sequence number PacketForwarder read from the
@@ -297,7 +449,7 @@ final class TLSSession {
             }
             logger.debug("[\(self.tag, privacy: .public)] +\(self.elapsedMs)ms \(label, privacy: .public) seq=\(seq) expected=\(expected) len=\(data.count) → ack=\(self.clientSeq)")
         }
-        flow.writePackets([ackPacket], withProtocols: [NSNumber(value: AF_INET)])
+        sendToDevice(ackPacket)
         seqLock.unlock()
 
         guard inWindow else { return }
@@ -334,12 +486,78 @@ final class TLSSession {
         SharedSettings.incrementDropCount()
     }
 
-    func close() {
+    // The two receive chains (receiveFromTLS / receiveFromUpstream) are the
+    // only paths after the ClientHello that used to close() without going
+    // through dropSession — so a session dying in the bridge phase (e.g.
+    // the device-facing TLS handshake failing before a ServerHello ever
+    // left) incremented nothing and left "Last:" blank in Settings, while
+    // the packet capture showed every attempt ending in our FIN. Seen on
+    // device: 20+ consecutive duckduckgo.com sessions, each closed ~100 ms
+    // after the ClientHello (right after the upstream connect), zero
+    // diagnostics. Records the reason unless this callback is merely the
+    // echo of a close() that already happened (cancel() makes both chains
+    // end with an error), or the exchange had genuinely finished.
+    private func recordBridgeEnd(side: String, isDone: Bool, error: NWError?, state: NWConnection.State) {
+        guard !sessionClosed else { return }
+        let stage = self.stage
+        // A clean EOF is the normal end of an HTTP exchange only if the
+        // upstream server actually sent back application data at some point
+        // — `stage == "decrypting"` (the old check here) flips true the
+        // moment the device's own *request* is first decrypted and never
+        // resets, so it can't tell "exchange finished" apart from "upstream
+        // silently never responded."
+        if error == nil && upstreamRespondedWithData { return }
+        let failure = lastBridgeFailure.map { " last=\($0)" } ?? ""
+        dropSession("\(side) ended at stage=\(stage): isDone=\(isDone) error=\(error.map { String(describing: $0) } ?? "none") state=\(state)\(failure) respondedWithData=\(upstreamRespondedWithData)")
+    }
+
+    /// `deviceFINSeq`: when the device itself initiated the close (a FIN
+    /// arrived), this is that FIN's own sequence number. A FIN consumes one
+    /// sequence number same as real data — but the FIN packet carries no
+    /// payload and never goes through `receive(_:seq:)`, so `clientSeq` was
+    /// never advanced past it. Replying with the stale `clientSeq` acks one
+    /// byte short of the device's FIN, which its kernel doesn't recognize as
+    /// acknowledging that FIN at all — confirmed on-device: the device
+    /// re-sent the same FIN 12+ times over ~18s (growing backoff) before
+    /// finally giving up with an RST, even though our reply otherwise
+    /// arrived fine. Passing the FIN's own seq here lets close() ack
+    /// `deviceFINSeq + 1`, the value the device is actually waiting for.
+    func close(deviceFINSeq: UInt32? = nil) {
         condition.lock()
         let alreadyClosed = sessionClosed
         sessionClosed = true
         condition.signal()
         condition.unlock()
+
+        // Handled before the `alreadyClosed` guard, and sent even when this
+        // call turns out to be a no-op below: a *simultaneous* close is a
+        // real, common case here, not an edge case — the upstream server
+        // finishing its response triggers our own close() (deviceFINSeq nil)
+        // at essentially the same moment the device, having gotten what it
+        // wanted, sends its own FIN. Confirmed on-device: our FIN (sent first,
+        // acking only what we'd received *before* the device's FIN) and the
+        // device's FIN crossed on the wire seconds apart. Once alreadyClosed
+        // is true, nothing below this block runs again, so if the seq bump
+        // and the ack it requires stayed gated behind that guard (as they
+        // did before), the device's FIN would never get acked at all —
+        // reproducing the exact retransmit-storm-then-RST failure this
+        // parameter exists to prevent, just for the simultaneous-close case
+        // instead of the plain device-closes-first one.
+        if let deviceFINSeq {
+            seqLock.lock()
+            let bumped = max(clientSeq, deviceFINSeq &+ 1)
+            let advanced = bumped != clientSeq
+            clientSeq = bumped
+            let ackPacket = advanced ? buildTCPPacket(
+                srcIP: dstIP, dstIP: srcIP,
+                srcPort: dstPort, dstPort: key.srcPort,
+                seq: serverSeq, ack: clientSeq,
+                flags: 0x10, payload: Data()
+            ) : nil
+            seqLock.unlock()
+            if let ackPacket { sendToDevice(ackPacket) }
+        }
+
         guard !alreadyClosed else { return }
         onClosed?()
 
@@ -360,7 +578,7 @@ final class TLSSession {
             flags: 0x11, payload: Data()
         )
         seqLock.unlock()
-        flow.writePackets([finPacket], withProtocols: [NSNumber(value: AF_INET)])
+        sendToDevice(finPacket)
 
         let fd = proxyFD
         if fd != -1 {
@@ -369,6 +587,7 @@ final class TLSSession {
         }
         tlsListener?.cancel()
         upstream?.cancel()
+        deviceTLSConn?.cancel()
     }
 
     func writeToDevice(_ data: Data) {
@@ -381,23 +600,41 @@ final class TLSSession {
         // FIN was added to eliminate.
         guard !sessionClosed else { return }
         seqLock.lock(); defer { seqLock.unlock() }
-        let packet = buildTCPPacket(
-            srcIP: dstIP, dstIP: srcIP,
-            srcPort: dstPort, dstPort: key.srcPort,
-            seq: serverSeq, ack: clientSeq,
-            flags: 0x18, payload: data
-        )
-        // First reply is the TLS server's ServerHello flight heading back to
-        // the device. Its seq/ack pair is what to compare against the ack
-        // numbers in the device's pure-ACK packets (logged by
-        // PacketForwarder): if the device acks past this seq, it accepted
-        // the data; if it keeps acking the SYN-ACK's seq, it never saw it.
-        if !wroteFirstToDevice {
-            wroteFirstToDevice = true
-            logger.debug("[\(self.tag, privacy: .public)] +\(self.elapsedMs)ms first write to device: \(data.count) bytes seq=\(self.serverSeq) ack=\(self.clientSeq)")
+
+        // Split into MSS-sized segments instead of one packet holding the
+        // whole payload. A real response easily runs past 1460 bytes (an
+        // 11KB duckduckgo results page, confirmed on-device), and a single
+        // oversized synthetic segment silently violates both the MSS we
+        // advertised in our own SYN-ACK and the tunnel's 1500-byte MTU — the
+        // device's kernel just never acks it, which looked identical to "no
+        // response ever arrived" until packet capture covered our own
+        // outbound packets and made the oversized segment visible at all.
+        var offset = data.startIndex
+        var first = true
+        while offset < data.endIndex {
+            let end = data.index(offset, offsetBy: Self.advertisedMSS, limitedBy: data.endIndex) ?? data.endIndex
+            let chunk = data[offset..<end]
+            let packet = buildTCPPacket(
+                srcIP: dstIP, dstIP: srcIP,
+                srcPort: dstPort, dstPort: key.srcPort,
+                seq: serverSeq, ack: clientSeq,
+                flags: 0x18, payload: Data(chunk)
+            )
+            // First reply is the TLS server's ServerHello flight heading back
+            // to the device. Its seq/ack pair is what to compare against the
+            // ack numbers in the device's pure-ACK packets (logged by
+            // PacketForwarder): if the device acks past this seq, it
+            // accepted the data; if it keeps acking the SYN-ACK's seq, it
+            // never saw it.
+            if first, !wroteFirstToDevice {
+                wroteFirstToDevice = true
+                logger.debug("[\(self.tag, privacy: .public)] +\(self.elapsedMs)ms first write to device: \(data.count) bytes seq=\(self.serverSeq) ack=\(self.clientSeq)")
+            }
+            first = false
+            serverSeq = serverSeq &+ UInt32(truncatingIfNeeded: chunk.count)
+            sendToDevice(packet)
+            offset = end
         }
-        serverSeq = serverSeq &+ UInt32(truncatingIfNeeded: data.count)
-        flow.writePackets([packet], withProtocols: [NSNumber(value: AF_INET)])
     }
 
     func start(onDecryptedRequest: @escaping (Data, String) -> Void) {
@@ -455,6 +692,29 @@ final class TLSSession {
             tlsOpts.securityProtocolOptions, false)
 
         let listenerParams = NWParameters(tls: tlsOpts, tcp: NWProtocolTCP.Options())
+
+        // Pin the listener to loopback explicitly. Left at its default the
+        // listener binds the wildcard address, and inside a packet-tunnel
+        // provider that is not a neutral choice: NECP's VPN-loop-prevention
+        // policy scopes this process's sockets to the physical interface
+        // (en0/pdp_ip0) so the provider's own traffic never re-enters the
+        // tunnel. A wildcard-bound listener gets that scope — the kernel's
+        // loopback bypass only applies to sockets whose local/remote
+        // address is loopback or that are bound to lo0, not to 0.0.0.0 —
+        // and every connection it accepts inherits it (xnu tcp_input:
+        // "Inherit INP_BOUND_IF from listener"). The accepted socket's
+        // SYN-ACK to 127.0.0.1 then fails source-interface selection in
+        // ip_output (127.0.0.1 is not an address of en0 → EADDRNOTAVAIL)
+        // and is dropped silently, so posixConnect below sees no reply and
+        // fails with ETIMEDOUT (errno 60) — the exact reason recorded in
+        // SharedSettings.tlsInterceptorLastError on device, 91/91 drops.
+        // Refused (61) would have meant "no listener"; timed out means
+        // "listener heard us and could not answer". Both settings below
+        // put the listener on the loopback path the kernel exempts from
+        // scoping: a loopback local address takes NECP's loopback bypass,
+        // and an lo0 scope is treated as unscoped for routing.
+        listenerParams.requiredInterfaceType = .loopback
+        listenerParams.requiredLocalEndpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: .any)
 
         stage = "listenerCreate"
         let lst: NWListener
@@ -529,16 +789,48 @@ final class TLSSession {
         addr.sin_family = sa_family_t(AF_INET)
         addr.sin_port   = listenerPort.bigEndian
         addr.sin_addr.s_addr = inet_addr("127.0.0.1")
-        let connectOK = withUnsafePointer(to: &addr) {
+
+        // Bounded like every other wait in this function. A blocking
+        // connect() whose SYN gets no answer sits in the kernel for its
+        // full SYN-retransmit budget (~75s on iOS) before ETIMEDOUT — on
+        // device that parked this thread and left the device's socket
+        // hanging for over a minute per session. Non-blocking connect +
+        // poll() gives it the same 5s the listener/accept waits get. The
+        // fd is put back into blocking mode on success because
+        // deviceToProxy/proxyToDevice rely on blocking send/recv.
+        let savedFlags = fcntl(fd, F_GETFL)
+        _ = fcntl(fd, F_SETFL, savedFlags | O_NONBLOCK)
+        let rc = withUnsafePointer(to: &addr) {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
                 Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
             }
-        } == 0
+        }
+        // Read errno before anything else runs: the previous version logged
+        // and close()d first, both of which may overwrite it, so the value
+        // that reached the Settings diagnostic was not guaranteed to be
+        // connect()'s own.
+        var connectErrno: Int32 = (rc == 0) ? 0 : errno
+        if rc != 0 && connectErrno == EINPROGRESS {
+            var pfd = pollfd(fd: fd, events: Int16(POLLOUT), revents: 0)
+            let ready = poll(&pfd, 1, 5000)
+            if ready == 0 {
+                connectErrno = ETIMEDOUT
+            } else if ready < 0 {
+                connectErrno = errno
+            } else {
+                var soErr: Int32 = 0
+                var soLen = socklen_t(MemoryLayout<Int32>.size)
+                getsockopt(fd, SOL_SOCKET, SO_ERROR, &soErr, &soLen)
+                connectErrno = soErr
+            }
+        }
+        _ = fcntl(fd, F_SETFL, savedFlags)
 
-        guard connectOK else {
-            logger.debug("[\(self.tag, privacy: .public)] DROP: connect(127.0.0.1:\(listenerPort)) failed errno=\(errno)")
+        guard connectErrno == 0 else {
+            let desc = String(cString: strerror(connectErrno))
+            logger.debug("[\(self.tag, privacy: .public)] +\(self.elapsedMs)ms DROP: connect(127.0.0.1:\(listenerPort)) failed errno=\(connectErrno) (\(desc, privacy: .public))")
             Darwin.close(fd)
-            dropSession("connect(127.0.0.1:\(listenerPort)) failed errno=\(errno)")
+            dropSession("connect(127.0.0.1:\(listenerPort)) failed errno=\(connectErrno) (\(desc))")
             close(); return
         }
         proxyFD = fd
@@ -558,31 +850,81 @@ final class TLSSession {
             dropSession("No accepted loopback connection (accepted=\(acceptedConn != nil))")
             close(); return
         }
+        deviceTLSConn = tlsConn
         logger.debug("[\(self.tag, privacy: .public)] +\(self.elapsedMs)ms loopback bridge accepted")
 
-        // Connect to the real upstream TLS server
-        // Host is a bare IP literal, so Network.framework sends no SNI and
-        // validates the server's certificate against the IP — expect
-        // `.failed` with a trust error (-9808/-9814 family) for most real
-        // sites. `.waiting` is logged but does NOT signal the semaphore, so
-        // a session whose last line is "upstream waiting" is parked here.
+        // Connect to the real upstream TLS server.
+        //
+        // Connect to the IP the device itself chose (dstIP) — the exact
+        // server the device resolved, with no second DNS lookup and no risk
+        // of a CDN handing this process a different edge — but give the TLS
+        // layer the real hostname from the device's ClientHello. Without it
+        // the endpoint is an IP literal, Network.framework sends no SNI, and
+        // the server's default certificate cannot match an IP. Reproduced on
+        // macOS 26 against 52.149.246.39 (Safari's duckduckgo.com endpoint):
+        // the bare-IP connection goes `.waiting(-9808: bad certificate
+        // format)` within ~400ms and stays there indefinitely. It never
+        // reaches `.failed` — since macOS 13 / iOS 16 establishment-time
+        // failures are surfaced as `.waiting`, not `.failed` — so the old
+        // handler, which only signaled on `.ready`/`.failed`, left every
+        // session to die at the 10s timeout below. The same IP with
+        // sec_protocol_options_set_tls_server_name(sni) is `.ready` in
+        // ~100ms and the negotiated TLS metadata reports server_name == sni:
+        // the name drives both the SNI extension and certificate hostname
+        // validation (the header describes it as overriding "the server name
+        // obtained from the endpoint"; Apple DTS recommends it for exactly
+        // this connect-by-IP-with-separate-SNI case). Only set when the
+        // device's ClientHello actually carried an SNI — `sni` falls back to
+        // dstIP otherwise, and an IP literal is not a legal SNI value
+        // (RFC 6066 §3).
         stage = "upstreamConnect"
+        let upstreamTLS = NWProtocolTLS.Options()
+        if parsedSNI != nil {
+            sec_protocol_options_set_tls_server_name(upstreamTLS.securityProtocolOptions, sni)
+        }
         let upstreamConn = NWConnection(
             host: NWEndpoint.Host(dstIP),
             port: NWEndpoint.Port(rawValue: dstPort)!,
-            using: .tls
+            using: NWParameters(tls: upstreamTLS, tcp: NWProtocolTCP.Options())
         )
         upstream = upstreamConn
         let upstreamSem = DispatchSemaphore(value: 0)
+        // Last state seen before any `.cancelled`, for the timeout diagnostic
+        // below. Network.framework only ever reports `.cancelled` for a
+        // connection "cancelled by the caller" (connection.h), and the sole
+        // caller here is close() → upstream.cancel(). A timeout that reads
+        // `.cancelled` therefore means something closed this session from
+        // outside runSession (device FIN/RST via closeSession, or stop())
+        // before the wait expired — on device that showed up as "never
+        // became ready within 10s (cancelled)", hiding what the connection
+        // had actually been doing. Written on the connection's queue, read
+        // on this thread, hence the lock.
+        let upstreamStateLock = NSLock()
+        var lastUpstreamState = "none"
         upstreamConn.stateUpdateHandler = { [weak self] state in
+            if case .cancelled = state {} else {
+                upstreamStateLock.lock()
+                lastUpstreamState = String(describing: state)
+                upstreamStateLock.unlock()
+            }
             switch state {
             case .ready:
                 self?.logger.debug("[\(self?.tag ?? "?", privacy: .public)] +\(self?.elapsedMs ?? -1)ms upstream TLS to \(self?.dstIP ?? "?", privacy: .public) READY")
                 upstreamSem.signal()
             case .failed(let err):
+                self?.lastBridgeFailure = "upstream failed: \(err)"
                 self?.logger.debug("[\(self?.tag ?? "?", privacy: .public)] +\(self?.elapsedMs ?? -1)ms upstream TLS to \(self?.dstIP ?? "?", privacy: .public) FAILED: \(String(describing: err), privacy: .public)")
                 upstreamSem.signal()
+            case .waiting(.tls(let status)):
+                // A TLS-layer error (trust, protocol) is terminal in
+                // practice — no path change will make the server's
+                // certificate match — but it arrives as `.waiting`, not
+                // `.failed` (see above). Signal so the guard below reports
+                // the real reason at once instead of after the 10s wait.
+                self?.logger.debug("[\(self?.tag ?? "?", privacy: .public)] +\(self?.elapsedMs ?? -1)ms upstream TLS to \(self?.dstIP ?? "?", privacy: .public) waiting on TLS error (treated as failed): \(status)")
+                upstreamSem.signal()
             case .waiting(let err):
+                self?.lastBridgeFailure = "upstream waiting: \(err)"
                 self?.logger.debug("[\(self?.tag ?? "?", privacy: .public)] +\(self?.elapsedMs ?? -1)ms upstream TLS to \(self?.dstIP ?? "?", privacy: .public) waiting (thread stays blocked): \(String(describing: err), privacy: .public)")
             case .cancelled:
                 self?.logger.debug("[\(self?.tag ?? "?", privacy: .public)] upstream cancelled")
@@ -590,19 +932,22 @@ final class TLSSession {
             }
         }
         upstreamConn.start(queue: .global())
-        // `.waiting` (e.g. no route, slow DNS/TCP handshake to the real
-        // destination) never signals this semaphore either — bounded for
-        // the same reason as listenerSem above. 10s, longer than the
-        // loopback-only waits, since this is a real network connection.
+        // `.waiting` with a non-TLS error (no route, slow TCP handshake to
+        // the real destination) still never signals this semaphore —
+        // bounded for the same reason as listenerSem above. 10s, longer
+        // than the loopback-only waits, since this is a real network
+        // connection.
         if upstreamSem.wait(timeout: .now() + 10) == .timedOut {
-            logger.debug("[\(self.tag, privacy: .public)] +\(self.elapsedMs)ms DROP: upstream never became ready within 10s (state=\(String(describing: upstreamConn.state), privacy: .public))")
-            dropSession("Upstream to \(dstIP):\(dstPort) never became ready within 10s (\(upstreamConn.state))")
+            upstreamStateLock.lock(); let last = lastUpstreamState; upstreamStateLock.unlock()
+            let closedExternally = sessionClosed
+            logger.debug("[\(self.tag, privacy: .public)] +\(self.elapsedMs)ms DROP: upstream never became ready within 10s (state=\(String(describing: upstreamConn.state), privacy: .public) last=\(last, privacy: .public) closedExternally=\(closedExternally))")
+            dropSession("Upstream to \(dstIP):\(dstPort) (sni \(sni)) never became ready within 10s (\(upstreamConn.state); last=\(last); closedExternally=\(closedExternally))")
             close(); return
         }
 
         guard case .ready = upstreamConn.state else {
             logger.debug("[\(self.tag, privacy: .public)] DROP: upstream not ready (state=\(String(describing: upstreamConn.state), privacy: .public))")
-            dropSession("Upstream to \(dstIP):\(dstPort) not ready (\(upstreamConn.state))")
+            dropSession("Upstream to \(dstIP):\(dstPort) (sni \(sni)) not ready (\(upstreamConn.state))")
             close(); return
         }
 
@@ -619,8 +964,10 @@ final class TLSSession {
                 self?.stage = "bridged"
                 self?.logger.debug("[\(self?.tag ?? "?", privacy: .public)] +\(self?.elapsedMs ?? -1)ms device-facing TLS READY — device completed handshake with our leaf cert")
             case .failed(let err):
+                self?.lastBridgeFailure = "device-facing TLS failed: \(err)"
                 self?.logger.debug("[\(self?.tag ?? "?", privacy: .public)] +\(self?.elapsedMs ?? -1)ms device-facing TLS FAILED: \(String(describing: err), privacy: .public)")
             case .waiting(let err):
+                self?.lastBridgeFailure = "device-facing TLS waiting: \(err)"
                 self?.logger.debug("[\(self?.tag ?? "?", privacy: .public)] device-facing TLS waiting: \(String(describing: err), privacy: .public)")
             case .cancelled:
                 self?.logger.debug("[\(self?.tag ?? "?", privacy: .public)] device-facing TLS cancelled")
@@ -691,15 +1038,22 @@ final class TLSSession {
                 if self.stage != "decrypting" {
                     self.stage = "decrypting"
                     self.logger.debug("[\(self.tag, privacy: .public)] +\(self.elapsedMs)ms first decrypted request bytes from device: \(data.count) bytes for \(sni, privacy: .public)")
+                } else {
+                    self.logger.debug("[\(self.tag, privacy: .public)] +\(self.elapsedMs)ms decrypted request chunk from device: \(data.count) bytes for \(sni, privacy: .public)")
                 }
                 onDecryptedRequest(data, sni)
-                upstream.send(content: data, completion: .idempotent)
+                upstream.send(content: data, completion: .contentProcessed { [weak self] sendError in
+                    if let sendError {
+                        self?.logger.debug("[\(self?.tag ?? "?", privacy: .public)] upstream.send failed: \(String(describing: sendError), privacy: .public)")
+                    }
+                })
             }
             if !isDone && !self.sessionClosed {
                 self.receiveFromTLS(tlsConn: tlsConn, sni: sni, upstream: upstream,
                                     onDecryptedRequest: onDecryptedRequest)
             } else {
                 self.logger.debug("[\(self.tag, privacy: .public)] +\(self.elapsedMs)ms device-facing TLS receive ended: isDone=\(isDone) error=\(String(describing: error), privacy: .public)")
+                self.recordBridgeEnd(side: "Device-facing TLS for \(sni)", isDone: isDone, error: error, state: tlsConn.state)
                 self.close()
             }
         }
@@ -710,12 +1064,23 @@ final class TLSSession {
         upstream.receive(minimumIncompleteLength: 1, maximumLength: 65535) { [weak self] data, _, isDone, error in
             guard let self else { return }
             if let data, !data.isEmpty {
-                tlsConn.send(content: data, completion: .idempotent)
+                if !self.upstreamRespondedWithData {
+                    self.upstreamRespondedWithData = true
+                    self.logger.debug("[\(self.tag, privacy: .public)] +\(self.elapsedMs)ms first response bytes from upstream \(self.dstIP, privacy: .public):\(self.dstPort): \(data.count) bytes")
+                } else {
+                    self.logger.debug("[\(self.tag, privacy: .public)] +\(self.elapsedMs)ms response chunk from upstream: \(data.count) bytes")
+                }
+                tlsConn.send(content: data, completion: .contentProcessed { [weak self] sendError in
+                    if let sendError {
+                        self?.logger.debug("[\(self?.tag ?? "?", privacy: .public)] tlsConn.send (to device) failed: \(String(describing: sendError), privacy: .public)")
+                    }
+                })
             }
             if !isDone && !self.sessionClosed {
                 self.receiveFromUpstream(upstream: upstream, tlsConn: tlsConn)
             } else {
                 self.logger.debug("[\(self.tag, privacy: .public)] +\(self.elapsedMs)ms upstream receive ended: isDone=\(isDone) error=\(String(describing: error), privacy: .public)")
+                self.recordBridgeEnd(side: "Upstream TLS to \(self.dstIP):\(self.dstPort)", isDone: isDone, error: error, state: upstream.state)
                 self.close()
             }
         }
@@ -789,6 +1154,13 @@ final class TLSInterceptor {
     private var sessions: [SessionKey: TLSSession] = [:]
     private let lock = NSLock()
     let certCache = LeafCertCache()
+    // Forwarded to every TLSSession so its synthetic replies reach the same
+    // pcap capture as the plain-relay path's — see TLSSession.onPacket.
+    private let onPacket: PacketHandler?
+
+    init(onPacket: PacketHandler? = nil) {
+        self.onPacket = onPacket
+    }
 
     func openSession(key: SessionKey, srcIP: String, dstIP: String,
                      clientISN: UInt32, flow: NEPacketTunnelFlow,
@@ -797,6 +1169,7 @@ final class TLSInterceptor {
             key: key, srcIP: srcIP, dstIP: dstIP, dstPort: key.dstPort,
             clientISN: clientISN, flow: flow, certCache: certCache
         )
+        session.onPacket = onPacket
         session.onClosed = { [weak self] in
             guard let self else { return }
             self.lock.lock()
@@ -830,9 +1203,9 @@ final class TLSInterceptor {
         s?.receive(data, seq: seq)
     }
 
-    func closeSession(for key: SessionKey) {
+    func closeSession(for key: SessionKey, deviceFINSeq: UInt32? = nil) {
         lock.lock(); let s = sessions.removeValue(forKey: key); lock.unlock()
-        s?.close()
+        s?.close(deviceFINSeq: deviceFINSeq)
     }
 
     func stop() {

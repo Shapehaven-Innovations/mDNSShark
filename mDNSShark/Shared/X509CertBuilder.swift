@@ -15,6 +15,8 @@ enum X509CertBuilder {
     private static let oidCommonName:       [UInt8] = [0x55,0x04,0x03]
     private static let oidBasicConstraints: [UInt8] = [0x55,0x1D,0x13]
     private static let oidSubjectAltName:   [UInt8] = [0x55,0x1D,0x11]
+    private static let oidExtKeyUsage:      [UInt8] = [0x55,0x1D,0x25]
+    private static let oidServerAuth:       [UInt8] = [0x2B,0x06,0x01,0x05,0x05,0x07,0x03,0x01]
 
     /// Self-signed CA certificate DER. `privateKey` is used for both the SPKI and signing.
     static func buildSelfSignedCA(cn: String, privateKey: SecKey, validDays: Int = 1095) throws -> Data {
@@ -23,10 +25,50 @@ enum X509CertBuilder {
         return try assembleCert(tbs: tbs, signingKey: privateKey)
     }
 
-    /// Leaf certificate DER signed by `caPrivateKey`.
-    static func buildLeafCert(domain: String, leafPublicKey: SecKey, caPrivateKey: SecKey) throws -> Data {
-        let tbs = try tbs_Leaf(domain: domain, publicKey: leafPublicKey)
+    /// Leaf certificate DER signed by `caPrivateKey`. `issuer` is the DER-encoded
+    /// subject Name of the CA certificate, byte-for-byte (see
+    /// `subjectName(fromCertificateDER:)`): RFC 5280 §4.1.2.4 requires the leaf's
+    /// issuer field to equal the issuing CA's subject, and the platform's chain
+    /// builder locates the issuer by that name — a leaf whose issuer is anything
+    /// else fails with errSecCreateChainFailed ("Unable to build chain to root")
+    /// even with the CA installed as an anchor.
+    static func buildLeafCert(domain: String, leafPublicKey: SecKey, caPrivateKey: SecKey, issuer: Data) throws -> Data {
+        let tbs = try tbs_Leaf(domain: domain, publicKey: leafPublicKey, issuer: issuer)
         return try assembleCert(tbs: tbs, signingKey: caPrivateKey)
+    }
+
+    /// The DER-encoded subject Name of an X.509 certificate, exactly as encoded
+    /// in the certificate, for use as the issuer field of certificates it signs.
+    /// Walks TBSCertificate: [0] version (optional), serialNumber, signature,
+    /// issuer, validity, subject. Works for any v1–v3 certificate, so it also
+    /// covers a user-imported CA whose subject is not a bare CN.
+    static func subjectName(fromCertificateDER der: Data) -> Data? {
+        let b = [UInt8](der)
+        // (contentStart, contentEnd) of the TLV at `i`, or nil if malformed.
+        func tlv(_ i: Int) -> (start: Int, end: Int)? {
+            guard i + 2 <= b.count else { return nil }
+            var p = i + 1
+            var len = Int(b[p]); p += 1
+            if len & 0x80 != 0 {
+                let n = len & 0x7F
+                guard n >= 1, n <= 4, p + n <= b.count else { return nil }
+                len = 0
+                for _ in 0..<n { len = len << 8 | Int(b[p]); p += 1 }
+            }
+            guard p + len <= b.count else { return nil }
+            return (p, p + len)
+        }
+        guard b.first == 0x30, let cert = tlv(0),
+              cert.start < b.count, b[cert.start] == 0x30, let tbs = tlv(cert.start) else { return nil }
+        var i = tbs.start
+        if i < b.count, b[i] == 0xA0 {                       // [0] EXPLICIT version
+            guard let v = tlv(i) else { return nil }; i = v.end
+        }
+        for _ in 0..<4 {                                      // serial, sigAlg, issuer, validity
+            guard let e = tlv(i) else { return nil }; i = e.end
+        }
+        guard i < b.count, b[i] == 0x30, let subject = tlv(i) else { return nil }
+        return Data(b[i..<subject.end])
     }
 
     // MARK: - TBSCertificate builders
@@ -51,7 +93,7 @@ enum X509CertBuilder {
         )
     }
 
-    private static func tbs_Leaf(domain: String, publicKey: SecKey) throws -> Data {
+    private static func tbs_Leaf(domain: String, publicKey: SecKey, issuer: Data) throws -> Data {
         // ±1 h clock skew tolerance
         let now      = Calendar.current.date(byAdding: .hour, value: -1, to: Date())!
         let notAfter = Calendar.current.date(byAdding: .hour, value: 25, to: now)!
@@ -61,17 +103,23 @@ enum X509CertBuilder {
             derOID(oidSubjectAltName) +
             derOctetString(derSequence(derImplicit(tag: 0x82, Data(domain.utf8))))
         )
+        // ExtendedKeyUsage { id-kp-serverAuth }. Apple's trust evaluator has
+        // required an EKU containing serverAuth on every TLS server certificate
+        // since iOS 13 / macOS 10.15 (regardless of which root anchors it);
+        // without it the leaf is rejected with "Extended key usage does not
+        // match certificate usage".
+        let ekuExt   = derSequence(derOID(oidExtKeyUsage) + derOctetString(derSequence(derOID(oidServerAuth))))
         // BasicConstraints CA:FALSE (empty value sequence suffices)
         let bcExt    = derSequence(derOID(oidBasicConstraints) + derOctetString(derSequence(Data())))
         return derSequence(
             derExplicit(tag: 0xA0, derInteger(Data([0x02])))
             + randomSerial()
             + algID()
-            + rdnSequence(cn: domain)
+            + issuer
             + validity(from: now, to: notAfter)
             + rdnSequence(cn: domain)
             + spki
-            + derExplicit(tag: 0xA3, derSequence(sanExt + bcExt))
+            + derExplicit(tag: 0xA3, derSequence(sanExt + ekuExt + bcExt))
         )
     }
 

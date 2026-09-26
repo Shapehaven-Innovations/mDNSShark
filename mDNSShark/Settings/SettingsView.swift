@@ -549,7 +549,7 @@ private struct TLSWarningSheet: View {
                     .font(.largeTitle)
                     .foregroundColor(AppColors.warning)
                 Text("Before enabling TLS Inspection").font(.headline)
-                Text("mDNSShark will act as a TLS proxy for all HTTPS traffic.\n\n• Your CA certificate must be installed and trusted in iOS Settings → General → VPN & Device Management.\n• Add certificate-pinned apps (banking, health) to the Bypass List or they will fail.\n• See the README for full setup steps.")
+                Text("mDNSShark will act as a TLS proxy for all HTTPS traffic.\n\n• Your CA certificate must be installed and trusted in iOS Settings → General → VPN & Device Management.\n• Add certificate-pinned apps (banking, health) to the Bypass List or they will fail.\n• QUIC (HTTP/3) traffic is blocked while this is on, so sites fall back to regular HTTPS that can actually be inspected — some sites may feel slightly slower.\n• See the README for full setup steps.")
                     .font(.body)
                     .multilineTextAlignment(.center)
                     .padding()
