@@ -59,6 +59,31 @@ final class PacketCaptureManager: ObservableObject {
         return (pcapFileURL, metaFileURL)
     }
 
+    /// Authoritative check for whether the capture tunnel is (or is about
+    /// to be) routing this device's traffic. `isCapturing` alone isn't
+    /// enough: it's only flipped by the VPN status observer that
+    /// `startCapture()` installs, so it reads `false` if the app relaunches
+    /// while a previous session's tunnel is still connected, and during the
+    /// `.connecting` window before the observer's first `.connected` event.
+    /// Used to gate the threat-data refresh, whose request would otherwise
+    /// get routed into the app's own capture tunnel (see PacketTunnelProvider's
+    /// unconditional `includedRoutes = [NEIPv4Route.default()]`) and
+    /// potentially intercepted by its own TLSInterceptor.
+    func isTunnelActive() async -> Bool {
+        if isCapturing { return true }
+        let managers = (try? await NETunnelProviderManager.loadAllFromPreferences()) ?? []
+        return managers.contains { manager in
+            switch manager.connection.status {
+            case .connecting, .connected, .reasserting, .disconnecting:
+                return true
+            case .disconnected, .invalid:
+                return false
+            @unknown default:
+                return false
+            }
+        }
+    }
+
     // MARK: - VPN status observation
 
     private func observeVPNStatus() {

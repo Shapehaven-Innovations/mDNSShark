@@ -147,27 +147,63 @@ struct SecurityView: View {
         }.padding(40)
     }
 
+    private var isCapturing: Bool { coordinator.packetCaptureManager.isCapturing }
+
     private var footerButtons: some View {
         VStack(spacing: 8) {
-            Text("All assessments run entirely on-device. No data leaves your phone.")
+            Text("Security checks run entirely on this device. Refreshing downloads CISA's public catalog; your devices and scan results are never uploaded.")
                 .font(.caption).foregroundColor(.secondary).multilineTextAlignment(.center)
+
             Button {
-                Task { await vm.refreshThreatData() }
+                vm.startThreatDataRefresh()
             } label: {
                 if vm.isRefreshing {
-                    ProgressView().progressViewStyle(.circular)
+                    HStack(spacing: 6) {
+                        ProgressView().progressViewStyle(.circular)
+                        Text("Refreshing…")
+                    }
+                    .font(.subheadline)
                 } else {
-                    Label("Refresh Threat Data", systemImage: "arrow.clockwise")
+                    Label("Refresh CISA Data", systemImage: "arrow.clockwise")
                         .font(.subheadline)
                 }
             }
             .buttonStyle(.bordered)
-            if let d = vm.lastRefreshDate {
-                Text("Updated: \(d.formatted(.dateTime))")
-                    .font(.caption2).foregroundColor(.secondary)
+            .disabled(vm.isRefreshing || isCapturing)
+
+            if let status = vm.threatDataStatus {
+                let summary = status.summary()
+                Text(summary.text)
+                    .font(.caption2)
+                    .foregroundColor(summary.isStale ? AppColors.warning : .secondary)
+                Text("Refreshing updates CISA's known-exploited status for the \(status.checkedCVECount) vulnerabilities this app version checks. Which devices and services get checked only changes with app updates.")
+                    .font(.caption2).foregroundColor(.secondary).multilineTextAlignment(.center)
+            }
+
+            if isCapturing {
+                Text("Stop packet capture to refresh. Otherwise the download would pass through the capture tunnel.")
+                    .font(.caption2).foregroundColor(AppColors.warning).multilineTextAlignment(.center)
+            } else if let reason = vm.refreshError {
+                Text(refreshErrorText(reason))
+                    .font(.caption2).foregroundColor(AppColors.warning).multilineTextAlignment(.center)
             }
         }
         .padding(.top, 8)
+    }
+
+    private func refreshErrorText(_ reason: ThreatRefreshFailure) -> String {
+        switch reason {
+        case .captureActive:
+            return "Stop packet capture to refresh. Otherwise the download would pass through the capture tunnel."
+        case .cancelledByCapture:
+            return "Refresh stopped because packet capture started."
+        case .network:
+            return "Couldn't reach CISA. Check your connection and try again."
+        case .unusableData:
+            return "CISA returned data mDNSShark couldn't use. Your existing threat data was kept."
+        case .saveFailed:
+            return "Couldn't save the update. Your existing threat data was kept."
+        }
     }
 
     // MARK: - Helpers

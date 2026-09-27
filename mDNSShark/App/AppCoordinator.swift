@@ -34,12 +34,16 @@ final class AppCoordinator: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     init() {
-        let threatDB = ThreatDatabase()
+        let threatDB = ThreatDatabase.live()
+        let pcm = PacketCaptureManager()
         networkScanViewModel  = NetworkScanViewModel()
-        securityViewModel     = SecurityViewModel(threatDatabase: threatDB)
-        packetCaptureManager  = PacketCaptureManager()
+        securityViewModel     = SecurityViewModel(threatDatabase: threatDB, isTunnelActive: { [weak pcm] in
+            await pcm?.isTunnelActive() ?? false
+        })
+        packetCaptureManager  = pcm
         analysisViewModel     = AnalysisViewModel()
         wire()
+        Task { await securityViewModel.loadThreatDataStatus() }
         // Waits out iOS's Local Network Privacy decision before the very
         // first scan fires. Starting immediately here raced the system
         // permission alert on every fresh install (confirmed via a live
@@ -116,6 +120,22 @@ final class AppCoordinator: ObservableObject {
             .sink { [weak self] _ in
                 guard let self, SharedSettings.includeAllNetworksInCapture else { return }
                 self.networkScanViewModel.startScan()
+            }
+            .store(in: &cancellables)
+
+        // A threat-data refresh's request to cisa.gov would otherwise get
+        // routed into the capture tunnel it just started (and potentially
+        // MITM'd by the app's own TLSInterceptor) — cancel it best-effort
+        // the moment capture connects. `performThreatDataRefresh`'s own
+        // `isTunnelActive()` pre-flight check is the authoritative guard;
+        // this just cuts short a refresh already in flight when capture
+        // starts mid-fetch.
+        packetCaptureManager.$isCapturing
+            .removeDuplicates()
+            .dropFirst()
+            .filter { $0 }
+            .sink { [weak self] _ in
+                self?.securityViewModel.cancelThreatDataRefresh()
             }
             .store(in: &cancellables)
     }

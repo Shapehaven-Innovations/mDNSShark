@@ -50,5 +50,35 @@
       "cves": ["CVE-2021-45514"],
       "description": "Netgear routers have authentication bypass vulnerabilities in certain firmware versions."
     }
+  },
+  "cves": {
+    "CVE-2020-10188": {
+      "title": "Telnet Server Buffer Overflow (netkit telnetd)",
+      "description": "netkit telnetd through 0.17, used by many embedded devices, has a buffer overflow that lets a remote attacker execute code."
+    },
+    "CVE-2019-15681": {
+      "title": "LibVNCServer Memory Disclosure",
+      "description": "LibVNCServer before a 2019 fix leaks stack memory to remote clients, which can expose data and help chain other exploits."
+    },
+    "CVE-2006-2369": {
+      "title": "RealVNC Authentication Bypass",
+      "description": "RealVNC 4.1.1 and products built on it let a remote client skip authentication by requesting an insecure security type."
+    },
+    "CVE-2011-2523": {
+      "title": "vsftpd 2.3.4 Backdoor",
+      "description": "A tampered vsftpd 2.3.4 release distributed in mid-2011 contains a backdoor that opens a remote shell."
+    },
+    "CVE-2023-39238": {
+      "title": "ASUS Router Format String Vulnerability",
+      "description": "A format string flaw in some ASUS router firmware (e.g. RT-AX56U V2) lets an attacker with admin access run code or crash the device."
+    },
+    "CVE-2021-45514": {
+      "title": "NETGEAR Router Command Injection",
+      "description": "Some NETGEAR routers (e.g. XR1000 before firmware 1.0.0.58) allow unauthenticated command injection."
+    },
+    "CVE-2023-44415": {
+      "title": "D-Link Router Command Injection",
+      "description": "Some D-Link routers (e.g. DIR-1260, DIR-2150) let attackers on the local network run code via command injection."
+    }
   }
 }

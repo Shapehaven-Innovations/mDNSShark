@@ -9,15 +9,30 @@ enum GroupMode: String, CaseIterable {
     case all      = "All"
 }
 
+/// User-facing reason a threat-data refresh didn't succeed. Distinct from
+/// `ThreatRefreshError` (the actor's internal error) so the UI only has to
+/// handle the handful of cases it actually shows different copy for.
+enum ThreatRefreshFailure: Equatable {
+    case captureActive
+    case cancelledByCapture
+    case network
+    case unusableData
+    case saveFailed
+}
+
 @MainActor
 final class SecurityViewModel: ObservableObject {
     @Published var findings:     [SecurityFinding] = []
     @Published var isAssessing:  Bool = false
-    @Published var isRefreshing: Bool = false
-    @Published var lastRefreshDate: Date? = nil
+    @Published private(set) var isRefreshing: Bool = false
+    @Published private(set) var threatDataStatus: ThreatDataStatus?
+    @Published private(set) var refreshError: ThreatRefreshFailure?
     @Published var groupMode:    GroupMode = .severity
 
     private let threatDatabase: ThreatDatabase
+    private let isTunnelActive: @Sendable () async -> Bool
+    private var refreshTask: Task<Void, Never>?
+    private var lastAssessedDevices: [DiscoveredDevice] = []
     private let logger = Logger(subsystem: "com.mDNSShark", category: "SecurityViewModel")
 
     /// Identifies the most recently STARTED `assess()` call. `$devices`
@@ -68,13 +83,15 @@ final class SecurityViewModel: ObservableObject {
 
     // MARK: - Init
 
-    init(threatDatabase: ThreatDatabase) {
+    init(threatDatabase: ThreatDatabase, isTunnelActive: @escaping @Sendable () async -> Bool) {
         self.threatDatabase = threatDatabase
+        self.isTunnelActive = isTunnelActive
     }
 
     // MARK: - Public API
 
     func assess(devices: [DiscoveredDevice]) async {
+        lastAssessedDevices = devices
         let assessmentID = UUID()
         currentAssessmentID = assessmentID
         isAssessing = true
@@ -95,11 +112,68 @@ final class SecurityViewModel: ObservableObject {
         isAssessing = false
     }
 
-    func refreshThreatData() async {
+    /// Loads the current threat-data status (bundled snapshot date, last
+    /// successful refresh if any) without fetching anything. Called once
+    /// at launch so the status line has real data before the user ever
+    /// taps refresh.
+    func loadThreatDataStatus() async {
+        threatDataStatus = await threatDatabase.status()
+    }
+
+    /// Starts a refresh if one isn't already running. Synchronous and
+    /// MainActor-isolated, so a double tap is caught here before it ever
+    /// reaches the actor's own (defense-in-depth) `.alreadyRefreshing`
+    /// guard.
+    func startThreatDataRefresh() {
+        guard !isRefreshing else { return }
         isRefreshing = true
-        await threatDatabase.refresh()
-        isRefreshing = false
-        lastRefreshDate = Date()
+        refreshError = nil
+        refreshTask = Task { [weak self] in
+            await self?.performThreatDataRefresh()
+        }
+    }
+
+    /// Cancels an in-flight refresh. Called when LAN capture starts, since
+    /// a refresh's request to cisa.gov would otherwise get routed into the
+    /// capture tunnel (and MITM'd by TLSInterceptor, if active) — see the
+    /// `isTunnelActive` pre-flight check in `performThreatDataRefresh`.
+    func cancelThreatDataRefresh() {
+        refreshTask?.cancel()
+    }
+
+    private func performThreatDataRefresh() async {
+        defer {
+            isRefreshing = false
+            refreshTask = nil
+        }
+
+        if await isTunnelActive() {
+            refreshError = .captureActive
+            return
+        }
+
+        do {
+            let status = try await threatDatabase.refresh()
+            threatDataStatus = status
+            if !lastAssessedDevices.isEmpty {
+                await assess(devices: lastAssessedDevices)
+            }
+        } catch let error as ThreatRefreshError {
+            switch error {
+            case .alreadyRefreshing:
+                break
+            case .cancelled:
+                refreshError = .cancelledByCapture
+            case .network:
+                refreshError = .network
+            case .badStatus, .undecodable, .implausibleFeed:
+                refreshError = .unusableData
+            case .persistence:
+                refreshError = .saveFailed
+            }
+        } catch {
+            refreshError = .network
+        }
     }
 
     // MARK: - Computed views of findings
@@ -135,6 +209,8 @@ final class SecurityViewModel: ObservableObject {
         var lines = [
             "mDNSShark Security Report",
             "Generated: \(df.string(from: Date()))",
+            "\(threatDataStatus?.summary().text ?? "CISA exploit data: not yet loaded.")",
+            "Vulnerabilities checked: \(threatDataStatus?.checkedCVECount ?? 0), fixed for this app version",
             "",
             "=== SUMMARY ===",
             "Total findings: \(findings.count)  |  Vulnerable devices: \(vulnerableDeviceCount)",
@@ -154,7 +230,7 @@ final class SecurityViewModel: ObservableObject {
                 }
             }
         }
-        lines += ["", "Generated by mDNSShark - on-device only, no data collected."]
+        lines += ["", "Generated by mDNSShark on this device. Scan results are not uploaded anywhere."]
         return lines.joined(separator: "\n")
     }
 
