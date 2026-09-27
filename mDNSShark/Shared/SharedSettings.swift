@@ -123,6 +123,32 @@ enum SharedSettings {
         set { suite.set(newValue, forKey: "tlsInterceptorLastError") }
     }
 
+    /// True when a raw TLSInterceptor drop reason describes a benign,
+    /// expected condition (nothing was listening on the real destination)
+    /// rather than something worth surfacing to the user (a certificate/
+    /// identity failure, an unexpected mid-session reset, or a genuine
+    /// internal bridge problem). The full raw string is still always kept
+    /// here for Settings; this only decides whether ContentView's Topology
+    /// banner also shows it. Real example that motivated this: "Upstream to
+    /// 192.168.8.243:443 ... never became ready within 10s (...
+    /// POSIXErrorCode(rawValue: 61): Connection refused ...)" fires simply
+    /// because that host isn't running an HTTPS server on 443, a normal,
+    /// constant background condition on any LAN scan, not a security
+    /// finding.
+    ///
+    /// Excludes any reason mentioning the loopback bridge (127.0.0.1): a
+    /// refusal there means our own local listener broke, which is a real
+    /// internal bug and can carry the same "Connection refused" text as the
+    /// benign upstream-refusal case.
+    static func isBenignTLSDropReason(_ reason: String) -> Bool {
+        guard !reason.isEmpty else { return true }
+        let refused = reason.contains("Connection refused")
+            || reason.contains("POSIXErrorCode(rawValue: 61)")
+            || reason.contains("errno=61")
+        guard refused else { return false }
+        return !reason.contains("127.0.0.1")
+    }
+
     static var tlsInterceptorDropCount: Int {
         get { suite.integer(forKey: "tlsInterceptorDropCount") }
         set { suite.set(newValue, forKey: "tlsInterceptorDropCount") }

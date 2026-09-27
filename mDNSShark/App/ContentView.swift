@@ -34,7 +34,8 @@ struct ContentView: View {
                 withAnimation { showBanner = true }
                 hasShownOnboarding = true
             }
-            tlsError = SharedSettings.tlsInterceptorLastError
+            let reason = SharedSettings.tlsInterceptorLastError
+            tlsError = SharedSettings.isBenignTLSDropReason(reason) ? "" : reason
         }
     }
 

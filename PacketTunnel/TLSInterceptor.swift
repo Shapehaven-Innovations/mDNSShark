@@ -55,18 +55,86 @@ final class LeafCertCache {
     private static let maxSize = 200
     private var cache: [String: SecIdentity] = [:]
     private var insertionOrder: [String] = []
-    private let lock = NSLock()
+    // Guards only `cache`/`insertionOrder`, held just long enough to read or
+    // write a dictionary entry, never across makeIdentity().
+    private let cacheLock = NSLock()
+    // One lock per domain, created on first use and never removed (even
+    // once that domain is evicted from `cache`), so first-time cert minting
+    // for one domain (CA lookup, DER subject parse, key generation, and the
+    // dummy ECDSA test signature in verifyUsable, all inside makeIdentity)
+    // never blocks a concurrent first-time mint for a different domain. A
+    // single shared lock around the whole identity(for:) body previously
+    // serialized every domain's mint against every other's: a page pulling
+    // from several third-party domains at once queued each one's cert-mint
+    // behind every other concurrent one instead of running independently.
+    // Same domain still serializes against itself, which is required (two
+    // concurrent first-time lookups for one domain must not double-mint/
+    // double-write its keychain items) and also against the domain's own
+    // eviction cleanup below. Never removing a domain's lock on eviction is
+    // deliberate: an evicted domain's NSLock instance must stay the one and
+    // only lock anyone (a re-mint, or the eviction that just happened) ever
+    // acquires for that domain string, or eviction cleanup and a re-mint of
+    // the same just-evicted domain could hold two different locks and run
+    // concurrently, doubly-writing (or deleting out from under) the same
+    // keychain tag. The set of distinct domains ever seen is small and
+    // bounded relative to a device's lifetime; purge() clears this too.
+    private var domainLocks: [String: NSLock] = [:]
+    private let domainLocksLock = NSLock()
+
+    private func lock(forDomain domain: String) -> NSLock {
+        domainLocksLock.lock(); defer { domainLocksLock.unlock() }
+        if let existing = domainLocks[domain] { return existing }
+        let new = NSLock()
+        domainLocks[domain] = new
+        return new
+    }
 
     func identity(for domain: String) throws -> SecIdentity {
-        lock.lock(); defer { lock.unlock() }
-        if let id = cache[domain] { return id }
+        cacheLock.lock()
+        if let id = cache[domain] { cacheLock.unlock(); return id }
+        cacheLock.unlock()
+
+        let domainLock = lock(forDomain: domain)
+        domainLock.lock(); defer { domainLock.unlock() }
+
+        // Re-check: another thread may have minted this domain's identity
+        // between the unlocked check above and acquiring domainLock.
+        cacheLock.lock()
+        if let id = cache[domain] { cacheLock.unlock(); return id }
+        cacheLock.unlock()
+
         let id = try makeIdentity(domain: domain)
+
+        cacheLock.lock()
         cache[domain] = id
         insertionOrder.append(domain)
+        var evicted: String?
         if insertionOrder.count > Self.maxSize {
-            let evicted = insertionOrder.removeFirst()
-            cache.removeValue(forKey: evicted)
-            KeychainStore.deleteAllLeafItems(domains: [evicted])
+            evicted = insertionOrder.removeFirst()
+            if let evicted { cache.removeValue(forKey: evicted) }
+        }
+        cacheLock.unlock()
+        // Deleting the evicted domain's keychain items here, under our own
+        // domainLock, would be the wrong lock: a concurrent identity(for:)
+        // for that same evicted domain acquires ITS OWN domain lock, not
+        // ours, so the two could interleave (its fresh SecItemAdd racing
+        // this SecItemDelete, or this delete running after it re-inserted
+        // into `cache`, wiping out keychain items `cache` still points at).
+        // Acquiring the evicted domain's own lock (the same NSLock instance
+        // any re-mint of it also acquires, since domain locks are never
+        // removed) and re-checking `cache` under it closes that race: if a
+        // re-mint won the lock first and is now cached again, its keychain
+        // items must survive, so the delete is skipped.
+        if let evicted {
+            let evictedLock = lock(forDomain: evicted)
+            evictedLock.lock()
+            cacheLock.lock()
+            let stillEvicted = cache[evicted] == nil
+            cacheLock.unlock()
+            if stillEvicted {
+                KeychainStore.deleteAllLeafItems(domains: [evicted])
+            }
+            evictedLock.unlock()
         }
         return id
     }
@@ -186,11 +254,14 @@ final class LeafCertCache {
     }
 
     func purge() {
-        lock.lock()
+        cacheLock.lock()
         let domains = Array(cache.keys)
         cache.removeAll()
         insertionOrder.removeAll()
-        lock.unlock()
+        cacheLock.unlock()
+        domainLocksLock.lock()
+        domainLocks.removeAll()
+        domainLocksLock.unlock()
         KeychainStore.deleteAllLeafItems(domains: domains)
     }
 }
@@ -588,6 +659,17 @@ final class TLSSession {
         tlsListener?.cancel()
         upstream?.cancel()
         deviceTLSConn?.cancel()
+    }
+
+    /// Snapshot of the sequence number this session next expects from the
+    /// device, i.e. how far its inbound stream has actually been accepted
+    /// so far. Lets a caller (PacketForwarder's FIN handling) tell a
+    /// genuinely-accepted FIN apart from one whose coalesced payload was
+    /// rejected as out-of-window, without duplicating receive(_:seq:)'s own
+    /// in-window bookkeeping.
+    func currentClientSeq() -> UInt32 {
+        seqLock.lock(); defer { seqLock.unlock() }
+        return clientSeq
     }
 
     func writeToDevice(_ data: Data) {
@@ -1215,6 +1297,14 @@ final class TLSInterceptor {
     func deliver(_ data: Data, seq: UInt32, for key: SessionKey) {
         lock.lock(); let s = sessions[key]; lock.unlock()
         s?.receive(data, seq: seq)
+    }
+
+    /// The session's current expected-next-from-device sequence number, or
+    /// nil if there's no session for `key`. Call before closeSession(for:)
+    /// removes the session, not after.
+    func clientSeq(for key: SessionKey) -> UInt32? {
+        lock.lock(); let s = sessions[key]; lock.unlock()
+        return s?.currentClientSeq()
     }
 
     func closeSession(for key: SessionKey, deviceFINSeq: UInt32? = nil) {

@@ -174,7 +174,7 @@ struct SettingsView: View {
         } header: {
             Text("TLS Inspection")
         } footer: {
-            Text("Install a trusted CA certificate on this device before enabling. See the README for steps.")
+            Text("Install a trusted CA certificate on this device before enabling. See the README for steps. The TLS Inspection toggle only controls whether HTTPS traffic is MITM-proxied for decryption; packet capture runs regardless, recording either decrypted or still-encrypted payloads.")
                 .font(.caption)
         }
     }

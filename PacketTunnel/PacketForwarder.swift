@@ -147,8 +147,13 @@ final class PacketForwarder {
             // TLS-inspecting proxies use. Gated on tlsInterceptor being
             // non-nil (checked here, same as forwardTCP, since it's only
             // mutated on this queue), not just the settings toggle, so this
-            // never fires unless interception can actually happen.
-            if dstPort == 443, self.tlsInterceptor != nil { return }
+            // never fires unless interception can actually happen. Also
+            // consults the same per-host bypass list dstPort443Intercepted
+            // checks for TCP:443: a bypass-listed host that also speaks
+            // QUIC on UDP:443 (no TCP fallback, e.g. VoIP, VPN-over-443,
+            // some games) was otherwise silently dropped here even though
+            // its TCP:443 traffic would correctly pass through unintercepted.
+            if dstPort == 443, self.tlsInterceptor != nil, !self.isHostBypassed(dstIP: key.dstIP) { return }
 
             let session = self.sessions[key] ?? self.createUDPSession(key: key, srcIP: srcIP, srcPort: srcPort)
             session.lastActivity = Date()
@@ -261,12 +266,26 @@ final class PacketForwarder {
                         interceptor.deliver(payload, seq: tcpSeq, for: key)
                     }
                     let finSeq = tcpSeq &+ UInt32(payload.count)
+                    // deliver() above only advances the session's real
+                    // clientSeq when the (possibly coalesced) payload landed
+                    // in-window; a reordered/retransmitted FIN+data segment
+                    // can arrive with a seq TLSSession.receive rejects, in
+                    // which case clientSeq is still short of finSeq here.
+                    // Passing finSeq to closeSession's deviceFINSeq anyway
+                    // would bump the ack straight past whatever gap caused
+                    // the rejection, silently truncating the stream with no
+                    // retransmit ever requested. Checking the session's own
+                    // clientSeq (not just assuming acceptance from tcpSeq)
+                    // catches that; a bare FIN degenerates to the same check
+                    // (payload empty: finSeq == tcpSeq).
+                    let finSeqActuallyReached = isFIN
+                        && interceptor.clientSeq(for: key) == finSeq
                     // RST right after our SYN-ACK = the device's TCP stack
                     // received the SYN-ACK (so checksums passed) but rejected
                     // it (bad ack number, or no listening socket anymore).
                     // RST/FIN minutes later = the device's own timer gave up.
                     self.logger.debug("[\(flowTag, privacy: .public)] device sent \(isRST ? "RST" : "FIN", privacy: .public) flags=0x\(String(tcpFlags, radix: 16), privacy: .public) seq=\(tcpSeq) ack=\(tcpAck) payload=\(payload.count); closing intercept session")
-                    interceptor.closeSession(for: key, deviceFINSeq: isFIN ? finSeq : nil)
+                    interceptor.closeSession(for: key, deviceFINSeq: finSeqActuallyReached ? finSeq : nil)
                 } else if isSYN {
                     // A repeated SYN on a key that already has a session means
                     // the device never accepted our SYN-ACK and is retrying
@@ -421,13 +440,21 @@ final class PacketForwarder {
         }
     }
 
+    /// IP-level bypass: true if we've seen `dstIP` resolve to a hostname on
+    /// the TLS bypass list. Shared by the TCP:443 intercept decision
+    /// (`dstPort443Intercepted`) and the UDP:443/QUIC drop check in
+    /// `forwardUDP`, so a bypass-listed host is never intercepted on one
+    /// protocol and silently dropped on the other.
+    private func isHostBypassed(dstIP: String) -> Bool {
+        guard let hostname = dnsCache[dstIP] else { return false }
+        return SharedSettings.tlsBypassList.contains(where: { hostname.hasSuffix($0) })
+    }
+
     private func dstPort443Intercepted(key: SessionKey, srcIP: String,
                                         bytes: [UInt8], ipPacket: Data) -> Bool {
         guard key.dstPort == 443, let interceptor = tlsInterceptor else { return false }
-        // IP-level bypass: check if we've seen this IP resolve to a bypassed hostname
-        if let hostname = dnsCache[key.dstIP],
-           SharedSettings.tlsBypassList.contains(where: { hostname.hasSuffix($0) }) {
-            logger.debug("[\(srcIP, privacy: .public):\(key.srcPort)→\(key.dstIP, privacy: .public):443] not intercepting: dnsCache says \(hostname, privacy: .public) is bypassed")
+        if isHostBypassed(dstIP: key.dstIP) {
+            logger.debug("[\(srcIP, privacy: .public):\(key.srcPort)→\(key.dstIP, privacy: .public):443] not intercepting: dnsCache says \(self.dnsCache[key.dstIP] ?? "?", privacy: .public) is bypassed")
             return false
         }
         // Extract client ISN from the SYN packet (sequence number field in TCP header)
@@ -919,14 +946,18 @@ final class PacketForwarder {
     // running for hours/days, so re-check alongside the existing 60s cleanup tick
     // instead of trusting the one-time check in start().
     private func reevaluateTLSAccess() {
-        guard SharedSettings.tlsInspectionEnabled else { return }
-        if !SharedSettings.tlsInspectionUnlocked {
+        let shouldRun = SharedSettings.tlsInspectionEnabled
+            && SharedSettings.tlsInspectionUnlocked
+            && TLSInterceptor.hasCompleteCAIdentity()
+        if !shouldRun {
             if tlsInterceptor != nil {
                 tlsInterceptor?.stop()
                 tlsInterceptor = nil
-                SharedSettings.tlsInterceptorLastError = "TLS inspection is off - unlock it in Settings"
+                if SharedSettings.tlsInspectionEnabled && !SharedSettings.tlsInspectionUnlocked {
+                    SharedSettings.tlsInterceptorLastError = "TLS inspection is off - unlock it in Settings"
+                }
             }
-        } else if tlsInterceptor == nil && TLSInterceptor.hasCompleteCAIdentity() {
+        } else if tlsInterceptor == nil {
             tlsInterceptor = TLSInterceptor(onPacket: onPacket)
         }
     }
