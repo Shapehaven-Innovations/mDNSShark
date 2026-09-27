@@ -10,7 +10,26 @@ import Darwin
 // MARK: - NetworkScanner
 class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
     @Published var devices: [Device] = []
-    @Published var isScanning: Bool = false
+    // Diagnostic for a 2026-09-27 on-device report that the header Scan
+    // button (disabled while this is true) seemed to re-enable after ~5s
+    // instead of the full 25s `scanNetwork` duration. Code trace found no
+    // path that flips this early (only set true at scan start, false in
+    // the single end-of-duration asyncAfter, guarded against re-entry),
+    // and ~5s is exactly when the port-80 sweep / port-scan enrichment
+    // stops producing visible activity, so the likely explanation is an
+    // eyeball estimate of the wrong sub-phase. Logs every transition with
+    // an absolute timestamp and seconds-since-scan-start so a Console
+    // capture can settle it without guessing.
+    @Published var isScanning: Bool = false {
+        didSet {
+            guard oldValue != isScanning else { return }
+            let now = Date()
+            if isScanning { scanStartedAt = now }
+            let sinceStart = scanStartedAt.map { now.timeIntervalSince($0) } ?? 0
+            logger.debug("isScanning -> \(self.isScanning) at \(now.timeIntervalSince1970, format: .fixed(precision: 3)) (\(sinceStart, format: .fixed(precision: 2))s since scan start)")
+        }
+    }
+    private var scanStartedAt: Date?
 
     // List of service types to search for
     private let serviceTypes: [String] = [
@@ -88,6 +107,22 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
     
     private var bonjourBrowsers: [NWBrowser] = []
     private var serviceToDeviceId: [ObjectIdentifier: UUID] = [:]
+    // NetService.schedule(in:forMode:) does NOT retain the instance the way
+    // e.g. Timer does — resolveService()'s local `netService` had no other
+    // strong reference anywhere (serviceToDeviceId only stores its
+    // ObjectIdentifier, not the object), so ARC deallocated it as soon as
+    // resolveService() returned, mid-resolve, every single time. Confirmed
+    // as the real cause of a 2026-09-26/27 on-device "scan freezes the app"
+    // report: Console showed "cannot add handler to 0 from 0 — dropping"
+    // and "invalid mode 'kCFRunLoopCommonModes' provided to
+    // CFRunLoopRunSpecific" during a scan, both signatures of a
+    // CFNetService/mDNSResponder connection being torn down mid-flight
+    // rather than of anything in the packet-tunnel/capture path this was
+    // first suspected to be. Every discovered Bonjour service triggers one
+    // of these, so a device-rich LAN turns this into a repeated,
+    // main-thread-adjacent teardown storm for the whole ~20s Bonjour
+    // portion of a scan.
+    private var activeNetServices: [ObjectIdentifier: NetService] = [:]
     
     // Logger
     private let logger = Logger(subsystem: "com.mDNSShark", category: "NetworkScanner")
@@ -132,6 +167,8 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         devices.removeAll()
         isScanning = true
         serviceToDeviceId.removeAll()
+        activeNetServices.values.forEach { $0.stop() }
+        activeNetServices.removeAll()
         logger.info("Starting network scan for service types: \(self.serviceTypes)")
         
         // Start Bonjour scanning.
@@ -230,6 +267,9 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         let netService = NetService(domain: domain, type: type, name: name)
         netService.delegate = self
         netService.schedule(in: RunLoop.main, forMode: .common)
+        // Must outlive this function's scope until a delegate callback
+        // fires — see the activeNetServices doc comment above.
+        activeNetServices[ObjectIdentifier(netService)] = netService
         if let device = self.devices.first(where: { $0.serviceName == name &&
                                                      $0.serviceDomain == domain &&
                                                      $0.serviceType == type }) {
@@ -341,6 +381,7 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
     // MARK: - NetServiceDelegate
     func netServiceDidResolveAddress(_ sender: NetService) {
         let key = ObjectIdentifier(sender)
+        activeNetServices.removeValue(forKey: key)
         guard let deviceID = serviceToDeviceId[key],
               let device = devices.first(where: { $0.id == deviceID }) else {
             logger.error("No device mapping for resolved service \(sender.name)")
@@ -428,6 +469,7 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
     }
     
     func netService(_ sender: NetService, didNotResolve errorDict: [String : NSNumber]) {
+        activeNetServices.removeValue(forKey: ObjectIdentifier(sender))
         logger.error("Failed to resolve \(sender.name) with error: \(errorDict)")
     }
     

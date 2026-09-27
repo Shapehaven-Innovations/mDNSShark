@@ -40,7 +40,15 @@ final class PCAPWriter {
     }
 
     // Flush and close. Returns metadata dict for capture-meta.json.
-    func stopCapture(deviceWiFiIP: String, tunnelIP: String, totalPackets: Int) -> [String: Any] {
+    // `lanRouteStatus` records whether PacketTunnelProvider's LAN-route
+    // attempt (todo.md item 1's includeAllNetworksInCapture A/B test) found
+    // a Wi-Fi subnet to add and what it added, or why it couldn't — without
+    // this, a pcap showing zero LAN traffic can't be told apart from "the
+    // route was never added" vs. "the route was added but the on-link route
+    // still won it", both of which look identical in the packet capture
+    // itself.
+    func stopCapture(deviceWiFiIP: String, tunnelIP: String, totalPackets: Int,
+                      lanRouteStatus: String = "n/a") -> [String: Any] {
         dispatchPrecondition(condition: .notOnQueue(queue))
         var startTime = Date()
         var reconCount = 0
@@ -54,6 +62,7 @@ final class PCAPWriter {
             "captureStart": ISO8601DateFormatter().string(from: startTime),
             "deviceWiFiIP": deviceWiFiIP,
             "tunnelIP": tunnelIP,
+            "lanRouteStatus": lanRouteStatus,
             "totalPackets": totalPackets,
             "rawPackets": totalPackets - reconCount,
             "reconstructedPackets": reconCount,

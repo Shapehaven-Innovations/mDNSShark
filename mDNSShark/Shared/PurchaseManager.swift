@@ -157,6 +157,14 @@ final class PurchaseManager: ObservableObject {
             return
         }
         logger.info("handle: verified product=\(transaction.productID) id=\(transaction.id) purchaseDate=\(transaction.purchaseDate) revoked=\(transaction.revocationDate != nil)")
+        // A revoked trial is the one positive signal that the persisted trial
+        // start must go. refreshEntitlements() deliberately keeps the persisted
+        // date when the trial is merely absent from currentEntitlements, so the
+        // revocation has to be applied here, where StoreKit delivers it.
+        if transaction.revocationDate != nil, transaction.productID == TLSInspectionProduct.trial {
+            logger.notice("handle: trial revoked; clearing persisted trial start")
+            SharedSettings.tlsTrialStartDate = nil
+        }
         await transaction.finish()
         await refreshEntitlements()
         applyIfMissing(transaction)
@@ -194,6 +202,19 @@ final class PurchaseManager: ObservableObject {
             } else if transaction.productID == TLSInspectionProduct.trial {
                 trialStart = transaction.purchaseDate
             }
+        }
+        // Absence from currentEntitlements is not evidence of revocation. On a
+        // cold launch (or offline, or before the sandbox account syncs) the local
+        // cache can be empty even though the trial was purchased, and publishing
+        // nil here would wipe the persisted start date and re-show the "Start
+        // 3-Day Free Trial" CTA. The persisted date only ever comes from a
+        // verified transaction.purchaseDate, so keeping it cannot extend the
+        // trial past what StoreKit would compute. The only positive evidence
+        // that a trial is gone is a revoked transaction on Transaction.updates,
+        // which handle() clears explicitly.
+        if trialStart == nil, let persisted = SharedSettings.tlsTrialStartDate {
+            logger.notice("refreshEntitlements: trial absent from currentEntitlements; keeping persisted trial start \(persisted)")
+            trialStart = persisted
         }
         logger.info("refreshEntitlements: currentEntitlements=\(seen) unlocked=\(unlocked) trialStart=\(trialStart.map { "\($0)" } ?? "nil")")
         publish(unlocked: unlocked, trialStart: trialStart)

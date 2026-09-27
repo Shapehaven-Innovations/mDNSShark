@@ -21,8 +21,16 @@ struct SettingsView: View {
     @State private var activeSheet: TLSSheet?
     @AppStorage("hasSeenTLSWarning") private var hasSeenTLSWarning = false
     @State private var purchaseInFlight = false
-    @State private var dropCount: Int = SharedSettings.tlsInterceptorDropCount
-    @State private var lastDropReason: String = SharedSettings.tlsInterceptorLastError
+    // dropCount/lastDropReason UI disabled 2026-09-26 — see todo.md item 7's
+    // "Last: line" note for why (SharedSettings.tlsInterceptorDropCount has
+    // no reset path anywhere, so once any session ever drops, this text
+    // never goes away again for the life of the install). Left commented
+    // rather than deleted: the underlying SharedSettings counters and the
+    // TLSInterceptor/PacketForwarder writers that feed them are still real
+    // diagnostics and may get a proper reset-on-relevant-event treatment
+    // later instead of just being cut.
+    // @State private var dropCount: Int = SharedSettings.tlsInterceptorDropCount
+    // @State private var lastDropReason: String = SharedSettings.tlsInterceptorLastError
 
     // Bypass list
     @State private var bypassList: [String] = SharedSettings.tlsBypassList
@@ -34,6 +42,7 @@ struct SettingsView: View {
 
     // Capture filters
     @State private var activeFilters: Set<String> = SharedSettings.captureFilterProtocols
+    @State private var includeAllNetworks: Bool = SharedSettings.includeAllNetworksInCapture
 
     var body: some View {
         NavigationView {
@@ -43,18 +52,18 @@ struct SettingsView: View {
                 bypassListSection
                 dnsSection
                 captureFiltersSection
+                captureRoutingSection
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
-            .onAppear {
-                // dropCount/lastDropReason are written by the PacketTunnel
-                // extension process, not this one; @State only captures
-                // their value at view init, so re-read on every appearance
-                // or reopening Settings after a test always shows stale data.
-                dropCount = SharedSettings.tlsInterceptorDropCount
-                lastDropReason = SharedSettings.tlsInterceptorLastError
-            }
+            // .onAppear dropCount/lastDropReason refresh disabled alongside
+            // the "Last:" UI block above (see the @State comment near the
+            // top of this file).
+            // .onAppear {
+            //     dropCount = SharedSettings.tlsInterceptorDropCount
+            //     lastDropReason = SharedSettings.tlsInterceptorLastError
+            // }
             // Presentation modifiers (.sheet/.alert) must live on the List, not on a
             // Section inside it: List's row machinery (_VariadicView) enumerates a
             // Section's children and reapplies ambient modifiers to each one, so a
@@ -141,16 +150,20 @@ struct SettingsView: View {
                         .foregroundColor(AppColors.warning)
                 }
 
-                if dropCount > 0 {
-                    Text("\(dropCount) connection(s) dropped during TLS inspection")
-                        .font(.caption)
-                        .foregroundColor(AppColors.warning)
-                    if !lastDropReason.isEmpty {
-                        Text("Last: \(lastDropReason)")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                }
+                // "N connection(s) dropped" / "Last: ..." UI disabled
+                // 2026-09-26 (todo.md item 7): tlsInterceptorDropCount never
+                // resets, so this text never goes away once any session has
+                // ever dropped, across every future launch until reinstall.
+                // if dropCount > 0 {
+                //     Text("\(dropCount) connection(s) dropped during TLS inspection")
+                //         .font(.caption)
+                //         .foregroundColor(AppColors.warning)
+                //     if !lastDropReason.isEmpty {
+                //         Text("Last: \(lastDropReason)")
+                //             .font(.caption2)
+                //             .foregroundColor(.secondary)
+                //     }
+                // }
             } else {
                 tlsGateView
             }
@@ -447,6 +460,26 @@ struct SettingsView: View {
                     }
                 ))
             }
+        }
+    }
+
+    // Experimental, see SharedSettings.includeAllNetworksInCapture. Off by
+    // default (matches today's behavior). Only takes effect on the next
+    // Start Capture, since it's part of the tunnel's saved VPN config, not
+    // something changeable while a capture is already running. When on,
+    // AppCoordinator auto-starts a network scan once the tunnel connects,
+    // so the user never has to know about the separate header Scan button.
+    private var captureRoutingSection: some View {
+        Section {
+            Toggle("Include LAN traffic in capture", isOn: Binding(
+                get: { includeAllNetworks },
+                set: { val in
+                    includeAllNetworks = val
+                    SharedSettings.includeAllNetworksInCapture = val
+                }
+            ))
+        } footer: {
+            Text("Experimental. Routes same-subnet LAN traffic through the capture relay. When this is on, starting a capture automatically runs a network scan so there is LAN traffic to capture; the relay can add latency to that scan. Takes effect the next time you start a capture.")
         }
     }
 }

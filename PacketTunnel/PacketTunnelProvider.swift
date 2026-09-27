@@ -1,6 +1,8 @@
 // PacketTunnelProvider.swift (compiled into PacketTunnel target)
 import NetworkExtension
 import Foundation
+import Darwin
+import os
 
 class PacketTunnelProvider: NEPacketTunnelProvider {
     private var counter: UInt = 1          // mutated only on logQueue
@@ -9,6 +11,15 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     private let logQueue = DispatchQueue(label: "com.mDNSShark.provider.log")
     private var logHandle: FileHandle?
     private var running = false            // written by stopTunnel; read on NE queue in readLoop callback
+    private let logger = Logger(subsystem: "com.mDNSShark.PacketTunnel", category: "routing")
+
+    // Recorded once at startTunnel so stopTunnel can put a real answer in
+    // capture-meta.json instead of an empty string: without this, a pcap
+    // showing zero LAN traffic is unfalsifiable — there's no way to tell
+    // "the LAN route was never added" (en0 not found, wrong family, etc.)
+    // apart from "the route was added but the on-link route still won".
+    private var detectedWiFiIP = ""
+    private var lanRouteStatus = "not attempted (includeAllNetworksInCapture off)"
 
     private let sharedFileURL: URL = {
         FileManager.default
@@ -31,8 +42,60 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     override func startTunnel(options: [String: NSObject]?,
                               completionHandler: @escaping (Error?) -> Void) {
         let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "127.0.0.1")
-        let ipv4 = NEIPv4Settings(addresses: ["192.168.100.1"], subnetMasks: ["255.255.255.0"])
-        ipv4.includedRoutes = [NEIPv4Route.default()]
+        // 100.64.0.0/10 (RFC 6598, "Shared Address Space" / CGNAT range) rather
+        // than a regular private-range address: the tunnel's own virtual
+        // subnet must never collide with a real LAN the device might be on,
+        // or the two subnets being identical creates additional routing-table
+        // ambiguity on top of the on-link problem below — confirmed on-device
+        // 2026-09-26: the tunnel's old address (192.168.100.1/24) happened to
+        // exactly match the tester's real Wi-Fi subnet. No consumer router
+        // hands out addresses in this range, so that class of collision is
+        // now structurally impossible, not just unlikely.
+        let ipv4 = NEIPv4Settings(addresses: ["100.64.0.1"], subnetMasks: ["255.255.255.0"])
+        var includedRoutes = [NEIPv4Route.default()]
+        // The subnet fix above is necessary but not sufficient: even with a
+        // non-colliding tunnel subnet and includeAllNetworks/
+        // excludeLocalNetworks=false set at the NEVPNProtocol level (app
+        // side, PacketCaptureManager.swift), traffic to the device's own
+        // currently-connected LAN still never reached this tunnel on-device.
+        // Multiple Apple Developer Forum threads report the identical
+        // symptom (search: "LAN traffic with NEPacketTunnelProvider"): an
+        // on-link route for a directly-connected interface's own subnet can
+        // win over a tunnel's default (0.0.0.0/0) route in iOS's routing
+        // table, regardless of includeAllNetworks/excludeLocalNetworks —
+        // those flags document affecting OTHER local networks, not
+        // necessarily the currently-active primary interface's own subnet.
+        // NOTE: Apple's own "Routing your VPN network traffic" doc says the
+        // system routing table supersedes includedRoutes/excludedRoutes for
+        // routes of *equal* specificity (which this /24 is, versus en0's
+        // own /24 on-link route), and names NEVPNProtocol.enforceRoutes
+        // (not includedRoutes alone) as the documented override mechanism.
+        // enforceRoutes is itself ignored whenever includeAllNetworks is
+        // true, which is what PacketCaptureManager.swift set until the
+        // fifth fix (todo.md item 1): it now sets includeAllNetworks=false
+        // and enforceRoutes=includeAllNetworksInCapture instead. The two
+        // halves are complementary, not alternatives: enforceRoutes only
+        // makes the system honor routes this tunnel actually requests, so
+        // the explicit Wi-Fi-subnet route below is still what names the
+        // LAN as tunnel-bound. The detectedWiFiIP/lanRouteStatus diagnostics
+        // below exist specifically so an on-device pcap showing zero LAN
+        // traffic after this change is still interpretable (route never
+        // added vs. route added but lost to the system table) instead of
+        // leaving that ambiguous yet again.
+        // Opt-in only (SharedSettings.includeAllNetworksInCapture, todo.md
+        // item 1's on-device A/B test), same as the app-side flags it pairs
+        // with.
+        if SharedSettings.includeAllNetworksInCapture {
+            if let wifi = currentWiFiIPv4Network() {
+                detectedWiFiIP = wifi.address
+                lanRouteStatus = "added \(wifi.networkAddress)/\(wifi.subnetMask)"
+                includedRoutes.append(NEIPv4Route(destinationAddress: wifi.networkAddress, subnetMask: wifi.subnetMask))
+            } else {
+                lanRouteStatus = "not added (could not determine en0's IPv4 address/netmask)"
+            }
+            logger.debug("startTunnel: includeAllNetworksInCapture=true, en0=\(self.detectedWiFiIP, privacy: .private), lanRoute=\(self.lanRouteStatus, privacy: .public)")
+        }
+        ipv4.includedRoutes = includedRoutes
         settings.ipv4Settings = ipv4
         settings.dnsSettings = NEDNSSettings(servers: [SharedSettings.dnsPrimary, SharedSettings.dnsSecondary])
         settings.mtu = 1500
@@ -127,14 +190,73 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         }
 
         let meta = pcapWriter.stopCapture(
-            deviceWiFiIP: "",
-            tunnelIP: "192.168.100.1",
-            totalPackets: totalPackets
+            deviceWiFiIP: detectedWiFiIP,
+            tunnelIP: "100.64.0.1",
+            totalPackets: totalPackets,
+            lanRouteStatus: lanRouteStatus
         )
         if let data = try? JSONSerialization.data(withJSONObject: meta, options: .prettyPrinted) {
             try? data.write(to: metaFileURL)
         }
         completionHandler()
+    }
+
+    // MARK: - LAN route detection
+
+    /// The device's current Wi-Fi (`en0`) IPv4 address + netmask, reduced to
+    /// the network address the interface is actually on-link for (e.g.
+    /// `192.168.100.42`/`255.255.255.0` → `192.168.100.0`/`255.255.255.0`).
+    /// Used to add an explicit, more-specific `NEIPv4Route` for that subnet
+    /// alongside the tunnel's default route — see the comment at this
+    /// method's call site in `startTunnel` for why that's necessary at all.
+    /// Same `getifaddrs`/`en0` technique `LocalDeviceScanner.getWiFiAddress()`
+    /// uses in the main app target; duplicated rather than shared because
+    /// that type lives in the app target, not this extension's.
+    private func currentWiFiIPv4Network() -> (address: String, networkAddress: String, subnetMask: String)? {
+        var result: (String, String, String)?
+        var ifaddr: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&ifaddr) == 0, let first = ifaddr else { return nil }
+        defer { freeifaddrs(ifaddr) }
+
+        var ptr: UnsafeMutablePointer<ifaddrs>? = first
+        while let current = ptr {
+            let interface = current.pointee
+            let flags = Int32(interface.ifa_flags)
+            if (flags & (IFF_UP | IFF_RUNNING | IFF_LOOPBACK)) == (IFF_UP | IFF_RUNNING),
+               interface.ifa_addr?.pointee.sa_family == UInt8(AF_INET),
+               String(cString: interface.ifa_name) == "en0",
+               let addrPtr = interface.ifa_addr, let maskPtr = interface.ifa_netmask {
+
+                var addrHost = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+                var maskHost = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+                let addrRC = getnameinfo(addrPtr, socklen_t(addrPtr.pointee.sa_len), &addrHost,
+                                          socklen_t(addrHost.count), nil, 0, NI_NUMERICHOST)
+                let maskRC = getnameinfo(maskPtr, socklen_t(maskPtr.pointee.sa_len), &maskHost,
+                                          socklen_t(maskHost.count), nil, 0, NI_NUMERICHOST)
+                // A non-nil ifa_netmask can still carry a malformed/wrong-family
+                // sockaddr (observed on a lo0 alias: sa_family=0), which
+                // getnameinfo rejects with a nonzero return code and an
+                // untouched (still-zeroed) buffer. Checking the return code
+                // explicitly fails closed here instead of relying on
+                // String(cString:) on a zeroed buffer happening to produce ""
+                // and networkAddress happening to reject that.
+                if addrRC == 0, maskRC == 0,
+                   let network = Self.networkAddress(address: String(cString: addrHost),
+                                                      mask: String(cString: maskHost)) {
+                    result = (String(cString: addrHost), network, String(cString: maskHost))
+                }
+                break
+            }
+            ptr = interface.ifa_next
+        }
+        return result
+    }
+
+    private static func networkAddress(address: String, mask: String) -> String? {
+        let a = address.split(separator: ".").compactMap { UInt8($0) }
+        let m = mask.split(separator: ".").compactMap { UInt8($0) }
+        guard a.count == 4, m.count == 4 else { return nil }
+        return (0..<4).map { String(a[$0] & m[$0]) }.joined(separator: ".")
     }
 
     // MARK: - Parsing (called only on logQueue)

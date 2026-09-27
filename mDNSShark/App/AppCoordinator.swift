@@ -95,5 +95,28 @@ final class AppCoordinator: ObservableObject {
                 self?.analysisViewModel.update(findings: findings)
             }
             .store(in: &cancellables)
+
+        // With "Include LAN traffic in capture" on, the only LAN traffic
+        // worth capturing is the app's own scan, and nothing in the UI
+        // used to say the separate header Scan button had to be tapped
+        // after Start Capture (todo.md item 1: every early verification
+        // capture was empty for exactly that reason). So the moment the
+        // tunnel actually reaches .connected (not the Start tap, since
+        // connecting takes a beat), kick off a scan automatically.
+        // `removeDuplicates` + `dropFirst` turns this into a strict
+        // false -> true edge: the initial `false` seed on subscription is
+        // dropped, and repeated `true`s can't re-fire. `startScan` is
+        // already a no-op while a scan is in flight. Left off when the
+        // LAN toggle is off: a plain internet-traffic capture shouldn't
+        // start a device sweep the user never asked for.
+        packetCaptureManager.$isCapturing
+            .removeDuplicates()
+            .dropFirst()
+            .filter { $0 }
+            .sink { [weak self] _ in
+                guard let self, SharedSettings.includeAllNetworksInCapture else { return }
+                self.networkScanViewModel.startScan()
+            }
+            .store(in: &cancellables)
     }
 }
