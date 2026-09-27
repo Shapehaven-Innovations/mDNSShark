@@ -1151,6 +1151,20 @@ final class TLSSession {
 // MARK: - TLSInterceptor coordinator
 
 final class TLSInterceptor {
+    // Mirrors the check LeafCertCache.makeIdentity(for:) does before minting any
+    // leaf cert: a CA key alone is not enough, since makeIdentity() throws
+    // .caCertMissing without a matching CA cert too. PacketForwarder calls this
+    // instead of KeychainStore.loadCAKey() != nil so "key pasted but no cert"
+    // resolves to a clean not-configured/plain-relay state instead of turning
+    // interception on and then failing every session's cert mint.
+    static func hasCompleteCAIdentity() -> Bool {
+        guard KeychainStore.loadCAKey() != nil else { return false }
+        guard let caCert = KeychainStore.loadCACert(),
+              X509CertBuilder.subjectName(fromCertificateDER: SecCertificateCopyData(caCert) as Data) != nil
+        else { return false }
+        return true
+    }
+
     private var sessions: [SessionKey: TLSSession] = [:]
     private let lock = NSLock()
     let certCache = LeafCertCache()

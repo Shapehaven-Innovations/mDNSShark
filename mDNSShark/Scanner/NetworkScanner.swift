@@ -391,14 +391,21 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         var foundIP: String? = nil
         if let addresses = sender.addresses, !addresses.isEmpty {
             logger.info("\(sender.name) has \(addresses.count) addresses")
+            // Every enrichment probe and the port-80 sweep dedup are IPv4-only, so IPv6 only wins when no IPv4 sockaddr exists.
+            var firstIPv6: String? = nil
             for addressData in addresses {
-                if let ip = ipAddressFromData(addressData) {
-                    foundIP = ip
-                    logger.info("Found IP \(ip) for \(sender.name)")
-                    break
+                guard let ip = ipAddressFromData(addressData) else { continue }
+                if ip.contains(":") {
+                    if firstIPv6 == nil { firstIPv6 = ip }
+                    continue
                 }
+                foundIP = ip
+                break
             }
-            if foundIP == nil {
+            if foundIP == nil { foundIP = firstIPv6 }
+            if let ip = foundIP {
+                logger.info("Found IP \(ip) for \(sender.name)")
+            } else {
                 logger.warning("No valid IP parsed for \(sender.name)")
             }
         } else {
@@ -413,6 +420,7 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
                         device.resolvedIPAddress = host
                         device.port = Int(port)
                         self.logger.info("Fallback resolved \(sender.name) to IP: \(host) on port: \(port)")
+                        self.republishDevices()
                     }
                 } else {
                     self.logger.error("Fallback resolution failed for \(sender.name)")
@@ -466,8 +474,18 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         } else {
             logger.debug("No TXT record data available for \(sender.name)")
         }
+        // Queued last so it runs after every in-place field update dispatched above.
+        DispatchQueue.main.async {
+            self.republishDevices()
+        }
     }
-    
+
+    // Device is a class, so in-place field updates never fire $devices; reassign so the view model re-merges.
+    private func republishDevices() {
+        let current = devices
+        devices = current
+    }
+
     func netService(_ sender: NetService, didNotResolve errorDict: [String : NSNumber]) {
         activeNetServices.removeValue(forKey: ObjectIdentifier(sender))
         logger.error("Failed to resolve \(sender.name) with error: \(errorDict)")

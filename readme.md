@@ -35,6 +35,21 @@ mDNSShark is still **in active development**, with regular updates that refine p
   one side of the conversation. The details are in
   [Under the Hood](#under-the-hood-a-userspace-tcp-stack-inside-a-packet-tunnel)
   below.
+- **Plain (non-TLS) TCP through the tunnel now completes a real handshake.**
+  The same packet-tunnel extension previously never synthesized a SYN-ACK
+  or tracked real sequence numbers for ordinary TCP, which meant LAN scan
+  probes routed through capture never actually connected. Fixed alongside
+  five routing issues that kept LAN traffic from ever reaching the tunnel
+  in the first place (`excludeLocalNetworks`, a tunnel/Wi-Fi subnet
+  collision, `enforceRoutes`, an explicit on-link route, and a `NetService`
+  retention bug that looked related but wasn't). Verified on-device against
+  a real 254-host subnet sweep with zero bad checksums and clean teardown
+  on every connection.
+- **Starting a capture with "Include LAN traffic" on now runs a scan
+  automatically.** Previously, seeing any LAN traffic in a capture required
+  separately tapping the header bar's **Scan** button — nothing in the UI
+  said this was necessary, and the toggle alone produced an empty capture.
+  The app now starts a scan itself once the tunnel actually connects.
 
 ## Core Features at a Glance
 
@@ -148,7 +163,6 @@ The plain relay additionally wraps every flow in an `OSSignposter` interval (`re
 
 Honest list of what is known to be wrong or unfinished in the extension, in rough priority order. Several were raised in code review and are not yet acted on; see `todo.md` for the full backlog.
 
-- **Plain-relay TCP never completes a device-side handshake.** `PacketForwarder`'s TCP path sends no SYN-ACK and acks with zero, so non-443 TCP through the tunnel (including LAN scan probes when capture is on) never really connects. The reviewed design is to defer the SYN-ACK until the relay's own `NWConnection` reaches `.ready`, and to RST on `.failed` and on `.waiting` (LAN connection-refused arrives as `.waiting`). Mirroring the interceptor's immediate SYN-ACK would be worse, turning every filtered LAN port into a phantom "open".
 - **QUIC drop ignores the bypass list.** The UDP:443 drop is keyed only on the interceptor existing; the TCP:443 path also consults the per-host bypass list. A bypass-listed host that speaks HTTP/3, or any UDP:443 protocol with no TCP fallback, is silently dropped.
 - **Leaf minting is serialized across domains.** `LeafCertCache.identity(for:)` does the CA lookup, DER subject parse, key generation, and test signature under one lock, so a page pulling from several new third-party domains at once mints them one after another.
 - **FIN with out-of-order coalesced payload.** If a FIN's coalesced payload is not in-window (a retransmit or reordering), `close(deviceFINSeq:)` still bumps `clientSeq` past it, which could skip a gap we never received. Not observed on-device; needs a reordered FIN+data segment specifically.
@@ -191,7 +205,7 @@ Not all apps tolerate a TLS proxy - apps that use certificate pinning (banking, 
 
 Pre-populate the bypass list with any certificate-pinned apps before enabling inspection.
 
-**Always add Apple's own services.** `push.apple.com` (APNs) and `icloud.com` (including Private Relay) are certificate-pinned and can never be intercepted. Without these two entries, their failed sessions show up as a steady stream of drops in the Settings diagnostics and bury the errors you actually care about. The bypass list is stored in the shared `UserDefaults` suite and **can be cleared by a rebuild or reinstall**, so re-add both after a fresh install before reading the drop count as a signal.
+**Always add Apple's own services.** `push.apple.com` (APNs), `icloud.com` (including Private Relay), and `apple-native-relay.apple.com` (Private Relay's egress endpoint) are certificate-pinned and can never be intercepted — their handshakes are specifically designed to resist MITM re-encryption (ECH/QUIC-based), not a bug in `TLSInterceptor.swift`. Without these three entries, their failed sessions show up as a steady stream of drops in the Settings diagnostics (`apple-native-relay.apple.com` fails with `-9830: errSSLIllegalParam`) and bury the errors you actually care about. The bypass list is stored in the shared `UserDefaults` suite and **can be cleared by a rebuild or reinstall**, so re-add all three after a fresh install before reading the drop count as a signal.
 
 ### DNS Server
 
@@ -278,9 +292,6 @@ A rough look at what's next, roughly in priority order:
   permission that's still pending approval.
 - **Netgear Orbi mesh support** - identifying satellite nodes alongside the
   primary router, not just the primary router itself.
-- **Smoother interaction between packet capture and network scanning**
-  when both are running at the same time. This is the plain-relay
-  handshake gap described under [Known gaps](#known-gaps-and-open-review-findings).
 
 None of these are promises with dates attached - just where our attention
 is headed next. If one of them is exactly the itch you want to scratch,

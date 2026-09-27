@@ -65,12 +65,12 @@ final class PacketForwarder {
         if SharedSettings.tlsInspectionEnabled && !SharedSettings.tlsInspectionUnlocked {
             SharedSettings.tlsInterceptorLastError = "TLS inspection is off - unlock it in Settings"
             logger.debug("forwarder start: TLS inspection enabled but NOT unlocked; 443 flows take the plain relay path")
-        } else if SharedSettings.tlsInspectionEnabled && KeychainStore.loadCAKey() != nil {
+        } else if SharedSettings.tlsInspectionEnabled && TLSInterceptor.hasCompleteCAIdentity() {
             tlsInterceptor = TLSInterceptor(onPacket: onPacket)
             logger.debug("forwarder start: TLSInterceptor active: 443 SYNs will be intercepted")
         } else if SharedSettings.tlsInspectionEnabled {
-            SharedSettings.tlsInterceptorLastError = "TLS inspection is off - CA key not found in keychain"
-            logger.debug("forwarder start: TLS inspection enabled but CA key not found in keychain (extension process); plain relay path")
+            SharedSettings.tlsInterceptorLastError = "TLS inspection is off - CA key/cert not found in keychain"
+            logger.debug("forwarder start: TLS inspection enabled but no complete CA key+cert pair in keychain (extension process); plain relay path")
         } else {
             logger.debug("forwarder start: TLS inspection disabled; plain relay path for everything")
         }
@@ -926,7 +926,7 @@ final class PacketForwarder {
                 tlsInterceptor = nil
                 SharedSettings.tlsInterceptorLastError = "TLS inspection is off - unlock it in Settings"
             }
-        } else if tlsInterceptor == nil && KeychainStore.loadCAKey() != nil {
+        } else if tlsInterceptor == nil && TLSInterceptor.hasCompleteCAIdentity() {
             tlsInterceptor = TLSInterceptor(onPacket: onPacket)
         }
     }

@@ -33,6 +33,34 @@ enum SharedSettings {
         set { suite.set(newValue, forKey: "tlsTrialStartDate") }
     }
 
+    // Pure paid-unlock signal — distinct from tlsInspectionUnlocked, which
+    // mirrors hasAccess (trial OR unlock combined) and is what PacketTunnel
+    // gates on. This one is only ever set true by a verified StoreKit unlock
+    // transaction and only ever cleared by an explicit revocation
+    // (transaction.revocationDate != nil), never by an empty
+    // Transaction.currentEntitlements snapshot alone (documented StoreKit
+    // cache lag on cold launch, Apple forum threads 820813/823454 - see
+    // PurchaseManager.refreshEntitlements). PurchaseManager seeds its
+    // paywall-gating isUnlocked from this key so an already-purchased
+    // customer never sees the paywall reappear because of that lag.
+    static var tlsPurchaseUnlocked: Bool {
+        get { suite.bool(forKey: "tlsPurchaseUnlocked") }
+        set { suite.set(newValue, forKey: "tlsPurchaseUnlocked") }
+    }
+
+    // Apple's own account-scoped answer to "has this Apple ID ever obtained
+    // this app before" (AppTransaction.appTransactionID), cached so
+    // PurchaseManager.reconcileOwnership() can tell a genuine relaunch under
+    // the same account apart from a restored backup, a fresh install that
+    // inherited leftover App Group state, or a switch to a different Apple
+    // ID - none of which this App Group UserDefaults suite is scoped to on
+    // its own. A mismatch means tlsTrialStartDate/tlsPurchaseUnlocked on
+    // disk belong to a different account and must not be trusted.
+    static var ownerAppTransactionID: String? {
+        get { suite.string(forKey: "ownerAppTransactionID") }
+        set { suite.set(newValue, forKey: "ownerAppTransactionID") }
+    }
+
     static var tlsBypassList: [String] {
         get {
             guard let data = suite.data(forKey: "tlsBypassList"),

@@ -34,7 +34,7 @@ final class PurchaseManager: ObservableObject {
     // Seeded from the last known StoreKit result (written by refreshEntitlements below)
     // so relaunch after backgrounding shows the correct gate immediately instead of
     // flashing the paywall while Transaction.currentEntitlements resolves.
-    @Published private(set) var isUnlocked = SharedSettings.tlsInspectionUnlocked
+    @Published private(set) var isUnlocked = SharedSettings.tlsPurchaseUnlocked
     @Published private(set) var trialState: TrialState = PurchaseManager.computeTrialState(from: SharedSettings.tlsTrialStartDate)
     @Published var lastError: String?
 
@@ -63,6 +63,7 @@ final class PurchaseManager: ObservableObject {
             // false→true transition left to present on. purchase() re-fetches
             // on demand and reports its own errors.
             await self?.loadProducts(reportErrors: false)
+            await self?.reconcileOwnership()
             await self?.refreshEntitlements()
         }
     }
@@ -108,6 +109,7 @@ final class PurchaseManager: ObservableObject {
     func restore() async {
         do {
             try await AppStore.sync()
+            await reconcileOwnership()
             await refreshEntitlements()
         } catch {
             lastError = error.localizedDescription
@@ -115,6 +117,35 @@ final class PurchaseManager: ObservableObject {
     }
 
     // MARK: - Internals
+
+    // SharedSettings is an App Group UserDefaults suite, not scoped to any
+    // Apple ID: a restored backup, a fresh install inheriting leftover App
+    // Group state, or a switch to a different Apple ID that never redeemed
+    // anything here can all leave a stale tlsTrialStartDate/
+    // tlsPurchaseUnlocked on disk that refreshEntitlements() would otherwise
+    // carry forward indefinitely (by design, to survive the StoreKit
+    // cache-lag case above). AppTransaction.appTransactionID is
+    // Apple's own account-scoped answer to "has this Apple ID ever obtained
+    // this app before" - stable across reinstalls for the SAME account, so
+    // a mismatch against the persisted owner means the state on disk
+    // belongs to someone else and must be cleared before refreshEntitlements
+    // runs, so its cache-lag fallback doesn't re-adopt it.
+    private func reconcileOwnership() async {
+        guard let result = try? await AppTransaction.shared,
+              case .verified(let appTransaction) = result else {
+            logger.notice("reconcileOwnership: AppTransaction unavailable/unverified; leaving persisted state as-is")
+            return
+        }
+        let currentOwner = appTransaction.appTransactionID
+        guard let persistedOwner = SharedSettings.ownerAppTransactionID, persistedOwner != currentOwner else {
+            SharedSettings.ownerAppTransactionID = currentOwner
+            return
+        }
+        logger.notice("reconcileOwnership: App Group state belongs to a different Apple ID; clearing persisted trial/unlock state")
+        SharedSettings.tlsTrialStartDate = nil
+        SharedSettings.tlsPurchaseUnlocked = false
+        SharedSettings.ownerAppTransactionID = currentOwner
+    }
 
     private func purchase(productID: String) async {
         if products[productID] == nil { await loadProducts() }
@@ -161,9 +192,14 @@ final class PurchaseManager: ObservableObject {
         // start must go. refreshEntitlements() deliberately keeps the persisted
         // date when the trial is merely absent from currentEntitlements, so the
         // revocation has to be applied here, where StoreKit delivers it.
-        if transaction.revocationDate != nil, transaction.productID == TLSInspectionProduct.trial {
-            logger.notice("handle: trial revoked; clearing persisted trial start")
-            SharedSettings.tlsTrialStartDate = nil
+        if transaction.revocationDate != nil {
+            if transaction.productID == TLSInspectionProduct.trial {
+                logger.notice("handle: trial revoked; clearing persisted trial start")
+                SharedSettings.tlsTrialStartDate = nil
+            } else if transaction.productID == TLSInspectionProduct.unlock {
+                logger.notice("handle: unlock revoked; clearing persisted purchase-unlock flag")
+                SharedSettings.tlsPurchaseUnlocked = false
+            }
         }
         await transaction.finish()
         await refreshEntitlements()
@@ -216,6 +252,14 @@ final class PurchaseManager: ObservableObject {
             logger.notice("refreshEntitlements: trial absent from currentEntitlements; keeping persisted trial start \(persisted)")
             trialStart = persisted
         }
+        // Same reasoning as the trial above, for the one-time paid unlock:
+        // an empty currentEntitlements on cold launch must not clear an
+        // already-paid customer's access. tlsPurchaseUnlocked only goes
+        // false via an explicit revocation in handle(), never here.
+        if !unlocked, SharedSettings.tlsPurchaseUnlocked {
+            logger.notice("refreshEntitlements: unlock absent from currentEntitlements; keeping persisted purchase-unlock flag")
+            unlocked = true
+        }
         logger.info("refreshEntitlements: currentEntitlements=\(seen) unlocked=\(unlocked) trialStart=\(trialStart.map { "\($0)" } ?? "nil")")
         publish(unlocked: unlocked, trialStart: trialStart)
     }
@@ -236,6 +280,7 @@ final class PurchaseManager: ObservableObject {
         // gate on it without talking to StoreKit itself, and so PurchaseManager
         // can seed an accurate TrialState on next launch before StoreKit responds.
         SharedSettings.tlsInspectionUnlocked = hasAccess
+        SharedSettings.tlsPurchaseUnlocked = unlocked
         SharedSettings.tlsTrialStartDate = trialStart
     }
 
