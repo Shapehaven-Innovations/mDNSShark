@@ -1,84 +1,340 @@
 {
-  "serviceTypes": {
-    "_telnet._tcp": {
-      "cves": ["CVE-2020-10188"],
-      "description": "Telnet transmits all data including credentials in cleartext and has known RCE vulnerabilities."
+  "vendorAdvisories": {
+    "asus": {
+      "displayName": "ASUS",
+      "manufacturerAliases": [
+        "asus",
+        "asustek"
+      ],
+      "kevVendorProjects": [
+        "ASUS"
+      ],
+      "nvdCPEVendors": [],
+      "nvdAliases": []
     },
-    "_rfb._tcp": {
-      "cves": ["CVE-2019-15681", "CVE-2006-2369"],
-      "description": "VNC (RFB protocol) remote desktop has known authentication bypass and RCE vulnerabilities."
+    "netgear": {
+      "displayName": "NETGEAR",
+      "manufacturerAliases": [
+        "netgear"
+      ],
+      "kevVendorProjects": [
+        "NETGEAR"
+      ],
+      "nvdCPEVendors": [],
+      "nvdAliases": []
     },
-    "_vnc._tcp": {
-      "cves": ["CVE-2019-15681", "CVE-2006-2369"],
-      "description": "VNC remote desktop has known authentication bypass and RCE vulnerabilities."
+    "dlink": {
+      "displayName": "D-Link",
+      "manufacturerAliases": [
+        "dlink"
+      ],
+      "kevVendorProjects": [
+        "D-Link",
+        "D-Link and TRENDnet"
+      ],
+      "nvdCPEVendors": [],
+      "nvdAliases": []
     },
-    "_ftp._tcp": {
-      "cves": ["CVE-2011-2523", "CVE-2020-9054"],
-      "description": "FTP transmits credentials in cleartext. Multiple FTP servers have critical known vulnerabilities."
+    "tplink": {
+      "displayName": "TP-Link",
+      "manufacturerAliases": [
+        "tplink"
+      ],
+      "kevVendorProjects": [
+        "TP-Link"
+      ],
+      "nvdCPEVendors": [],
+      "nvdAliases": []
     },
-    "_ssh._tcp": {
-      "cves": [],
-      "description": "SSH provides encrypted remote shell access. Ensure key-based authentication is enforced."
+    "zyxel": {
+      "displayName": "Zyxel",
+      "manufacturerAliases": [
+        "zyxel"
+      ],
+      "kevVendorProjects": [
+        "Zyxel"
+      ],
+      "nvdCPEVendors": [],
+      "nvdAliases": []
     },
-    "_remotemanagement._tcp": {
-      "cves": [],
-      "description": "Apple Remote Desktop management allows full screen sharing and remote control."
+    "qnap": {
+      "displayName": "QNAP",
+      "manufacturerAliases": [
+        "qnap"
+      ],
+      "kevVendorProjects": [
+        "QNAP",
+        "QNAP Systems"
+      ],
+      "nvdCPEVendors": [],
+      "nvdAliases": []
     },
-    "_smb._tcp": {
-      "cves": [],
-      "description": "SMB file sharing has a history of critical vulnerabilities. Keep firmware and OS updated."
+    "mikrotik": {
+      "displayName": "MikroTik",
+      "manufacturerAliases": [
+        "mikrotik"
+      ],
+      "kevVendorProjects": [
+        "MikroTik"
+      ],
+      "nvdCPEVendors": [],
+      "nvdAliases": []
     },
-    "_http._tcp": {
-      "cves": [],
-      "description": "Unencrypted HTTP service. Local network traffic can be intercepted."
-    }
-  },
-  "manufacturers": {
-    "ASUS": {
-      "cves": ["CVE-2023-39238"],
-      "description": "ASUS router firmware has known critical RCE vulnerabilities in recent versions."
+    "ubiquiti": {
+      "displayName": "Ubiquiti",
+      "manufacturerAliases": [
+        "ubiquiti",
+        "ubnt"
+      ],
+      "kevVendorProjects": [
+        "Ubiquiti"
+      ],
+      "nvdCPEVendors": [],
+      "nvdAliases": []
     },
-    "Cisco": {
-      "cves": ["CVE-2023-20198"],
-      "description": "Cisco IOS XE has a critical privilege escalation vulnerability in the web management UI."
+    "hikvision": {
+      "displayName": "Hikvision",
+      "manufacturerAliases": [
+        "hikvision"
+      ],
+      "kevVendorProjects": [
+        "Hikvision"
+      ],
+      "nvdCPEVendors": [],
+      "nvdAliases": []
     },
-    "D-Link": {
-      "cves": ["CVE-2023-44415"],
-      "description": "D-Link router firmware has known RCE vulnerabilities."
+    "dahua": {
+      "displayName": "Dahua",
+      "manufacturerAliases": [
+        "dahua"
+      ],
+      "kevVendorProjects": [
+        "Dahua"
+      ],
+      "nvdCPEVendors": [],
+      "nvdAliases": []
     },
-    "Netgear": {
-      "cves": ["CVE-2021-45514"],
-      "description": "Netgear routers have authentication bypass vulnerabilities in certain firmware versions."
-    }
-  },
-  "cves": {
-    "CVE-2020-10188": {
-      "title": "Telnet Server Buffer Overflow (netkit telnetd)",
-      "description": "netkit telnetd through 0.17, used by many embedded devices, has a buffer overflow that lets a remote attacker execute code."
+    "draytek": {
+      "displayName": "DrayTek",
+      "manufacturerAliases": [
+        "draytek"
+      ],
+      "kevVendorProjects": [
+        "DrayTek"
+      ],
+      "nvdCPEVendors": [],
+      "nvdAliases": []
     },
-    "CVE-2019-15681": {
-      "title": "LibVNCServer Memory Disclosure",
-      "description": "LibVNCServer before a 2019 fix leaks stack memory to remote clients, which can expose data and help chain other exploits."
+    "tenda": {
+      "displayName": "Tenda",
+      "manufacturerAliases": [
+        "tenda"
+      ],
+      "kevVendorProjects": [
+        "Tenda"
+      ],
+      "nvdCPEVendors": [],
+      "nvdAliases": []
     },
-    "CVE-2006-2369": {
-      "title": "RealVNC Authentication Bypass",
-      "description": "RealVNC 4.1.1 and products built on it let a remote client skip authentication by requesting an insecure security type."
+    "reolink": {
+      "displayName": "Reolink",
+      "manufacturerAliases": [
+        "reolink"
+      ],
+      "kevVendorProjects": [
+        "Reolink"
+      ],
+      "nvdCPEVendors": [],
+      "nvdAliases": []
     },
-    "CVE-2011-2523": {
-      "title": "vsftpd 2.3.4 Backdoor",
-      "description": "A tampered vsftpd 2.3.4 release distributed in mid-2011 contains a backdoor that opens a remote shell."
+    "terramaster": {
+      "displayName": "TerraMaster",
+      "manufacturerAliases": [
+        "terramaster"
+      ],
+      "kevVendorProjects": [
+        "TerraMaster"
+      ],
+      "nvdCPEVendors": [],
+      "nvdAliases": []
     },
-    "CVE-2023-39238": {
-      "title": "ASUS Router Format String Vulnerability",
-      "description": "A format string flaw in some ASUS router firmware (e.g. RT-AX56U V2) lets an attacker with admin access run code or crash the device."
+    "netis": {
+      "displayName": "Netis",
+      "manufacturerAliases": [
+        "netis"
+      ],
+      "kevVendorProjects": [
+        "Netis"
+      ],
+      "nvdCPEVendors": [],
+      "nvdAliases": []
     },
-    "CVE-2021-45514": {
-      "title": "NETGEAR Router Command Injection",
-      "description": "Some NETGEAR routers (e.g. XR1000 before firmware 1.0.0.58) allow unauthenticated command injection."
+    "edimax": {
+      "displayName": "Edimax",
+      "manufacturerAliases": [
+        "edimax"
+      ],
+      "kevVendorProjects": [
+        "Edimax"
+      ],
+      "nvdCPEVendors": [],
+      "nvdAliases": []
     },
-    "CVE-2023-44415": {
-      "title": "D-Link Router Command Injection",
-      "description": "Some D-Link routers (e.g. DIR-1260, DIR-2150) let attackers on the local network run code via command injection."
+    "arcadyan": {
+      "displayName": "Arcadyan",
+      "manufacturerAliases": [
+        "arcadyan"
+      ],
+      "kevVendorProjects": [
+        "Arcadyan"
+      ],
+      "nvdCPEVendors": [],
+      "nvdAliases": []
+    },
+    "dzs": {
+      "displayName": "DZS (Dasan Zhone)",
+      "manufacturerAliases": [
+        "zhone",
+        "dasan",
+        "dzs"
+      ],
+      "kevVendorProjects": [
+        "Dasan"
+      ],
+      "nvdCPEVendors": [
+        "dasanzhone",
+        "zhone_technologies",
+        "dasan"
+      ],
+      "nvdAliases": [
+        "Zhone",
+        "Dasan"
+      ]
+    },
+    "arris": {
+      "displayName": "Arris/CommScope",
+      "manufacturerAliases": [
+        "arris",
+        "commscope"
+      ],
+      "kevVendorProjects": [],
+      "nvdCPEVendors": [
+        "arris",
+        "commscope"
+      ],
+      "nvdAliases": [
+        "Arris",
+        "CommScope"
+      ]
+    },
+    "technicolor": {
+      "displayName": "Technicolor/Vantiva",
+      "manufacturerAliases": [
+        "technicolor",
+        "vantiva"
+      ],
+      "kevVendorProjects": [],
+      "nvdCPEVendors": [
+        "technicolor",
+        "vantiva"
+      ],
+      "nvdAliases": [
+        "Technicolor",
+        "Vantiva"
+      ]
+    },
+    "sagemcom": {
+      "displayName": "Sagemcom",
+      "manufacturerAliases": [
+        "sagemcom"
+      ],
+      "kevVendorProjects": [],
+      "nvdCPEVendors": [
+        "sagemcom"
+      ],
+      "nvdAliases": [
+        "Sagemcom"
+      ]
+    },
+    "humax": {
+      "displayName": "Humax",
+      "manufacturerAliases": [
+        "humax"
+      ],
+      "kevVendorProjects": [],
+      "nvdCPEVendors": [
+        "humaxdigital",
+        "humax"
+      ],
+      "nvdAliases": [
+        "Humax"
+      ]
+    },
+    "sercomm": {
+      "displayName": "Sercomm",
+      "manufacturerAliases": [
+        "sercomm"
+      ],
+      "kevVendorProjects": [],
+      "nvdCPEVendors": [
+        "sercomm"
+      ],
+      "nvdAliases": [
+        "Sercomm"
+      ]
+    },
+    "askey": {
+      "displayName": "Askey",
+      "manufacturerAliases": [
+        "askey"
+      ],
+      "kevVendorProjects": [],
+      "nvdCPEVendors": [
+        "askey"
+      ],
+      "nvdAliases": [
+        "Askey"
+      ]
+    },
+    "hitron": {
+      "displayName": "Hitron",
+      "manufacturerAliases": [
+        "hitron"
+      ],
+      "kevVendorProjects": [],
+      "nvdCPEVendors": [
+        "hitrontech",
+        "hitron"
+      ],
+      "nvdAliases": [
+        "Hitron"
+      ]
+    },
+    "calix": {
+      "displayName": "Calix",
+      "manufacturerAliases": [
+        "calix"
+      ],
+      "kevVendorProjects": [],
+      "nvdCPEVendors": [
+        "calix"
+      ],
+      "nvdAliases": [
+        "Calix"
+      ]
+    },
+    "glinet": {
+      "displayName": "GL.iNet",
+      "manufacturerAliases": [
+        "gl"
+      ],
+      "kevVendorProjects": [],
+      "nvdCPEVendors": [
+        "gl-inet"
+      ],
+      "nvdAliases": [
+        "GL.iNet"
+      ]
     }
   }
 }

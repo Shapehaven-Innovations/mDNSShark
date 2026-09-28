@@ -15,7 +15,27 @@ enum Severity: Int, Comparable, Codable {
 }
 
 enum FindingSource: String, Codable {
-    case portRule = "Port", bonjourRule = "Bonjour", cisaKEV = "CISA", nist = "NIST"
+    case portRule = "Port", bonjourRule = "Bonjour", vendorAdvisory = "Vendor"
+}
+
+/// One CVE inside a `CVETier` - enough to show a title and link out to its
+/// NVD detail page without a second lookup.
+struct CVETierEntry: Identifiable, Equatable {
+    var id: String { cveID }
+    let cveID: String
+    let title: String
+}
+
+/// A named group of CVEs shown as a tappable capsule (e.g. "37 High/Crit")
+/// that expands to its own list, instead of dumping every ID inline -
+/// `vendorAdvisoryFinding` can attach dozens of CVEs to one finding.
+struct CVETier: Identifiable, Equatable {
+    var id: String { label }
+    let label: String
+    let severity: Severity
+    let entries: [CVETierEntry]
+
+    var cveIDs: [String] { entries.map(\.cveID) }
 }
 
 struct SecurityFinding: Identifiable, Equatable {
@@ -30,6 +50,7 @@ struct SecurityFinding: Identifiable, Equatable {
     let source: FindingSource
     let cveID: String?
     let referenceURL: URL?
+    let cveTiers: [CVETier]
 
     init(
         id: UUID = UUID(),
@@ -42,7 +63,8 @@ struct SecurityFinding: Identifiable, Equatable {
         recommendation: String,
         source: FindingSource,
         cveID: String? = nil,
-        referenceURL: URL? = nil
+        referenceURL: URL? = nil,
+        cveTiers: [CVETier] = []
     ) {
         self.id = id
         self.deviceID = deviceID
@@ -55,5 +77,6 @@ struct SecurityFinding: Identifiable, Equatable {
         self.source = source
         self.cveID = cveID
         self.referenceURL = referenceURL
+        self.cveTiers = cveTiers
     }
 }

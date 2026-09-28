@@ -176,7 +176,9 @@ struct SecurityView: View {
                 Text(summary.text)
                     .font(.caption2)
                     .foregroundColor(summary.isStale ? AppColors.warning : .secondary)
-                Text("Refreshing updates CISA's known-exploited status for the \(status.checkedCVECount) vulnerabilities this app version checks. Which devices and services get checked only changes with app updates.")
+                Text("Findings flag exposed services and manufacturers with published advisories. mDNSShark does not confirm that a specific vulnerability is present on a device.")
+                    .font(.caption2).foregroundColor(.secondary).multilineTextAlignment(.center)
+                Text("This product uses the NVD API but is not endorsed or certified by the NVD.")
                     .font(.caption2).foregroundColor(.secondary).multilineTextAlignment(.center)
             }
 

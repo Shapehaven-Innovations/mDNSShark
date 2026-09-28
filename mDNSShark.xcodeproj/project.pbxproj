@@ -19,6 +19,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		9A87858B3069EB2300082E7A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9A1C9E812D443D5300643122 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9A1C9E882D443D5300643122;
+			remoteInfo = mDNSShark;
+		};
 		9AEA1A332FABF80F00D8F38C /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 9A1C9E812D443D5300643122 /* Project object */;
@@ -45,6 +52,7 @@
 /* Begin PBXFileReference section */
 		9A1C9E892D443D5300643122 /* mDNSShark.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = mDNSShark.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9A40CE762D5EC61A000379E7 /* MIT.license */ = {isa = PBXFileReference; lastKnownFileType = text; path = MIT.license; sourceTree = "<group>"; };
+		9A8785873069EB2300082E7A /* mDNSSharkTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = mDNSSharkTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9A8F66CE2D4EEF4B00A033B5 /* libdns_services.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libdns_services.tbd; path = usr/lib/libdns_services.tbd; sourceTree = SDKROOT; };
 		9A8F66FE2D4F069100A033B5 /* ScanX-Bridging-Header.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "ScanX-Bridging-Header.m"; sourceTree = "<group>"; };
 		9A8F67042D4F076500A033B5 /* ScanX-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "ScanX-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -109,6 +117,11 @@
 			path = PacketTunnel;
 			sourceTree = "<group>";
 		};
+		F2C49336196DFE6B549C2F75 /* mDNSSharkTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = mDNSSharkTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -120,6 +133,13 @@
 				9AC2AB802D4F2285004A9F66 /* CFNetwork.framework in Frameworks */,
 				9AC2AB6C2D4F1F3B004A9F66 /* libmdns.tbd in Frameworks */,
 				3173238BF83DA8A145886A53 /* NetworkExtension.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9A8785843069EB2300082E7A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -141,6 +161,7 @@
 				9A40CE762D5EC61A000379E7 /* MIT.license */,
 				9A1C9E8B2D443D5300643122 /* mDNSShark */,
 				9AEA1A2E2FABF80F00D8F38C /* PacketTunnel */,
+				F2C49336196DFE6B549C2F75 /* mDNSSharkTests */,
 				9A1C9E8A2D443D5300643122 /* Products */,
 				9A8F66CD2D4EEED100A033B5 /* Frameworks */,
 				9AFD8F6A2D5E89C80034B804 /* readme.md */,
@@ -152,6 +173,7 @@
 			children = (
 				9A1C9E892D443D5300643122 /* mDNSShark.app */,
 				9AEA1A2C2FABF80F00D8F38C /* PacketTunnel.appex */,
+				9A8785873069EB2300082E7A /* mDNSSharkTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -197,6 +219,29 @@
 			productReference = 9A1C9E892D443D5300643122 /* mDNSShark.app */;
 			productType = "com.apple.product-type.application";
 		};
+		9A8785863069EB2300082E7A /* mDNSSharkTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9A87858D3069EB2300082E7A /* Build configuration list for PBXNativeTarget "mDNSSharkTests" */;
+			buildPhases = (
+				9A8785833069EB2300082E7A /* Sources */,
+				9A8785843069EB2300082E7A /* Frameworks */,
+				9A8785853069EB2300082E7A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				9A87858C3069EB2300082E7A /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				F2C49336196DFE6B549C2F75 /* mDNSSharkTests */,
+			);
+			name = mDNSSharkTests;
+			packageProductDependencies = (
+			);
+			productName = mDNSSharkTests;
+			productReference = 9A8785873069EB2300082E7A /* mDNSSharkTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		9AEA1A2B2FABF80F00D8F38C /* PacketTunnel */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 9AEA1A392FABF80F00D8F38C /* Build configuration list for PBXNativeTarget "PacketTunnel" */;
@@ -226,12 +271,16 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2640;
+				LastSwiftUpdateCheck = 2650;
 				LastUpgradeCheck = 2650;
 				TargetAttributes = {
 					9A1C9E882D443D5300643122 = {
 						CreatedOnToolsVersion = 16.2;
 						LastSwiftMigration = 1620;
+					};
+					9A8785863069EB2300082E7A = {
+						CreatedOnToolsVersion = 26.5;
+						TestTargetID = 9A1C9E882D443D5300643122;
 					};
 					9AEA1A2B2FABF80F00D8F38C = {
 						CreatedOnToolsVersion = 26.4.1;
@@ -257,6 +306,7 @@
 			targets = (
 				9A1C9E882D443D5300643122 /* mDNSShark */,
 				9AEA1A2B2FABF80F00D8F38C /* PacketTunnel */,
+				9A8785863069EB2300082E7A /* mDNSSharkTests */,
 			);
 		};
 /* End PBXProject section */
@@ -268,6 +318,13 @@
 			files = (
 				9A40CE772D5EC623000379E7 /* MIT.license in Resources */,
 				9AFD8F6F2D5E89C80034B804 /* readme.md in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9A8785853069EB2300082E7A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -289,6 +346,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9A8785833069EB2300082E7A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9AEA1A282FABF80F00D8F38C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -299,6 +363,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		9A87858C3069EB2300082E7A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9A1C9E882D443D5300643122 /* mDNSShark */;
+			targetProxy = 9A87858B3069EB2300082E7A /* PBXContainerItemProxy */;
+		};
 		9AEA1A342FABF80F00D8F38C /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 9AEA1A2B2FABF80F00D8F38C /* PacketTunnel */;
@@ -511,6 +580,50 @@
 			};
 			name = Release;
 		};
+		9A87858E3069EB2300082E7A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = P9Z5QB8965;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = beta.mDNSSharkTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/mDNSShark.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/mDNSShark";
+			};
+			name = Debug;
+		};
+		9A87858F3069EB2300082E7A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = P9Z5QB8965;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = beta.mDNSSharkTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/mDNSShark.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/mDNSShark";
+			};
+			name = Release;
+		};
 		9AEA1A372FABF80F00D8F38C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -590,6 +703,15 @@
 			buildConfigurations = (
 				9A1C9E982D443D5400643122 /* Debug */,
 				9A1C9E992D443D5400643122 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9A87858D3069EB2300082E7A /* Build configuration list for PBXNativeTarget "mDNSSharkTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9A87858E3069EB2300082E7A /* Debug */,
+				9A87858F3069EB2300082E7A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

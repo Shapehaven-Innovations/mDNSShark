@@ -1,9 +1,359 @@
 {
   "title": "CISA KEV Snapshot - mDNSShark referenced subset",
-  "catalogVersion": "2026.09.25",
-  "dateReleased": "2026-09-25T18:58:16.5029Z",
+  "catalogVersion": "2026.09.27",
+  "dateReleased": "2026-09-27T21:30:35.5521Z",
   "snapshotDate": "2026-09-27",
   "vulnerabilities": [
+    {
+      "cveID": "CVE-2010-5330",
+      "vendorProject": "Ubiquiti",
+      "product": "AirOS",
+      "vulnerabilityName": "Ubiquiti AirOS Command Injection Vulnerability",
+      "shortDescription": "Certain Ubiquiti devices contain a command injection vulnerability via a GET request to stainfo.cgi."
+    },
+    {
+      "cveID": "CVE-2011-4723",
+      "vendorProject": "D-Link",
+      "product": "DIR-300 Router",
+      "vulnerabilityName": "D-Link DIR-300 Router Cleartext Storage of a Password Vulnerability",
+      "shortDescription": "The D-Link DIR-300 router stores cleartext passwords, which allows context-dependent attackers to obtain sensitive information."
+    },
+    {
+      "cveID": "CVE-2013-5223",
+      "vendorProject": "D-Link",
+      "product": "DSL-2760U",
+      "vulnerabilityName": "D-Link DSL-2760U Gateway Cross-Site Scripting Vulnerability",
+      "shortDescription": "A cross-site scripting (XSS) vulnerability exists in the D-Link DSL-2760U gateway, allowing remote authenticated users to inject arbitrary web script or HTML."
+    },
+    {
+      "cveID": "CVE-2014-100005",
+      "vendorProject": "D-Link",
+      "product": "DIR-600 Router",
+      "vulnerabilityName": "D-Link DIR-600 Router Cross-Site Request Forgery (CSRF) Vulnerability",
+      "shortDescription": "D-Link DIR-600 routers contain a cross-site request forgery (CSRF) vulnerability that allows an attacker to change router configurations by hijacking an existing administrator session."
+    },
+    {
+      "cveID": "CVE-2015-1187",
+      "vendorProject": "D-Link and TRENDnet",
+      "product": "Multiple Devices",
+      "vulnerabilityName": "D-Link and TRENDnet Multiple Devices Remote Code Execution Vulnerability",
+      "shortDescription": "The ping tool in multiple D-Link and TRENDnet devices allow remote attackers to perform remote code execution."
+    },
+    {
+      "cveID": "CVE-2015-2051",
+      "vendorProject": "D-Link",
+      "product": "DIR-645 Router",
+      "vulnerabilityName": "D-Link DIR-645 Router Remote Code Execution Vulnerability",
+      "shortDescription": "D-Link DIR-645 Wired/Wireless Router allows remote attackers to execute arbitrary commands via a GetDeviceSettings action to the HNAP interface."
+    },
+    {
+      "cveID": "CVE-2015-3035",
+      "vendorProject": "TP-Link",
+      "product": "Multiple Archer Devices",
+      "vulnerabilityName": "TP-Link Multiple Archer Devices Directory Traversal Vulnerability",
+      "shortDescription": "Directory traversal vulnerability in multiple TP-Link Archer devices allows remote attackers to read arbitrary files via a .. (dot dot) in the PATH_INFO to login/."
+    },
+    {
+      "cveID": "CVE-2016-10174",
+      "vendorProject": "NETGEAR",
+      "product": "WNR2000v5 Router",
+      "vulnerabilityName": "NETGEAR WNR2000v5 Router Buffer Overflow Vulnerability",
+      "shortDescription": "The NETGEAR WNR2000v5 router contains a buffer overflow which can be exploited to achieve remote code execution."
+    },
+    {
+      "cveID": "CVE-2016-11021",
+      "vendorProject": "D-Link",
+      "product": "DCS-930L Devices",
+      "vulnerabilityName": "D-Link DCS-930L Devices OS Command Injection Vulnerability",
+      "shortDescription": "setSystemCommand on D-Link DCS-930L devices allows a remote attacker to execute code via an OS command."
+    },
+    {
+      "cveID": "CVE-2016-1555",
+      "vendorProject": "NETGEAR",
+      "product": "Wireless Access Point (WAP) Devices",
+      "vulnerabilityName": "NETGEAR Multiple WAP Devices Command Injection Vulnerability",
+      "shortDescription": "Multiple NETGEAR Wireless Access Point devices allows unauthenticated web pages to pass form input directly to the command-line interface. Exploitation allows for arbitrary code execution."
+    },
+    {
+      "cveID": "CVE-2016-20017",
+      "vendorProject": "D-Link",
+      "product": "DSL-2750B Devices",
+      "vulnerabilityName": "D-Link DSL-2750B Devices Command Injection Vulnerability",
+      "shortDescription": "D-Link DSL-2750B devices contain a command injection vulnerability that allows remote, unauthenticated command injection via the login.cgi cli parameter."
+    },
+    {
+      "cveID": "CVE-2016-6277",
+      "vendorProject": "NETGEAR",
+      "product": "Multiple Routers",
+      "vulnerabilityName": "NETGEAR Multiple Routers Remote Code Execution Vulnerability",
+      "shortDescription": "NETGEAR confirmed multiple routers allow unauthenticated web pages to pass form input directly to the command-line interface, permitting remote code execution."
+    },
+    {
+      "cveID": "CVE-2017-18368",
+      "vendorProject": "Zyxel",
+      "product": "P660HN-T1A Routers",
+      "vulnerabilityName": "Zyxel P660HN-T1A Routers Command Injection Vulnerability",
+      "shortDescription": "Zyxel P660HN-T1A routers contain a command injection vulnerability in the Remote System Log forwarding function, which is accessible by an unauthenticated user and exploited via the remote_host parameter of the ViewLog.asp page."
+    },
+    {
+      "cveID": "CVE-2017-5521",
+      "vendorProject": "NETGEAR",
+      "product": "Multiple Devices",
+      "vulnerabilityName": "NETGEAR Multiple Devices Exposure of Sensitive Information Vulnerability",
+      "shortDescription": "Multiple NETGEAR devices are prone to admin password disclosure via simple crafted requests to the web management server."
+    },
+    {
+      "cveID": "CVE-2017-6077",
+      "vendorProject": "NETGEAR",
+      "product": "Wireless Router DGN2200",
+      "vulnerabilityName": "NETGEAR DGN2200 Remote Code Execution Vulnerability",
+      "shortDescription": "NETGEAR DGN2200 wireless routers contain a vulnerability that allows for remote code execution."
+    },
+    {
+      "cveID": "CVE-2017-6334",
+      "vendorProject": "NETGEAR",
+      "product": "DGN2200 Devices",
+      "vulnerabilityName": "NETGEAR DGN2200 Devices OS Command Injection Vulnerability",
+      "shortDescription": "dnslookup.cgi on NETGEAR DGN2200 devices with firmware through 10.0.0.50 allows remote authenticated users to execute arbitrary OS commands"
+    },
+    {
+      "cveID": "CVE-2017-6862",
+      "vendorProject": "NETGEAR",
+      "product": "Multiple Devices",
+      "vulnerabilityName": "NETGEAR Multiple Devices Buffer Overflow Vulnerability",
+      "shortDescription": "Multiple NETGEAR devices contain a buffer overflow vulnerability that allows for authentication bypass and remote code execution."
+    },
+    {
+      "cveID": "CVE-2017-6884",
+      "vendorProject": "Zyxel",
+      "product": "EMG2926 Routers",
+      "vulnerabilityName": "Zyxel EMG2926 Routers Command Injection Vulnerability",
+      "shortDescription": "Zyxel EMG2926 routers contain a command injection vulnerability located in the diagnostic tools, specifically the nslookup function. A malicious user may exploit numerous vectors to execute malicious commands on the router, such as the ping_ip parameter to the expert/maintenance/diagnostic/nslookup URI."
+    },
+    {
+      "cveID": "CVE-2017-7921",
+      "vendorProject": "Hikvision",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Hikvision Multiple Products Improper Authentication Vulnerability",
+      "shortDescription": "Multiple Hikvision products contain an improper authentication vulnerability that could allow a malicious user to escalate privileges on the system and gain access to sensitive information."
+    },
+    {
+      "cveID": "CVE-2018-10561",
+      "vendorProject": "Dasan",
+      "product": "Gigabit Passive Optical Network (GPON) Routers",
+      "vulnerabilityName": "Dasan GPON Routers Authentication Bypass Vulnerability",
+      "shortDescription": "Dasan GPON Routers contain an authentication bypass vulnerability. When combined with CVE-2018-10562, exploitation can allow an attacker to perform remote code execution."
+    },
+    {
+      "cveID": "CVE-2018-10562",
+      "vendorProject": "Dasan",
+      "product": "Gigabit Passive Optical Network (GPON) Routers",
+      "vulnerabilityName": "Dasan GPON Routers Command Injection Vulnerability",
+      "shortDescription": "Dasan GPON Routers contain an authentication bypass vulnerability. When combined with CVE-2018-10561, exploitation can allow an attacker to perform remote code execution."
+    },
+    {
+      "cveID": "CVE-2018-14558",
+      "vendorProject": "Tenda",
+      "product": "AC7, AC9, and AC10 Routers",
+      "vulnerabilityName": "Tenda AC7, AC9, and AC10 Routers Command Injection Vulnerability",
+      "shortDescription": "Tenda AC7, AC9, and AC10 devices contain a command injection vulnerability due to  the \"formsetUsbUnload\" function executes a dosystemCmd function with untrusted input. Successful exploitation allows an attacker to execute OS commands via a crafted goform/setUsbUnload request."
+    },
+    {
+      "cveID": "CVE-2018-14847",
+      "vendorProject": "MikroTik",
+      "product": "RouterOS",
+      "vulnerabilityName": "MikroTik Router OS Directory Traversal Vulnerability",
+      "shortDescription": "MikroTik RouterOS through 6.42 allows unauthenticated remote attackers to read arbitrary files and remote authenticated attackers to write arbitrary files due to a directory traversal vulnerability in the WinBox interface."
+    },
+    {
+      "cveID": "CVE-2018-19943",
+      "vendorProject": "QNAP",
+      "product": "Network Attached Storage (NAS)",
+      "vulnerabilityName": "QNAP NAS File Station Cross-Site Scripting Vulnerability",
+      "shortDescription": "A cross-site scripting vulnerability affecting QNAP NAS File Station could allow remote attackers to inject malicious code."
+    },
+    {
+      "cveID": "CVE-2018-19949",
+      "vendorProject": "QNAP",
+      "product": "Network Attached Storage (NAS)",
+      "vulnerabilityName": "QNAP NAS File Station Command Injection Vulnerability",
+      "shortDescription": "A command injection vulnerability affecting QNAP NAS File Station could allow remote attackers to run commands."
+    },
+    {
+      "cveID": "CVE-2018-19953",
+      "vendorProject": "QNAP",
+      "product": "Network Attached Storage (NAS)",
+      "vulnerabilityName": "QNAP NAS File Station Cross-Site Scripting Vulnerability",
+      "shortDescription": "A cross-site scripting vulnerability affecting QNAP NAS File Station could allow remote attackers to inject malicious code."
+    },
+    {
+      "cveID": "CVE-2018-6530",
+      "vendorProject": "D-Link",
+      "product": "Multiple Routers",
+      "vulnerabilityName": "D-Link Multiple Routers OS Command Injection Vulnerability",
+      "shortDescription": "Multiple D-Link routers contain an unspecified vulnerability that allows for execution of OS commands."
+    },
+    {
+      "cveID": "CVE-2018-7445",
+      "vendorProject": "MikroTik",
+      "product": "RouterOS",
+      "vulnerabilityName": "MikroTik RouterOS Stack-Based Buffer Overflow Vulnerability",
+      "shortDescription": "In MikroTik RouterOS, a stack-based buffer overflow occurs when processing NetBIOS session request messages. Remote attackers with access to the service can exploit this vulnerability and gain code execution on the system."
+    },
+    {
+      "cveID": "CVE-2019-11001",
+      "vendorProject": "Reolink",
+      "product": "Multiple IP Cameras",
+      "vulnerabilityName": "Reolink Multiple IP Cameras OS Command Injection Vulnerability",
+      "shortDescription": "Reolink RLC-410W, C1 Pro, C2 Pro, RLC-422W, and RLC-511W IP cameras contain an authenticated OS command injection vulnerability. This vulnerability allows an authenticated admin to use the \"TestEmail\" functionality to inject and run OS commands as root."
+    },
+    {
+      "cveID": "CVE-2019-16057",
+      "vendorProject": "D-Link",
+      "product": "DNS-320 Storage Device",
+      "vulnerabilityName": "D-Link DNS-320 Remote Code Execution Vulnerability",
+      "shortDescription": "The login_mgr.cgi script in D-Link DNS-320 is vulnerable to remote code execution."
+    },
+    {
+      "cveID": "CVE-2019-16920",
+      "vendorProject": "D-Link",
+      "product": "Multiple Routers",
+      "vulnerabilityName": "D-Link Multiple Routers Command Injection Vulnerability",
+      "shortDescription": "Multiple D-Link routers contain a command injection vulnerability which can allow attackers to achieve full system compromise."
+    },
+    {
+      "cveID": "CVE-2019-17621",
+      "vendorProject": "D-Link",
+      "product": "DIR-859 Router",
+      "vulnerabilityName": "D-Link DIR-859 Router Command Execution Vulnerability",
+      "shortDescription": "D-Link DIR-859 router contains a command execution vulnerability in the UPnP endpoint URL, /gena.cgi. Exploitation allows an unauthenticated remote attacker to execute system commands as root by sending a specially crafted HTTP SUBSCRIBE request to the UPnP service when connecting to the local network."
+    },
+    {
+      "cveID": "CVE-2019-19356",
+      "vendorProject": "Netis",
+      "product": "WF2419 Devices",
+      "vulnerabilityName": "Netis WF2419 Devices Remote Code Execution Vulnerability",
+      "shortDescription": "Netis WF2419 devices contains an unspecified vulnerability that allows an attacker to perform remote code execution as root through the router's web management page."
+    },
+    {
+      "cveID": "CVE-2019-20500",
+      "vendorProject": "D-Link",
+      "product": "DWL-2600AP Access Point",
+      "vulnerabilityName": "D-Link DWL-2600AP Access Point Command Injection Vulnerability",
+      "shortDescription": "D-Link DWL-2600AP access point contains an authenticated command injection vulnerability via the Save Configuration functionality in the Web interface, using shell metacharacters in the admin.cgi?action=config_save configBackup or downloadServerip parameter."
+    },
+    {
+      "cveID": "CVE-2019-7192",
+      "vendorProject": "QNAP",
+      "product": "Photo Station",
+      "vulnerabilityName": "QNAP Photo Station Improper Access Control Vulnerability",
+      "shortDescription": "QNAP NAS devices running Photo Station contain an improper access control vulnerability allowing remote attackers to gain unauthorized access to the system."
+    },
+    {
+      "cveID": "CVE-2019-7193",
+      "vendorProject": "QNAP",
+      "product": "QTS",
+      "vulnerabilityName": "QNAP QTS Improper Input Validation Vulnerability",
+      "shortDescription": "QNAP QTS contains an improper input validation vulnerability allowing remote attackers to inject code on the system."
+    },
+    {
+      "cveID": "CVE-2019-7194",
+      "vendorProject": "QNAP",
+      "product": "Photo Station",
+      "vulnerabilityName": "QNAP Photo Station Path Traversal Vulnerability",
+      "shortDescription": "QNAP devices running Photo Station contain an external control of file name or path vulnerability allowing remote attackers to access or modify system files."
+    },
+    {
+      "cveID": "CVE-2019-7195",
+      "vendorProject": "QNAP",
+      "product": "Photo Station",
+      "vulnerabilityName": "QNAP Photo Station Path Traversal Vulnerability",
+      "shortDescription": "QNAP devices running Photo Station contain an external control of file name or path vulnerability allowing remote attackers to access or modify system files."
+    },
+    {
+      "cveID": "CVE-2020-10987",
+      "vendorProject": "Tenda",
+      "product": "AC1900 Router AC15 Model",
+      "vulnerabilityName": "Tenda AC1900 Router AC15 Model Remote Code Execution Vulnerability",
+      "shortDescription": "Tenda AC1900 Router AC15 Model contains an unspecified vulnerability that allows remote attackers to execute system commands via the deviceName POST parameter."
+    },
+    {
+      "cveID": "CVE-2020-15415",
+      "vendorProject": "DrayTek",
+      "product": "Multiple Vigor Routers",
+      "vulnerabilityName": "DrayTek Multiple Vigor Routers OS Command Injection Vulnerability",
+      "shortDescription": "DrayTek Vigor3900, Vigor2960, and Vigor300B devices contain an OS command injection vulnerability in cgi-bin/mainfunction.cgi/cvmcfgupload that allows for remote code execution via shell metacharacters in a filename when the text/x-python-script content type is used."
+    },
+    {
+      "cveID": "CVE-2020-24363",
+      "vendorProject": "TP-Link",
+      "product": "TL-WA855RE",
+      "vulnerabilityName": "TP-link TL-WA855RE Missing Authentication for Critical Function Vulnerability",
+      "shortDescription": "TP-link TL-WA855RE contains a missing authentication for critical function vulnerability. This vulnerability could allow an unauthenticated attacker (on the same network) to submit a TDDP_RESET POST request for a factory reset and reboot. The attacker can then obtain incorrect access control by setting a new administrative password. The impacted products could be end-of-life (EoL) and/or end-of-service (EoS). Users should discontinue product utilization."
+    },
+    {
+      "cveID": "CVE-2020-2506",
+      "vendorProject": "QNAP Systems",
+      "product": "Helpdesk",
+      "vulnerabilityName": "QNAP Helpdesk Improper Access Control Vulnerability",
+      "shortDescription": "QNAP Helpdesk contains an improper access control vulnerability which could allow an attacker to gain privileges or to read sensitive information."
+    },
+    {
+      "cveID": "CVE-2020-25078",
+      "vendorProject": "D-Link",
+      "product": "DCS-2530L and DCS-2670L Devices",
+      "vulnerabilityName": "D-Link DCS-2530L and DCS-2670L Devices Unspecified Vulnerability",
+      "shortDescription": "D-Link DCS-2530L and DCS-2670L devices contains an unspecified vulnerability that could allow for remote administrator password disclosure. The impacted products could be end-of-life (EoL) and/or end-of-service (EoS). Users should discontinue product utilization."
+    },
+    {
+      "cveID": "CVE-2020-25079",
+      "vendorProject": "D-Link",
+      "product": "DCS-2530L and DCS-2670L Devices",
+      "vulnerabilityName": "D-Link DCS-2530L and DCS-2670L Command Injection Vulnerability",
+      "shortDescription": "D-Link DCS-2530L and DCS-2670L devices contains a command injection vulnerability in the cgi-bin/ddns_enc.cgi. The impacted products could be end-of-life (EoL) and/or end-of-service (EoS). Users should discontinue product utilization."
+    },
+    {
+      "cveID": "CVE-2020-2509",
+      "vendorProject": "QNAP",
+      "product": "QNAP Network-Attached Storage (NAS)",
+      "vulnerabilityName": "QNAP Network-Attached Storage (NAS) Command Injection Vulnerability",
+      "shortDescription": "QNAP NAS devices contain a command injection vulnerability which could allow attackers to perform remote code execution."
+    },
+    {
+      "cveID": "CVE-2020-25506",
+      "vendorProject": "D-Link",
+      "product": "DNS-320 Device",
+      "vulnerabilityName": "D-Link DNS-320 Device Command Injection Vulnerability",
+      "shortDescription": "D-Link DNS-320 device contains a command injection vulnerability in the sytem_mgr.cgi component that may allow for remote code execution."
+    },
+    {
+      "cveID": "CVE-2020-26919",
+      "vendorProject": "NETGEAR",
+      "product": "JGS516PE Devices",
+      "vulnerabilityName": "Netgear JGS516PE Devices Missing Function Level Access Control Vulnerability",
+      "shortDescription": "Netgear JGS516PE devices contain a missing function level access control vulnerability."
+    },
+    {
+      "cveID": "CVE-2020-29557",
+      "vendorProject": "D-Link",
+      "product": "DIR-825 R1 Devices",
+      "vulnerabilityName": "D-Link DIR-825 R1 Devices Buffer Overflow Vulnerability",
+      "shortDescription": "D-Link DIR-825 R1 devices contain a buffer overflow vulnerability in the web interface that may allow for remote code execution."
+    },
+    {
+      "cveID": "CVE-2020-29583",
+      "vendorProject": "Zyxel",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Zyxel Multiple Products Use of Hard-Coded Credentials Vulnerability",
+      "shortDescription": "Zyxel firewalls (ATP, USG, VM) and AP Controllers (NXC2500 and NXC5500) contain a use of hard-coded credentials vulnerability in an undocumented account (\"zyfwp\") with an unchangeable password."
+    },
+    {
+      "cveID": "CVE-2020-8515",
+      "vendorProject": "DrayTek",
+      "product": "Multiple Vigor Routers",
+      "vulnerabilityName": "Multiple DrayTek Vigor Routers Web Management Page Vulnerability",
+      "shortDescription": "DrayTek Vigor3900, Vigor2960, and Vigor300B routers contain an unspecified vulnerability that allows for remote code execution."
+    },
     {
       "cveID": "CVE-2020-9054",
       "vendorProject": "Zyxel",
@@ -12,11 +362,333 @@
       "shortDescription": "Multiple Zyxel network-attached storage (NAS) devices contain a pre-authentication command injection vulnerability, which may allow a remote, unauthenticated attacker to execute arbitrary code."
     },
     {
-      "cveID": "CVE-2023-20198",
-      "vendorProject": "Cisco",
-      "product": "IOS XE Web UI",
-      "vulnerabilityName": "Cisco IOS XE Web UI Privilege Escalation Vulnerability",
-      "shortDescription": "Cisco IOS XE Web UI contains a privilege escalation vulnerability in the web user interface that could allow a remote, unauthenticated attacker to create an account with privilege level 15 access. The attacker can then use that account to gain control of the affected device."
+      "cveID": "CVE-2020-9377",
+      "vendorProject": "D-Link",
+      "product": "DIR-610 Devices",
+      "vulnerabilityName": "D-Link DIR-610 Devices Remote Command Execution",
+      "shortDescription": "D-Link DIR-610 devices allow remote code execution via the cmd parameter to command.php."
+    },
+    {
+      "cveID": "CVE-2021-20090",
+      "vendorProject": "Arcadyan",
+      "product": "Buffalo Firmware",
+      "vulnerabilityName": "Arcadyan Buffalo Firmware Path Traversal Vulnerability",
+      "shortDescription": "Arcadyan Buffalo firmware contains a path traversal vulnerability that could allow unauthenticated, remote attackers to bypass authentication and access sensitive information. This vulnerability affects multiple routers across several different vendors."
+    },
+    {
+      "cveID": "CVE-2021-20123",
+      "vendorProject": "DrayTek",
+      "product": "VigorConnect",
+      "vulnerabilityName": "Draytek VigorConnect Path Traversal Vulnerability ",
+      "shortDescription": "Draytek VigorConnect contains a path traversal vulnerability in the DownloadFileServlet endpoint. An unauthenticated attacker could leverage this vulnerability to download arbitrary files from the underlying operating system with root privileges. "
+    },
+    {
+      "cveID": "CVE-2021-20124",
+      "vendorProject": "DrayTek",
+      "product": "VigorConnect",
+      "vulnerabilityName": "Draytek VigorConnect Path Traversal Vulnerability ",
+      "shortDescription": "Draytek VigorConnect contains a path traversal vulnerability in the file download functionality of the WebServlet endpoint. An unauthenticated attacker could leverage this vulnerability to download arbitrary files from the underlying operating system with root privileges."
+    },
+    {
+      "cveID": "CVE-2021-28799",
+      "vendorProject": "QNAP",
+      "product": "Network Attached Storage (NAS)",
+      "vulnerabilityName": "QNAP NAS Improper Authorization Vulnerability",
+      "shortDescription": "QNAP NAS running HBS 3 contains an improper authorization vulnerability which can allow remote attackers to log in to a device."
+    },
+    {
+      "cveID": "CVE-2021-31755",
+      "vendorProject": "Tenda",
+      "product": "AC11 Router",
+      "vulnerabilityName": "Tenda AC11 Router Stack Buffer Overflow Vulnerability",
+      "shortDescription": "Tenda AC11 devices contain a stack buffer overflow vulnerability in /goform/setmac which allows attackers to execute code via a crafted post request."
+    },
+    {
+      "cveID": "CVE-2021-32030",
+      "vendorProject": "ASUS",
+      "product": "Routers",
+      "vulnerabilityName": "ASUS Routers Improper Authentication Vulnerability",
+      "shortDescription": "ASUS Lyra Mini and ASUS GT-AC2900 devices contain an improper authentication vulnerability that allows an attacker to gain unauthorized access to the administrative interface. The impacted products could be end-of-life (EoL) and/or end-of-service (EoS). Users should discontinue product utilization."
+    },
+    {
+      "cveID": "CVE-2021-33044",
+      "vendorProject": "Dahua",
+      "product": "IP Camera Firmware",
+      "vulnerabilityName": "Dahua IP Camera Authentication Bypass Vulnerability",
+      "shortDescription": "Dahua IP cameras and related products contain an authentication bypass vulnerability when the NetKeyboard type argument is specified by the client during authentication."
+    },
+    {
+      "cveID": "CVE-2021-33045",
+      "vendorProject": "Dahua",
+      "product": "IP Camera Firmware",
+      "vulnerabilityName": "Dahua IP Camera Authentication Bypass Vulnerability",
+      "shortDescription": "Dahua IP cameras and related products contain an authentication bypass vulnerability when the loopback device is specified by the client during authentication."
+    },
+    {
+      "cveID": "CVE-2021-36260",
+      "vendorProject": "Hikvision",
+      "product": "Security cameras web server",
+      "vulnerabilityName": "Hikvision Improper Input Validation",
+      "shortDescription": "A command injection vulnerability in the web server of some Hikvision product. Due to the insufficient input validation."
+    },
+    {
+      "cveID": "CVE-2021-40407",
+      "vendorProject": "Reolink",
+      "product": "RLC-410W IP Camera",
+      "vulnerabilityName": "Reolink RLC-410W IP Camera OS Command Injection Vulnerability ",
+      "shortDescription": "Reolink RLC-410W IP cameras contain an authenticated OS command injection vulnerability in the device network settings functionality."
+    },
+    {
+      "cveID": "CVE-2021-40655",
+      "vendorProject": "D-Link",
+      "product": "DIR-605 Router",
+      "vulnerabilityName": "D-Link DIR-605 Router Information Disclosure Vulnerability",
+      "shortDescription": "D-Link DIR-605 routers contain an information disclosure vulnerability that allows attackers to obtain a username and password by forging a post request to the /getcfg.php page. "
+    },
+    {
+      "cveID": "CVE-2021-45382",
+      "vendorProject": "D-Link",
+      "product": "Multiple Routers",
+      "vulnerabilityName": "D-Link Multiple Routers Remote Code Execution Vulnerability",
+      "shortDescription": "A remote code execution vulnerability exists in all series H/W revisions routers via the DDNS function in ncc2 binary file."
+    },
+    {
+      "cveID": "CVE-2022-24990",
+      "vendorProject": "TerraMaster",
+      "product": "TerraMaster OS",
+      "vulnerabilityName": "TerraMaster OS Remote Command Execution Vulnerability",
+      "shortDescription": "TerraMaster OS contains a remote command execution vulnerability that allows an unauthenticated user to execute commands on the target endpoint."
+    },
+    {
+      "cveID": "CVE-2022-26258",
+      "vendorProject": "D-Link",
+      "product": "DIR-820L",
+      "vulnerabilityName": "D-Link DIR-820L Remote Code Execution Vulnerability",
+      "shortDescription": "D-Link DIR-820L contains an unspecified vulnerability in Device Name parameter in /lan.asp which allows for remote code execution."
+    },
+    {
+      "cveID": "CVE-2022-27593",
+      "vendorProject": "QNAP",
+      "product": "Photo Station",
+      "vulnerabilityName": "QNAP Photo Station Externally Controlled Reference Vulnerability",
+      "shortDescription": "Certain QNAP NAS running Photo Station with internet exposure contain an externally controlled reference to a resource vulnerability which can allow an attacker to modify system files. This vulnerability was observed being utilized in a Deadbolt ransomware campaign."
+    },
+    {
+      "cveID": "CVE-2022-30525",
+      "vendorProject": "Zyxel",
+      "product": "Multiple Firewalls",
+      "vulnerabilityName": "Zyxel Multiple Firewalls OS Command Injection Vulnerability",
+      "shortDescription": "A command injection vulnerability in the CGI program of some Zyxel firewall versions could allow an attacker to modify specific files and then execute some OS commands on a vulnerable device."
+    },
+    {
+      "cveID": "CVE-2022-37055",
+      "vendorProject": "D-Link",
+      "product": "Routers",
+      "vulnerabilityName": "D-Link Routers Buffer Overflow Vulnerability",
+      "shortDescription": "D-Link Routers contains a buffer overflow vulnerability that has a high impact on confidentiality, integrity, and availability. The impacted products could be end-of-life (EoL) and/or end-of-service (EoS). Users should discontinue product utilization."
+    },
+    {
+      "cveID": "CVE-2022-40799",
+      "vendorProject": "D-Link",
+      "product": "DNR-322L",
+      "vulnerabilityName": "D-Link DNR-322L Download of Code Without Integrity Check Vulnerability",
+      "shortDescription": "D-Link DNR-322L contains a download of code without integrity check vulnerability that could allow an authenticated attacker to execute OS level commands on the device. The impacted products could be end-of-life (EoL) and/or end-of-service (EoS). Users should discontinue product utilization."
+    },
+    {
+      "cveID": "CVE-2023-1389",
+      "vendorProject": "TP-Link",
+      "product": "Archer AX21",
+      "vulnerabilityName": "TP-Link Archer AX-21 Command Injection Vulnerability",
+      "shortDescription": "TP-Link Archer AX-21 contains a command injection vulnerability that allows for remote code execution."
+    },
+    {
+      "cveID": "CVE-2023-25280",
+      "vendorProject": "D-Link",
+      "product": "DIR-820 Router",
+      "vulnerabilityName": "D-Link DIR-820 Router OS Command Injection Vulnerability",
+      "shortDescription": "D-Link DIR-820 routers contain an OS command injection vulnerability that allows a remote, unauthenticated attacker to escalate privileges to root via a crafted payload with the ping_addr parameter to ping.ccp."
+    },
+    {
+      "cveID": "CVE-2023-27992",
+      "vendorProject": "Zyxel",
+      "product": "Multiple Network-Attached Storage (NAS) Devices",
+      "vulnerabilityName": "Zyxel Multiple NAS Devices Command Injection Vulnerability",
+      "shortDescription": "Multiple Zyxel network-attached storage (NAS) devices contain a pre-authentication command injection vulnerability that could allow an unauthenticated attacker to execute commands remotely via a crafted HTTP request."
+    },
+    {
+      "cveID": "CVE-2023-28771",
+      "vendorProject": "Zyxel",
+      "product": "Multiple Firewalls",
+      "vulnerabilityName": "Zyxel Multiple Firewalls OS Command Injection Vulnerability",
+      "shortDescription": "Zyxel ATP, USG FLEX, VPN, and ZyWALL/USG firewalls allow for improper error message handling which could allow an unauthenticated attacker to execute OS commands remotely by sending crafted packets to an affected device."
+    },
+    {
+      "cveID": "CVE-2023-33009",
+      "vendorProject": "Zyxel",
+      "product": "Multiple Firewalls",
+      "vulnerabilityName": "Zyxel Multiple Firewalls Buffer Overflow Vulnerability",
+      "shortDescription": "Zyxel ATP, USG FLEX, USG FLEX 50(W), USG20(W)-VPN, VPN, and ZyWALL/USG firewalls contain a buffer overflow vulnerability in the notification function that could allow an unauthenticated attacker to cause denial-of-service (DoS) conditions and remote code execution on an affected device."
+    },
+    {
+      "cveID": "CVE-2023-33010",
+      "vendorProject": "Zyxel",
+      "product": "Multiple Firewalls",
+      "vulnerabilityName": "Zyxel Multiple Firewalls Buffer Overflow Vulnerability",
+      "shortDescription": "Zyxel ATP, USG FLEX, USG FLEX 50(W), USG20(W)-VPN, VPN, and ZyWALL/USG firewalls contain a buffer overflow vulnerability in the ID processing function that could allow an unauthenticated attacker to cause denial-of-service (DoS) conditions and remote code execution on an affected device."
+    },
+    {
+      "cveID": "CVE-2023-33538",
+      "vendorProject": "TP-Link",
+      "product": "Multiple Routers",
+      "vulnerabilityName": "TP-Link Multiple Routers Command Injection Vulnerability",
+      "shortDescription": "TP-Link TL-WR940N V2/V4, TL-WR841N V8/V10, and TL-WR740N V1/V2 contain a command injection vulnerability via the component /userRpm/WlanNetworkRpm. The impacted products could be end-of-life (EoL) and/or end-of-service (EoS). Users should discontinue product utilization."
+    },
+    {
+      "cveID": "CVE-2023-39780",
+      "vendorProject": "ASUS",
+      "product": "RT-AX55 Routers",
+      "vulnerabilityName": "ASUS RT-AX55 Routers OS Command Injection Vulnerability",
+      "shortDescription": "ASUS RT-AX55 devices contain an OS command injection vulnerability that could allow a remote, authenticated attacker to execute arbitrary commands. As represented by CVE-2023-41346."
+    },
+    {
+      "cveID": "CVE-2023-47565",
+      "vendorProject": "QNAP",
+      "product": "VioStor NVR",
+      "vulnerabilityName": "QNAP VioStor NVR OS Command Injection Vulnerability",
+      "shortDescription": "QNAP VioStar NVR contains an OS command injection vulnerability that allows authenticated users to execute commands via a network."
+    },
+    {
+      "cveID": "CVE-2023-50224",
+      "vendorProject": "TP-Link",
+      "product": "TL-WR841N",
+      "vulnerabilityName": "TP-Link TL-WR841N Authentication Bypass by Spoofing Vulnerability",
+      "shortDescription": "TP-Link TL-WR841N contains an authentication bypass by spoofing vulnerability within the httpd service, which listens on TCP port 80 by default, leading to the disclose of stored credentials. The impacted products could be end-of-life (EoL) and/or end-of-service (EoS). Users should discontinue product utilization."
+    },
+    {
+      "cveID": "CVE-2024-0769",
+      "vendorProject": "D-Link",
+      "product": "DIR-859 Router",
+      "vulnerabilityName": " D-Link DIR-859 Router Path Traversal Vulnerability",
+      "shortDescription": "D-Link DIR-859 routers contain a path traversal vulnerability in the file /hedwig.cgi of the component HTTP POST Request Handler. Manipulation of the argument service with the input ../../../../htdocs/webinc/getcfg/DHCPS6.BRIDGE-1.xml allows for the leakage of session data potentially enabling privilege escalation and unauthorized control of the device. This vulnerability affects legacy D-Link products. All associated hardware revisions have reached their end-of-life (EOL) or end-of-service (EOS) life cycle and should be retired and replaced per vendor instructions."
+    },
+    {
+      "cveID": "CVE-2024-11667",
+      "vendorProject": "Zyxel",
+      "product": "Multiple Firewalls",
+      "vulnerabilityName": "Zyxel Multiple Firewalls Path Traversal Vulnerability",
+      "shortDescription": "Multiple Zyxel firewalls contain a path traversal vulnerability in the web management interface that could allow an attacker to download or upload files via a crafted URL."
+    },
+    {
+      "cveID": "CVE-2024-12987",
+      "vendorProject": "DrayTek",
+      "product": "Vigor Routers",
+      "vulnerabilityName": "DrayTek Vigor Routers OS Command Injection Vulnerability",
+      "shortDescription": "DrayTek Vigor2960, Vigor300B, and Vigor3900 routers contain an OS command injection vulnerability due to an unknown function of the file /cgi-bin/mainfunction.cgi/apmcfgupload of the component web management interface."
+    },
+    {
+      "cveID": "CVE-2024-3272",
+      "vendorProject": "D-Link",
+      "product": "Multiple NAS Devices",
+      "vulnerabilityName": "D-Link Multiple NAS Devices Use of Hard-Coded Credentials Vulnerability",
+      "shortDescription": "D-Link DNS-320L, DNS-325, DNS-327L, and DNS-340L contains a hard-coded credential that allows an attacker to conduct authenticated command injection, leading to remote, unauthorized code execution."
+    },
+    {
+      "cveID": "CVE-2024-3273",
+      "vendorProject": "D-Link",
+      "product": "Multiple NAS Devices",
+      "vulnerabilityName": "D-Link Multiple NAS Devices Command Injection Vulnerability",
+      "shortDescription": "D-Link DNS-320L, DNS-325, DNS-327L, and DNS-340L contain a command injection vulnerability. When combined with CVE-2024-3272, this can lead to remote, unauthorized code execution."
+    },
+    {
+      "cveID": "CVE-2024-40890",
+      "vendorProject": "Zyxel",
+      "product": "DSL CPE Devices",
+      "vulnerabilityName": "Zyxel DSL CPE OS Command Injection Vulnerability",
+      "shortDescription": "Multiple Zyxel DSL CPE devices contain a post-authentication command injection vulnerability in the CGI program that could allow an authenticated attacker to execute OS commands via a crafted HTTP request."
+    },
+    {
+      "cveID": "CVE-2024-40891",
+      "vendorProject": "Zyxel",
+      "product": "DSL CPE Devices",
+      "vulnerabilityName": "Zyxel DSL CPE OS Command Injection Vulnerability",
+      "shortDescription": "Multiple Zyxel DSL CPE devices contain a post-authentication command injection vulnerability in the management commands that could allow an authenticated attacker to execute OS commands via Telnet."
+    },
+    {
+      "cveID": "CVE-2025-1316",
+      "vendorProject": "Edimax",
+      "product": "IC-7100 IP Camera",
+      "vulnerabilityName": "Edimax IC-7100 IP Camera OS Command Injection Vulnerability",
+      "shortDescription": "Edimax IC-7100 IP camera contains an OS command injection vulnerability due to improper input sanitization that allows an attacker to achieve remote code execution via specially crafted requests. The impacted product could be end-of-life (EoL) and/or end-of-service (EoS). Users should discontinue product utilization."
+    },
+    {
+      "cveID": "CVE-2025-29635",
+      "vendorProject": "D-Link",
+      "product": "DIR-823X",
+      "vulnerabilityName": "D-Link DIR-823X Command Injection Vulnerability",
+      "shortDescription": "D-Link DIR-823X contains a command injection vulnerability that allows an authorized attacker to execute arbitrary commands on remote devices by sending a POST request to /goform/set_prohibiting via the corresponding function. The impacted product could be end-of-life (EoL) and/or end-of-service (EoS). Users should discontinue product utilization."
+    },
+    {
+      "cveID": "CVE-2025-59374",
+      "vendorProject": "ASUS",
+      "product": "Live Update",
+      "vulnerabilityName": "ASUS Live Update Embedded Malicious Code Vulnerability",
+      "shortDescription": "ASUS Live Update contains an embedded malicious code vulnerability client were distributed with unauthorized modifications introduced through a supply chain compromise. The modified builds could cause devices meeting specific targeting conditions to perform unintended actions. The impacted product could be end-of-life (EoL) and/or end-of-service (EoS). Users should discontinue product utilization."
+    },
+    {
+      "cveID": "CVE-2025-9377",
+      "vendorProject": "TP-Link",
+      "product": "Multiple Routers",
+      "vulnerabilityName": "TP-Link Archer C7(EU) and TL-WR841N/ND(MS) OS Command Injection Vulnerability",
+      "shortDescription": "TP-Link Archer C7(EU) and TL-WR841N/ND(MS) contain an OS command injection vulnerability that exists in the Parental Control page. The impacted products could be end-of-life (EoL) and/or end-of-service (EoS). Users should discontinue product utilization."
+    },
+    {
+      "cveID": "CVE-2026-34908",
+      "vendorProject": "Ubiquiti",
+      "product": "UniFi OS",
+      "vulnerabilityName": "Ubiquiti UniFi OS Improper Access Control Vulnerability",
+      "shortDescription": "Ubiquiti UniFi OS contains an improper access control vulnerability which could allow a malicious actor with access to the network to make unauthorized changes to the system."
+    },
+    {
+      "cveID": "CVE-2026-34909",
+      "vendorProject": "Ubiquiti",
+      "product": "UniFi OS",
+      "vulnerabilityName": "Ubiquiti UniFi OS Path Traversal Vulnerability",
+      "shortDescription": "Ubiquiti UniFi OS contains a path traversal vulnerability which could allow a malicious actor with access to the network to access files on the underlying system that could be manipulated to access an underlying account."
+    },
+    {
+      "cveID": "CVE-2026-34910",
+      "vendorProject": "Ubiquiti",
+      "product": "UniFi OS",
+      "vulnerabilityName": "Ubiquiti UniFi OS Improper Input Validation Vulnerability",
+      "shortDescription": "Ubiquiti UniFi OS contains an improper input validation vulnerability which could allow a malicious actor with access to the network to conduct command injection."
+    },
+    {
+      "cveID": "CVE-2026-67277",
+      "vendorProject": "MikroTik",
+      "product": "RouterOS",
+      "vulnerabilityName": "MikroTik RouterOS Missing Authentication for Critical Function Vulnerability",
+      "shortDescription": "MikroTik RouterOS contains a missing authentication for critical function vulnerability which allows kernel memory disclosure and denial of service in the btest service."
+    },
+    {
+      "cveID": "CVE-2026-67279",
+      "vendorProject": "MikroTik",
+      "product": "RouterOS",
+      "vulnerabilityName": "Mikrotik RouterOS Improper Enforcement of Behavioral Workflow Vulnerability",
+      "shortDescription": "Mikrotik RouterOS contains an improper enforcement of behavioral workflow vulnerability that could allow an unauthenticated client to open a session channel and send an exec request. This vulnerability can be chained to achieve unauthenticated exploitation of CVE-2026-86060."
+    },
+    {
+      "cveID": "CVE-2026-7273",
+      "vendorProject": "Zyxel",
+      "product": "GS1900 Series Switches",
+      "vulnerabilityName": "Zyxel GS1900 Series Switches Stack-Based Buffer Overflow Vulnerability",
+      "shortDescription": "Zyxel GS1900 series switches contain a stack-based buffer overflow vulnerability in the CGI program which could allow a LAN-based, unauthenticated attacker to exploit the flaw and potentially execute OS commands via a crafted HTTP request."
+    },
+    {
+      "cveID": "CVE-2026-86060",
+      "vendorProject": "MikroTik",
+      "product": "RouterOS",
+      "vulnerabilityName": "MikroTik RouterOS Improper Neutralization of Argument Delimiters in a Command Vulnerability",
+      "shortDescription": "MikroTik RouterOS contains an improper neutralization of argument delimiters in a command vulnerability which allows an attacker to change the trusted RouterOS policy mask, leading to privilege escalation."
     }
   ]
 }

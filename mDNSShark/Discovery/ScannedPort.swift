@@ -116,38 +116,14 @@ class PortScanner {
             DispatchQueue.global(qos: .userInitiated)
         )
 
-        // Accept legacy TLS versions too. Before this active-banner-grab
-        // change, ANY port that completed the TCP handshake reached
-        // `.ready` and got recorded as open in scan()'s timeout closure
-        // (`banner: nil` if nothing else came back); that closure's
-        // comment literally says this "confirms a web UI on 443 even
-        // without a grabbable banner." Now that 443/8443 go through a real
-        // TLS handshake, a connection whose TCP handshake succeeds but
-        // whose TLS handshake then fails lands in `.failed(.tls(...))`
-        // instead, and scan()'s existing `.failed`/`.waiting` branch treats
-        // that exactly like a closed port, silently dropping a genuinely
-        // open port out of `openPorts`. Embedded/router/IoT firmware
-        // running TLS-1.0/1.1-only stacks is common enough that this would
-        // otherwise be the most likely way to hit that gap, so lower the
-        // minimum accepted version to close it cheaply, matching the
-        // "LAN-local reconnaissance of devices we don't control, not a
-        // trust decision" posture already established for the
-        // cert-validation bypass above.
-        //
-        // This does not fully close the gap: a connection that fails its
-        // TLS handshake for any *other* reason (e.g. a plain-HTTP service
-        // accidentally listening on 8443, not TLS at all) still lands in
-        // `.failed(.tls(...))` and is still treated as closed: an
-        // accepted, known trade-off of moving to real TLS connections, not
-        // a bug. Fixing that fully would mean distinguishing a TLS-specific
-        // failure from a TCP-level one inside scan()'s protected
-        // `.failed`/`.waiting` branch (the same state machine that had a
-        // hard-won concurrency bug fixed in it previously), so that's left
-        // as a separate, separately-reviewed follow-up rather than bundled
-        // into this fix.
+        // Accept TLS 1.2, the minimum SecProtocolTypes still supports
+        // (TLSv10/TLSv11 were deprecated in iOS 15) — many embedded/router
+        // TLS-1.2-only stacks would otherwise fail the handshake and get
+        // silently dropped from openPorts as "closed" by scan()'s
+        // .failed/.waiting branch. TLS-1.0/1.1-only devices stay unsupported.
         sec_protocol_options_set_min_tls_protocol_version(
             tlsOptions.securityProtocolOptions,
-            .TLSv13
+            .TLSv12
         )
 
         return NWParameters(tls: tlsOptions)

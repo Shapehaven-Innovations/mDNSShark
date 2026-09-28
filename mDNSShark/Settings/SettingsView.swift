@@ -53,6 +53,7 @@ struct SettingsView: View {
                 dnsSection
                 captureFiltersSection
                 captureRoutingSection
+                aboutSection
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Settings")
@@ -480,6 +481,16 @@ struct SettingsView: View {
             ))
         } footer: {
             Text("Experimental. Routes same-subnet LAN traffic through the capture relay. When this is on, starting a capture automatically runs a network scan so there is LAN traffic to capture; the relay can add latency to that scan. Takes effect the next time you start a capture.")
+        }
+    }
+
+    // MARK: - About
+
+    private var aboutSection: some View {
+        Section("About") {
+            Text("This product uses the NVD API but is not endorsed or certified by the NVD.")
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
     }
 }

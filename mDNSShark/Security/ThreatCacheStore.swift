@@ -1,16 +1,56 @@
 // mDNSShark/Security/ThreatCacheStore.swift
 import Foundation
 
-/// A refreshed KEV catalog, filtered to the CVEs `nist_cpe_map.json` actually
-/// references, persisted so a successful refresh survives relaunch.
+/// One NVD-sourced vendor match, already severity-filtered (LOW/unscored
+/// entries never make it into this cache - see `ThreatDatabase.appSeverity`).
+struct NVDCachedEntry: Codable, Equatable, Sendable {
+    let cveID: String
+    let title: String
+    let description: String
+    let cvssBaseSeverity: String?
+    let cvssBaseScore: Double?
+    let dateAdded: String?
+}
+
+/// One vendor's last-successful NVD fetch. Vendors refresh independently -
+/// a vendor absent from this dictionary, or one whose entry is old, simply
+/// hasn't been (re)fetched yet; it never blocks or is blocked by any other
+/// vendor's fetch.
+struct NVDVendorCache: Codable, Equatable, Sendable {
+    let fetchedAt: Date
+    let entries: [NVDCachedEntry]
+}
+
+/// A refreshed KEV catalog (filtered to referenced/vendor-claimed CVEs) plus
+/// per-vendor NVD data, persisted so a successful refresh survives relaunch.
+/// KEV and NVD fields are independent: `kevFetchedAt`/`entries` describe the
+/// last successful KEV fetch (nil/empty if none has happened yet), and
+/// `nvdVendors` accumulates one entry per vendor as each NVD fetch succeeds -
+/// a KEV refresh preserves whatever `nvdVendors` already has, and vice versa.
 struct KEVCacheFile: Codable, Equatable {
-    static let currentSchema = 1
+    static let currentSchema = 2
 
     let schemaVersion: Int
-    let fetchedAt: Date
+    let kevFetchedAt: Date?
     let catalogVersion: String?
     let catalogDateReleased: String?
     let entries: [String: CISAKEVEntry]
+    let nvdVendors: [String: NVDVendorCache]
+    /// When each vendor was last seen among scanned devices, keyed by
+    /// canonical vendor key - drives the "seen within the last 30 days"
+    /// fallback so an NVD-covered device that's temporarily offline doesn't
+    /// immediately drop out of refresh scope. Optional (with a decode
+    /// default of nil for older cache files) rather than a schema bump,
+    /// since bumping `currentSchema` would silently discard a user's whole
+    /// existing cache - including their already-fetched KEV data - on the
+    /// next load.
+    let nvdVendorLastSeen: [String: Date]?
+    /// When the NVD refresh phase last completed, even with zero vendors to
+    /// query - lets the status line say "checked, nothing to report" for
+    /// the common case (no NVD-covered vendor on this LAN) instead of
+    /// claiming NVD has never been refreshed. Optional for the same
+    /// pre-existing-cache reason as above.
+    let nvdLastCheckedAt: Date?
 }
 
 protocol ThreatCacheStoring: Sendable {
