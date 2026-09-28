@@ -4,7 +4,7 @@ mDNSShark is an **open-source** iPhone application created by a small team of en
 
 ## Simplicity and Privacy
 
-Simplicity is key: we've stripped away clutter so you can focus on scanning and understanding results. Every discovery operation runs right on your phone, with **no external servers** involved. We also do **not** collect or share any usage data - there's no telemetry, no user analytics, and certainly no hidden trackers. You remain fully in control, deciding if and when to allow local network access, which is all the app needs to function.
+Simplicity is key: we've stripped away clutter so you can focus on scanning and understanding results. Every discovery operation runs right on your phone, with **no external servers** involved. The one exception is a button you tap yourself: **Refresh CISA Data** on the Security tab downloads CISA's public vulnerability catalog and asks NIST's National Vulnerability Database about specific device vendors. Your device list and scan results are never uploaded, but those NVD queries do name vendors seen on your network (see [Security Assessment](#security-assessment)). We also do **not** collect or share any usage data - there's no telemetry, no user analytics, and certainly no hidden trackers. You remain fully in control, deciding if and when to allow local network access, which is all the app needs to function.
 
 ## Built by Engineers, Open to Everyone
 
@@ -50,6 +50,24 @@ mDNSShark is still **in active development**, with regular updates that refine p
   separately tapping the header bar's **Scan** button — nothing in the UI
   said this was necessary, and the toggle alone produced an empty capture.
   The app now starts a scan itself once the tunnel actually connects.
+- **Security findings now check device manufacturers against live
+  vulnerability data.** The old system mapped a fixed handful of CVEs at
+  build time, and most of the ones labeled "CISA" were never actually in
+  CISA's catalog. The Security tab now matches each device's manufacturer
+  against CISA's Known Exploited Vulnerabilities (KEV) catalog and NIST's
+  National Vulnerability Database (NVD), and a refresh can surface CVEs
+  the app didn't ship with. Details in
+  [Security Assessment](#security-assessment) below.
+- **Fewer false CRITICAL findings.** Any device advertising FTP, Telnet, or
+  VNC used to be stamped CRITICAL for specific CVEs in software it might
+  not even run (e.g. the vsftpd 2.3.4 backdoor on any FTP server). Those
+  are gone; the plain "FTP exposed"-style findings remain.
+- **Open ports on TLS 1.2-only devices are no longer lost.** The port
+  scanner's HTTPS probe required TLS 1.3, so many routers and embedded
+  devices that only speak TLS 1.2 silently lost their open-port findings.
+- **Readable CVE lists.** A vendor with dozens of CVEs used to produce one
+  long comma-separated wall of IDs. Findings now show tappable severity
+  capsules that expand into a per-CVE list, each linking to its NVD page.
 
 ## Core Features at a Glance
 
@@ -57,8 +75,41 @@ mDNSShark is still **in active development**, with regular updates that refine p
 - **SSDP**: Finds devices that speak UPnP, such as smart TVs or internet gateways.
 - **Local Subnet Scans**: Optionally scans the /24 subnet to uncover common TCP-based services, even if they aren't broadcasting via Bonjour or SSDP.
 - **OUI Lookups**: Matches a device's MAC-like address to manufacturers, giving quick hardware insights.
+- **Security Assessment**: Flags risky exposed services and checks each device's manufacturer against CISA's Known Exploited Vulnerabilities catalog and the NVD.
 - **TLS Inspection**: Acts as a local HTTPS proxy via a PacketTunnel extension to decrypt and log HTTPS traffic for analysis. Free for a 3-day trial, then a one-time unlock supports continued development.
 - **Minimalist Interface**: Straight to the point - run a scan, view your devices, dig into details as needed.
+
+## Security Assessment
+
+The Security tab turns scan results into findings, grouped by severity, by device, or as one list, and exportable as a plain-text report. Everything here is computed on-device from what the scan already found.
+
+### What it checks
+
+Each device is assessed in three layers (all in `mDNSShark/Security/SecurityViewModel.swift`):
+
+- **Exposed ports.** Fixed rules per open port: Telnet, FTP, VNC, and RDP are Critical; SMB, NetBIOS, SSH, and RTSP are Warnings; UPnP and plain or admin HTTP/HTTPS are Informational.
+- **Bonjour-advertised services.** The same idea for services a device announces over mDNS (`_telnet._tcp`, `_rfb._tcp`, `_ssh._tcp`, `_smb._tcp`, printers, HomeKit, and so on).
+- **Manufacturer advisories.** The device's manufacturer, as identified by the scan (OUI lookup, SSDP, admin-page banners, and the other enrichment probes), is matched against a curated table of 27 vendors in `mDNSShark/Resources/nist_cpe_map.json` (`vendorAdvisories`). Matching is by whole word only, so "Harris" never matches Arris. A matched vendor is then checked against:
+  - **CISA KEV** for 18 vendors (ASUS, NETGEAR, D-Link, TP-Link, Zyxel, QNAP, MikroTik, Ubiquiti, Hikvision, Dahua, DrayTek, Tenda, Reolink, TerraMaster, Netis, Edimax, Arcadyan, DZS), by exact match on KEV's `vendorProject` field.
+  - **NVD** for 10 vendors that KEV barely covers, mostly ISP-supplied gateway makers (Arris/CommScope, Technicolor/Vantiva, Sagemcom, Humax, Sercomm, Askey, Hitron, Calix, GL.iNet, DZS). A CVE counts only if its description names the vendor as a whole word, or one of its CPE entries lists an allowlisted vendor ID. Rejected CVEs and CVEs rated Low are dropped.
+
+A manufacturer match says the vendor has known vulnerabilities somewhere in its product line, **not** that this particular device has them. The app does not know the device's model or firmware version. Because of that, each device gets at most one grouped vendor finding, never more than **Warning** (any KEV entry, or any NVD Critical/High) or **Informational** (NVD Medium only). These findings are also left out of the "vulnerable devices" count. The finding shows its CVEs as tappable capsules by tier (`N KEV`, `N High/Crit`, `N Medium`). Each capsule expands into a per-CVE list where every row links to that CVE's page on nvd.nist.gov.
+
+### Where the data comes from
+
+- **Bundled KEV snapshot.** `mDNSShark/Resources/cisa_kev_snapshot.json` is the subset of the live KEV catalog filed under a vendor in the table above. Regenerate it from the repo root with `python3 scripts/update_kev_snapshot.py`. NVD data is never bundled; it only arrives through a refresh.
+- **Refresh.** Only the **Refresh CISA Data** button on the Security tab starts one; nothing refreshes automatically or in the background. `ThreatDatabase` runs two phases:
+  1. **KEV.** Downloads the full catalog from cisa.gov and sanity-checks it (at least 1,000 entries, and a count that matches its own header) so a captive portal or a truncated response can't wipe anything. It then filters the catalog to the vendor table and merges it over the bundled snapshot by CVE ID. A cached catalog older than the bundled one (say, after an app update) never overrides it.
+  2. **NVD.** Queries only vendors that are on the current scan or were seen in the last 30 days, and skips any vendor already fetched in the last 24 hours. Most home networks have zero or one such vendor, so this usually takes seconds. Requests are spaced 6.5 seconds apart to stay under NVD's unauthenticated rate limit, and each vendor's result is saved as soon as it finishes, so one failure never discards another vendor's data.
+- **Cache.** Refreshed data is stored in `Application Support/ThreatData/`, excluded from backups and file-protected, and survives relaunches. The Security tab's status line shows, separately for CISA and NVD, whether the data is bundled or refreshed, and flags anything over 30 days old.
+- **Not during capture.** While the packet-capture tunnel is up, refresh is disabled, and starting a capture cancels a refresh already in progress. The tunnel routes the app's own traffic too, so the download would otherwise pass through the capture and, with TLS Inspection on, be decrypted by the app's own interceptor.
+
+This product uses the NVD API but is not endorsed or certified by the NVD. The same notice appears in Settings, on the Security tab, and in exported reports.
+
+### Limitations
+
+- Vendor-level only. Devices whose manufacturer isn't identified, or isn't in the vendor table, get no advisory finding at all.
+- The port scanner already captures SSH and HTTP banners that often include exact software versions, but they are only used for manufacturer/OS guessing today and are not matched against NVD. Per-device version matching is tracked in `todo.md`.
 
 ## TLS Inspection
 
@@ -92,7 +143,7 @@ Everything in this section lives in `PacketTunnel/`. `PacketForwarder.swift` rou
 
 `PacketForwarder` reads every outbound packet and does one of two things:
 
-- **Plain relay** (everything that is not an intercepted 443 flow): open one `NWConnection` per flow, send the payload, and write replies back as hand-built IPv4/UDP or IPv4/TCP packets. This is a userspace NAT. It works for UDP (DNS through the tunnel is how the extension learns IP-to-hostname mappings for the bypass list). For TCP it currently never synthesizes a SYN-ACK and hardcodes the ack number to zero, which is the biggest known gap in the extension; see [Known gaps](#known-gaps-and-open-review-findings).
+- **Plain relay** (everything that is not an intercepted 443 flow): open one `NWConnection` per flow, send the payload, and write replies back as hand-built IPv4/UDP or IPv4/TCP packets. This is a userspace NAT. It works for UDP (DNS through the tunnel is how the extension learns IP-to-hostname mappings for the bypass list) and, since the plain-relay rewrite noted under [Recent improvements](#recent-improvements), for TCP as well: the relay synthesizes its own SYN-ACK and tracks real sequence numbers, the same way the intercept path does.
 - **Intercept** (port 443, TLS Inspection unlocked and enabled, CA key present): hand the flow to `TLSInterceptor`, which owns it until it closes. The forwarder keeps feeding it the device's later packets, including the empty ACK that completes the handshake, SYN retransmits, and the FIN or RST at the end.
 
 While the interceptor is active the forwarder also drops UDP port 443 outright. QUIC (HTTP/3) needs no synthetic handshake and would win the race against the intercepted TCP path every time, so inspection would silently see nothing for QUIC-capable sites. Dropping the UDP forces the HTTP/3-to-HTTPS fallback every real client already implements, which is the same trick commercial TLS-inspecting middleboxes use.
@@ -158,15 +209,6 @@ Console access to a running network extension on a real iPhone has been unreliab
 - **Packet capture.** The Packet Capture view's export writes a `.pcap` that includes the extension's own synthetic packets (SYN-ACK, ServerHello flight, ACKs, FIN), tagged `[reconstructed]`. Until every synthetic packet was routed through the shared `onPacket` hook, captures showed only what the device sent and never what we sent back, which made the oversized-segment and FIN-storm bugs impossible to see from a pcap alone.
 
 The plain relay additionally wraps every flow in an `OSSignposter` interval (`relayFlow`, session open to first reply, or "no reply" on teardown), readable in Instruments' os_signpost template.
-
-### Known Gaps and Open Review Findings
-
-Honest list of what is known to be wrong or unfinished in the extension, in rough priority order. Several were raised in code review and are not yet acted on; see `todo.md` for the full backlog.
-
-- **QUIC drop ignores the bypass list.** The UDP:443 drop is keyed only on the interceptor existing; the TCP:443 path also consults the per-host bypass list. A bypass-listed host that speaks HTTP/3, or any UDP:443 protocol with no TCP fallback, is silently dropped.
-- **Leaf minting is serialized across domains.** `LeafCertCache.identity(for:)` does the CA lookup, DER subject parse, key generation, and test signature under one lock, so a page pulling from several new third-party domains at once mints them one after another.
-- **FIN with out-of-order coalesced payload.** If a FIN's coalesced payload is not in-window (a retransmit or reordering), `close(deviceFINSeq:)` still bumps `clientSeq` past it, which could skip a gap we never received. Not observed on-device; needs a reordered FIN+data segment specifically.
-- **Inspection activates on the CA key alone.** The forwarder turns interception on when `KeychainStore.loadCAKey()` is non-nil, but minting a leaf also requires the matching CA certificate. Pasting only a private-key PEM produces a state where inspection is on and every HTTPS session fails, instead of a clean "not configured".
 
 ### Setting Up TLS Inspection
 
@@ -264,6 +306,10 @@ A short map for anyone opening the project for the first time:
 | `mDNSShark/Shared/SharedSettings.swift` | The shared `UserDefaults` suite in the table above. |
 | `mDNSShark/Settings/SettingsView.swift` | TLS Inspection setup UI, CA generation and import, bypass list, diagnostics display. |
 | `mDNSShark/Discovery/` | Device enrichment probes (Ubiquiti, ASUS, NetBIOS, JNAP/HNAP, Google Wifi, SSDP description, TTL, ARP table) and their coordinator. |
+| `mDNSShark/Security/` | Security tab: `ThreatDatabase` (KEV/NVD loading, refresh, vendor matching), `ThreatCacheStore` (persisted refresh cache), `SecurityViewModel` (port, Bonjour, and vendor-advisory rules), and the findings UI. |
+| `mDNSShark/Resources/nist_cpe_map.json` | The curated vendor table (`vendorAdvisories`): manufacturer aliases, KEV `vendorProject` names, NVD search terms, and CPE vendor allowlists. |
+| `mDNSShark/Resources/cisa_kev_snapshot.json` | Bundled subset of the CISA KEV catalog, regenerated by `scripts/update_kev_snapshot.py`. |
+| `mDNSSharkTests/` | Unit tests for the threat-data and Security tab logic, run with Product → Test in Xcode. |
 | `Packages/DeviceFingerprint/` | Pure, unit-tested packet encoders/decoders and merge rules the probes are built on. No networking, no Foundation bundle access. |
 | `todo.md` | The working backlog, including the open findings summarized above. |
 
@@ -278,18 +324,17 @@ A short map for anyone opening the project for the first time:
 
 A rough look at what's next, roughly in priority order:
 
-- **MAC address display for more devices.** Right now mDNSShark only shows
-  a MAC address when a device announces it directly during discovery. On
-  iOS 11 through iOS 26, that's the only option - Apple's sandbox blocks
-  apps from reading a neighboring device's MAC address any other way, as an
-  anti-tracking protection. iOS 27 is the first release to open a narrow
-  path around that. We're watching it, but want real hardware and a proven
-  track record before building on it.
+- **Per-device vulnerability matching.** Security findings for a device's
+  manufacturer are vendor-level today. Matching the exact software versions
+  some devices already report during a port scan (SSH and HTTP banners,
+  for example) against NVD's product data would say whether this specific
+  device is affected, not just its vendor.
 - **Better identification for GL.iNet routers**, moving from a page-content
   match to GL.iNet's own device API for a more durable signal.
 - **ASUS / AiMesh device identification.** The detection logic is already
-  built and tested, but it needs a specific Apple-granted networking
-  permission that's still pending approval.
+  built and tested, and Apple has approved the networking permission it
+  needs; what remains is enabling it in the build and verifying on a real
+  device.
 - **Netgear Orbi mesh support** - identifying satellite nodes alongside the
   primary router, not just the primary router itself.
 
