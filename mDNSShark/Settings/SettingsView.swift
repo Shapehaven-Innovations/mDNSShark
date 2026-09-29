@@ -6,7 +6,6 @@ import StoreKit
 
 struct SettingsView: View {
     @StateObject private var purchase = PurchaseManager.shared
-    @EnvironmentObject private var coordinator: AppCoordinator
     @State private var showManageSubscriptions = false
 
     // Appearance
@@ -83,6 +82,7 @@ struct SettingsView: View {
                 case .tlsWarning:   tlsWarningSheet
                 }
             }
+            .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
             .onAppear { purchase.lastError = nil }
             .alert("Import Error", isPresented: Binding(
                 get: { showImportError != nil },
@@ -149,16 +149,7 @@ struct SettingsView: View {
                     }
                 }
 
-                if let status = accessStatusText {
-                    Text(status)
-                        .font(.caption)
-                        .foregroundColor(purchase.subscriptionState == .billingRetry ? AppColors.warning : .secondary)
-                }
-                if purchase.subscriptionState != .none {
-                    Button("Manage Subscription") { showManageSubscriptions = true }
-                        .font(.footnote)
-                        .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
-                }
+                subscriptionStatusRows
                 restoreButton
 
                 // "N connection(s) dropped" / "Last: ..." UI disabled
@@ -203,6 +194,9 @@ struct SettingsView: View {
             Text(subscriptionDisclosure)
                 .font(.caption)
                 .foregroundColor(.secondary)
+            // Billing retry drops the entitlement, so the payment-issue hint and Manage
+            // button must also be reachable from the gate.
+            subscriptionStatusRows
             restoreButton
             legalLinks
         }
@@ -225,6 +219,20 @@ struct SettingsView: View {
             return "TLS Inspection Monthly: free for \(trial), then \(renewal) Payment is charged to your Apple Account when the trial ends. Cancel at least 24 hours before the trial ends to avoid being charged. \(cancel)"
         }
         return "TLS Inspection Monthly: \(renewal) Payment is charged to your Apple Account. \(cancel)"
+    }
+
+    /// Status line and Manage Subscription, shown whenever StoreKit reports a subscription state.
+    @ViewBuilder
+    private var subscriptionStatusRows: some View {
+        if let status = accessStatusText {
+            Text(status)
+                .font(.caption)
+                .foregroundColor(purchase.subscriptionState == .billingRetry ? AppColors.warning : .secondary)
+        }
+        if purchase.subscriptionState != .none {
+            Button("Manage Subscription") { showManageSubscriptions = true }
+                .font(.footnote)
+        }
     }
 
     private var accessStatusText: String? {
