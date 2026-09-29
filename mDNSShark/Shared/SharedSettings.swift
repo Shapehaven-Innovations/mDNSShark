@@ -18,34 +18,18 @@ enum SharedSettings {
         set { suite.set(newValue, forKey: "tlsInspectionEnabled") }
     }
 
-    // Set by PurchaseManager (main app process) whenever it refreshes StoreKit
-    // entitlements. The PacketTunnel extension reads this instead of talking to
-    // StoreKit itself, since it has no purchase UI of its own.
-    static var tlsInspectionUnlocked: Bool {
-        get { suite.bool(forKey: "tlsInspectionUnlocked") }
-        set { suite.set(newValue, forKey: "tlsInspectionUnlocked") }
+    // Subscription expiry mirrored by PurchaseManager (main app process) from StoreKit.
+    // The PacketTunnel extension has no StoreKit access of its own, so it reads this.
+    static var tlsSubscriptionExpiry: Date? {
+        get { suite.object(forKey: "tlsSubscriptionExpiry") as? Date }
+        set { suite.set(newValue, forKey: "tlsSubscriptionExpiry") }
     }
 
-    // Cached alongside tlsInspectionUnlocked so PurchaseManager can seed an accurate
-    // TrialState (with days-remaining) on launch, before Transaction.currentEntitlements resolves.
-    static var tlsTrialStartDate: Date? {
-        get { suite.object(forKey: "tlsTrialStartDate") as? Date }
-        set { suite.set(newValue, forKey: "tlsTrialStartDate") }
-    }
-
-    // Pure paid-unlock signal — distinct from tlsInspectionUnlocked, which
-    // mirrors hasAccess (trial OR unlock combined) and is what PacketTunnel
-    // gates on. This one is only ever set true by a verified StoreKit unlock
-    // transaction and only ever cleared by an explicit revocation
-    // (transaction.revocationDate != nil), never by an empty
-    // Transaction.currentEntitlements snapshot alone (documented StoreKit
-    // cache lag on cold launch, Apple forum threads 820813/823454 - see
-    // PurchaseManager.refreshEntitlements). PurchaseManager seeds its
-    // paywall-gating isUnlocked from this key so an already-purchased
-    // customer never sees the paywall reappear because of that lag.
-    static var tlsPurchaseUnlocked: Bool {
-        get { suite.bool(forKey: "tlsPurchaseUnlocked") }
-        set { suite.set(newValue, forKey: "tlsPurchaseUnlocked") }
+    // Recomputed on every read so the extension enforces expiry without waiting
+    // for the main app to republish.
+    static var tlsAccessGranted: Bool {
+        guard let expiry = tlsSubscriptionExpiry else { return false }
+        return expiry > Date()
     }
 
     // Apple's own account-scoped answer to "has this Apple ID ever obtained
@@ -54,8 +38,8 @@ enum SharedSettings {
     // the same account apart from a restored backup, a fresh install that
     // inherited leftover App Group state, or a switch to a different Apple
     // ID - none of which this App Group UserDefaults suite is scoped to on
-    // its own. A mismatch means tlsTrialStartDate/tlsPurchaseUnlocked on
-    // disk belong to a different account and must not be trusted.
+    // its own. A mismatch means tlsSubscriptionExpiry on disk belongs to a
+    // different account and must not be trusted.
     static var ownerAppTransactionID: String? {
         get { suite.string(forKey: "ownerAppTransactionID") }
         set { suite.set(newValue, forKey: "ownerAppTransactionID") }

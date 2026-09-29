@@ -1,45 +1,53 @@
 {
-  "identifier" : "8F3A6C1E-2B4D-4E5F-9A1C-6D7E8F901234",
-  "nonRenewingSubscriptions" : [],
-  "products" : [
+  "identifier": "8F3A6C1E-2B4D-4E5F-9A1C-6D7E8F901234",
+  "nonRenewingSubscriptions": [],
+  "products": [],
+  "settings": {
+    "_askToBuyEnabled": false,
+    "_billingIssuesEnabled": false
+  },
+  "subscriptionGroups": [
     {
-      "displayPrice" : "0.00",
-      "familyShareable" : false,
-      "internalID" : "A1B2C3D4-1111-4A2B-8C3D-4E5F60718293",
-      "localizations" : [
+      "id": "21500000",
+      "localizations": [
         {
-          "description" : "3 days of full TLS Inspection access, on the house.",
-          "displayName" : "TLS Inspection - 3-Day Trial",
-          "locale" : "en_US"
+          "description": "",
+          "displayName": "TLS Inspection",
+          "locale": "en_US"
         }
       ],
-      "productID" : "beta.mDNSShark.tlsInspection.trial",
-      "referenceName" : "TLS Inspection 3-Day Trial",
-      "type" : "NonConsumable"
-    },
-    {
-      "displayPrice" : "4.99",
-      "familyShareable" : false,
-      "internalID" : "B2C3D4E5-2222-4B3C-9D4E-5F6071829304",
-      "localizations" : [
+      "name": "TLS Inspection",
+      "subscriptions": [
         {
-          "description" : "Unlocks TLS Inspection permanently on this Apple ID.",
-          "displayName" : "TLS Inspection Unlock",
-          "locale" : "en_US"
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "1.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "C3D4E5F6-3333-4C4D-AE5F-607182930415",
+          "introductoryOffer": {
+            "internalID": "D4E5F607-4444-4D5E-BF60-718293041526",
+            "paymentMode": "free",
+            "subscriptionPeriod": "P3D"
+          },
+          "localizations": [
+            {
+              "description": "Decrypts HTTPS traffic on this device for inspection. Renews monthly.",
+              "displayName": "TLS Inspection Monthly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "beta.mDNSShark.tlsInspection.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "TLS Inspection Monthly",
+          "subscriptionGroupID": "21500000",
+          "type": "RecurringSubscription"
         }
-      ],
-      "productID" : "beta.mDNSShark.tlsInspection.unlock",
-      "referenceName" : "TLS Inspection Unlock",
-      "type" : "NonConsumable"
+      ]
     }
   ],
-  "settings" : {
-    "_askToBuyEnabled" : false,
-    "_billingIssuesEnabled" : false
-  },
-  "subscriptionGroups" : [],
-  "version" : {
-    "major" : 3,
-    "minor" : 0
+  "version": {
+    "major": 3,
+    "minor": 0
   }
 }

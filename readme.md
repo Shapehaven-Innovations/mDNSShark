@@ -76,7 +76,7 @@ mDNSShark is still **in active development**, with regular updates that refine p
 - **Local Subnet Scans**: Optionally scans the /24 subnet to uncover common TCP-based services, even if they aren't broadcasting via Bonjour or SSDP.
 - **OUI Lookups**: Matches a device's MAC-like address to manufacturers, giving quick hardware insights.
 - **Security Assessment**: Flags risky exposed services and checks each device's manufacturer against CISA's Known Exploited Vulnerabilities catalog and the NVD.
-- **TLS Inspection**: Acts as a local HTTPS proxy via a PacketTunnel extension to decrypt and log HTTPS traffic for analysis. Free for a 3-day trial, then a one-time unlock supports continued development.
+- **TLS Inspection**: Acts as a local HTTPS proxy via a PacketTunnel extension to decrypt and log HTTPS traffic for analysis. Available as an auto-renewing monthly subscription with a free 3-day introductory trial.
 - **Minimalist Interface**: Straight to the point - run a scan, view your devices, dig into details as needed.
 
 ## Security Assessment
@@ -119,7 +119,7 @@ If you only want to turn it on, jump to [Setting Up TLS Inspection](#setting-up-
 
 ### Pricing
 
-The rest of mDNSShark - discovery, subnet scans, OUI lookups - is free, full stop. TLS Inspection is the one feature behind a paywall: it starts with a **free 3-day trial**, and after that a **one-time unlock** (currently $4.99, set in App Store Connect and shown live in Settings) keeps it enabled. This isn't about locking away the app - it's the mechanism that funds the ongoing work of maintaining a certificate-generating MITM proxy safely on-device. If you'd rather support the project by contributing code instead of paying, see [Contribute and Collaborate](#contribute-and-collaborate) below - PRs are always welcome regardless of trial or unlock status.
+The rest of mDNSShark - discovery, subnet scans, OUI lookups - is free, full stop. TLS Inspection is the one feature behind a paywall: it is available as a **monthly subscription** with a **free 3-day trial** (cancel any time in Settings > Apple Account > Subscriptions). Prices are set in App Store Connect and shown live in Settings. This isn't about locking away the app - it's the mechanism that funds the ongoing work of maintaining a certificate-generating MITM proxy safely on-device. If you'd rather support the project by contributing code instead of paying, see [Contribute and Collaborate](#contribute-and-collaborate) below - PRs are always welcome.
 
 ### How It Works
 
@@ -144,7 +144,7 @@ Everything in this section lives in `PacketTunnel/`. `PacketForwarder.swift` rou
 `PacketForwarder` reads every outbound packet and does one of two things:
 
 - **Plain relay** (everything that is not an intercepted 443 flow): open one `NWConnection` per flow, send the payload, and write replies back as hand-built IPv4/UDP or IPv4/TCP packets. This is a userspace NAT. It works for UDP (DNS through the tunnel is how the extension learns IP-to-hostname mappings for the bypass list) and, since the plain-relay rewrite noted under [Recent improvements](#recent-improvements), for TCP as well: the relay synthesizes its own SYN-ACK and tracks real sequence numbers, the same way the intercept path does.
-- **Intercept** (port 443, TLS Inspection unlocked and enabled, CA key present): hand the flow to `TLSInterceptor`, which owns it until it closes. The forwarder keeps feeding it the device's later packets, including the empty ACK that completes the handshake, SYN retransmits, and the FIN or RST at the end.
+- **Intercept** (port 443, TLS Inspection purchased and enabled, CA key present): hand the flow to `TLSInterceptor`, which owns it until it closes. The forwarder keeps feeding it the device's later packets, including the empty ACK that completes the handshake, SYN retransmits, and the FIN or RST at the end.
 
 While the interceptor is active the forwarder also drops UDP port 443 outright. QUIC (HTTP/3) needs no synthetic handshake and would win the race against the intercepted TCP path every time, so inspection would silently see nothing for QUIC-capable sites. Dropping the UDP forces the HTTP/3-to-HTTPS fallback every real client already implements, which is the same trick commercial TLS-inspecting middleboxes use.
 
@@ -264,8 +264,7 @@ All TLS settings are stored in a shared `UserDefaults` suite (`group.beta.mDNSSh
 | Key                       | Type            | Default       |
 | ------------------------- | --------------- | ------------- |
 | `tlsInspectionEnabled`    | Bool            | `false`       |
-| `tlsInspectionUnlocked`   | Bool            | `false`       |
-| `tlsTrialStartDate`       | Date?           | `nil`         |
+| `tlsSubscriptionExpiry`   | Date?           | `nil`         |
 | `tlsBypassList`           | JSON `[String]` | `[]`          |
 | `dnsPrimary`              | String          | `8.8.8.8`     |
 | `dnsSecondary`            | String          | `8.8.4.4`     |
@@ -273,7 +272,7 @@ All TLS settings are stored in a shared `UserDefaults` suite (`group.beta.mDNSSh
 | `tlsInterceptorDropCount` | Int             | `0`           |
 | `tlsInterceptorLastError` | String          | `""`          |
 
-`tlsInspectionUnlocked` and `tlsTrialStartDate` are written by `PurchaseManager` (main app process, backed by StoreKit) and read by the PacketTunnel extension, which has no StoreKit access of its own. The extension re-checks the unlock state on its 60-second cleanup tick, so a trial expiring or a refund while the tunnel is running turns interception off without a restart.
+`tlsSubscriptionExpiry` (the subscription or trial end date) is mirrored from StoreKit by `PurchaseManager` in the main app process and read by the PacketTunnel extension, which has no StoreKit access of its own. The extension derives access from it on its 60-second cleanup tick, so a subscription expiring or a refund while the tunnel is running turns interception off without a restart.
 
 `tlsInterceptorDropCount` and `tlsInterceptorLastError` flow the other way: written by the extension, read by Settings. They are the diagnostic channel described in [Diagnostics](#diagnostics-what-to-look-at-when-it-doesnt-work) and are meant to stay.
 

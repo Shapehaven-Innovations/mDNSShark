@@ -62,9 +62,9 @@ final class PacketForwarder {
 
     func start() {
         running = true
-        if SharedSettings.tlsInspectionEnabled && !SharedSettings.tlsInspectionUnlocked {
-            SharedSettings.tlsInterceptorLastError = "TLS inspection is off - unlock it in Settings"
-            logger.debug("forwarder start: TLS inspection enabled but NOT unlocked; 443 flows take the plain relay path")
+        if SharedSettings.tlsInspectionEnabled && !SharedSettings.tlsAccessGranted {
+            SharedSettings.tlsInterceptorLastError = "TLS inspection is off - subscribe in Settings"
+            logger.debug("forwarder start: TLS inspection enabled but no active subscription; 443 flows take the plain relay path")
         } else if SharedSettings.tlsInspectionEnabled && TLSInterceptor.hasCompleteCAIdentity() {
             tlsInterceptor = TLSInterceptor(onPacket: onPacket)
             logger.debug("forwarder start: TLSInterceptor active: 443 SYNs will be intercepted")
@@ -942,19 +942,19 @@ final class PacketForwarder {
         cleanupTimer = t
     }
 
-    // Entitlement can be revoked (trial expiry, refund) while the tunnel keeps
+    // Entitlement can be revoked (subscription expiry, refund) while the tunnel keeps
     // running for hours/days, so re-check alongside the existing 60s cleanup tick
     // instead of trusting the one-time check in start().
     private func reevaluateTLSAccess() {
         let shouldRun = SharedSettings.tlsInspectionEnabled
-            && SharedSettings.tlsInspectionUnlocked
+            && SharedSettings.tlsAccessGranted
             && TLSInterceptor.hasCompleteCAIdentity()
         if !shouldRun {
             if tlsInterceptor != nil {
                 tlsInterceptor?.stop()
                 tlsInterceptor = nil
-                if SharedSettings.tlsInspectionEnabled && !SharedSettings.tlsInspectionUnlocked {
-                    SharedSettings.tlsInterceptorLastError = "TLS inspection is off - unlock it in Settings"
+                if SharedSettings.tlsInspectionEnabled && !SharedSettings.tlsAccessGranted {
+                    SharedSettings.tlsInterceptorLastError = "TLS inspection is off - subscribe in Settings"
                 }
             }
         } else if tlsInterceptor == nil {

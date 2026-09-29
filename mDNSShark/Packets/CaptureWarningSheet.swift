@@ -13,7 +13,7 @@ struct CaptureWarningSheet: View {
                         .font(.headline)
                         .foregroundColor(AppColors.warning)
 
-                    Text("Capturing packets requires routing all network traffic through this app. You may notice slower speeds or brief interruptions during the session. This is normal and resolves when you stop capture.")
+                    Text("Capturing packets requires routing all network traffic through this app. You may notice slower speeds or brief interruptions during the session. This is normal and resolves when you stop capture. iOS will ask you to allow a VPN configuration: this is a local capture tunnel on this device only, and nothing is sent to any server.")
                         .font(.body)
                         .foregroundColor(.primary)
                 }

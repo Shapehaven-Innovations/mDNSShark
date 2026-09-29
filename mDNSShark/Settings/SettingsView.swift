@@ -2,9 +2,12 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
+import StoreKit
 
 struct SettingsView: View {
     @StateObject private var purchase = PurchaseManager.shared
+    @EnvironmentObject private var coordinator: AppCoordinator
+    @State private var showManageSubscriptions = false
 
     // Appearance
     @AppStorage("preferredColorScheme") private var colorSchemeRaw: Int = 0
@@ -80,6 +83,7 @@ struct SettingsView: View {
                 case .tlsWarning:   tlsWarningSheet
                 }
             }
+            .onAppear { purchase.lastError = nil }
             .alert("Import Error", isPresented: Binding(
                 get: { showImportError != nil },
                 set: { if !$0 { showImportError = nil } }
@@ -145,11 +149,17 @@ struct SettingsView: View {
                     }
                 }
 
-                if !purchase.isUnlocked, case .active(let daysRemaining) = purchase.trialState {
-                    Text(daysRemaining == 1 ? "1 day left in your free trial" : "\(daysRemaining) days left in your free trial")
+                if let status = accessStatusText {
+                    Text(status)
                         .font(.caption)
-                        .foregroundColor(AppColors.warning)
+                        .foregroundColor(purchase.subscriptionState == .billingRetry ? AppColors.warning : .secondary)
                 }
+                if purchase.subscriptionState != .none {
+                    Button("Manage Subscription") { showManageSubscriptions = true }
+                        .font(.footnote)
+                        .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
+                }
+                restoreButton
 
                 // "N connection(s) dropped" / "Last: ..." UI disabled
                 // 2026-09-26 (todo.md item 7): tlsInterceptorDropCount never
@@ -187,44 +197,69 @@ struct SettingsView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
 
-            if case .notStarted = purchase.trialState {
-                Button("Start 3-Day Free Trial") {
-                    guard !purchaseInFlight else { return }
-                    purchaseInFlight = true
-                    Task {
-                        await purchase.startTrial()
-                        purchaseInFlight = false
-                    }
-                }
+            Button(subscribeLabel) { run { await purchase.subscribe() } }
                 .buttonStyle(.borderedProminent)
                 .disabled(purchaseInFlight)
-            } else {
-                Text("Your free trial has ended.")
-                    .font(.caption)
-                    .foregroundColor(AppColors.warning)
-                Button("Unlock TLS Inspection for \(purchase.unlockPrice)") {
-                    guard !purchaseInFlight else { return }
-                    purchaseInFlight = true
-                    Task {
-                        await purchase.purchaseUnlock()
-                        purchaseInFlight = false
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(purchaseInFlight)
-                Button("Restore Purchases") {
-                    guard !purchaseInFlight else { return }
-                    purchaseInFlight = true
-                    Task {
-                        await purchase.restore()
-                        purchaseInFlight = false
-                    }
-                }
-                .font(.footnote)
-                .disabled(purchaseInFlight)
-            }
+            Text(subscriptionDisclosure)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            restoreButton
+            legalLinks
         }
         .padding(.vertical, 4)
+    }
+
+    private var subscribeLabel: String {
+        if purchase.trialLengthText != nil, purchase.trialEligible { return "Start Free Trial" }
+        return purchase.monthlyPrice.map { "Subscribe for \($0)/month" } ?? "Subscribe"
+    }
+
+    // Guideline 3.1.2: name, length, price, trial terms, auto-renewal and how to cancel.
+    private var subscriptionDisclosure: String {
+        guard let price = purchase.monthlyPrice else {
+            return "TLS Inspection Monthly is an auto-renewing monthly subscription. The price is shown once the App Store responds."
+        }
+        let renewal = "\(price) per month, renewing automatically until cancelled."
+        let cancel = "Cancel anytime in Settings > Apple Account > Subscriptions."
+        if let trial = purchase.trialLengthText, purchase.trialEligible {
+            return "TLS Inspection Monthly: free for \(trial), then \(renewal) Payment is charged to your Apple Account when the trial ends. Cancel at least 24 hours before the trial ends to avoid being charged. \(cancel)"
+        }
+        return "TLS Inspection Monthly: \(renewal) Payment is charged to your Apple Account. \(cancel)"
+    }
+
+    private var accessStatusText: String? {
+        switch purchase.subscriptionState {
+        case .active(let date):    return "Subscribed. Renews \(date.formatted(date: .abbreviated, time: .omitted))."
+        case .cancelled(let date): return "Subscription ends \(date.formatted(date: .abbreviated, time: .omitted))."
+        case .billingRetry:        return "Payment issue. Update your payment method in Manage Subscription to keep access."
+        case .expired, .none:      return nil
+        }
+    }
+
+    private var restoreButton: some View {
+        Button("Restore Purchases") { run { await purchase.restore() } }
+            .font(.footnote)
+            .disabled(purchaseInFlight)
+    }
+
+    private var legalLinks: some View {
+        HStack(spacing: 16) {
+            Link("Terms of Use", destination: Self.termsURL)
+            Link("Privacy Policy", destination: Self.privacyURL)
+        }
+        .font(.footnote)
+    }
+
+    private static let termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
+    private static let privacyURL = URL(string: "https://shapehaveninnovations.com/privacy.html")!
+
+    private func run(_ operation: @escaping () async -> Void) {
+        guard !purchaseInFlight else { return }
+        purchaseInFlight = true
+        Task {
+            await operation()
+            purchaseInFlight = false
+        }
     }
 
     // MARK: - Sheets
@@ -491,6 +526,7 @@ struct SettingsView: View {
             Text("This product uses the NVD API but is not endorsed or certified by the NVD.")
                 .font(.caption)
                 .foregroundColor(.secondary)
+            legalLinks
         }
     }
 }
