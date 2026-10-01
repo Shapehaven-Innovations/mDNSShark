@@ -97,7 +97,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         }
         ipv4.includedRoutes = includedRoutes
         settings.ipv4Settings = ipv4
-        settings.dnsSettings = NEDNSSettings(servers: [SharedSettings.dnsPrimary, SharedSettings.dnsSecondary])
+        settings.dnsSettings = NEDNSSettings(servers: SharedSettings.dnsServers)
         settings.mtu = 1500
 
         setTunnelNetworkSettings(settings) { [weak self] error in

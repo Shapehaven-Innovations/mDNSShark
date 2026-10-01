@@ -13,7 +13,7 @@ struct CaptureWarningSheet: View {
                         .font(.headline)
                         .foregroundColor(AppColors.warning)
 
-                    Text("Capturing packets requires routing all network traffic through this app. You may notice slower speeds or brief interruptions during the session. This is normal and resolves when you stop capture. iOS will ask you to allow a VPN configuration: this is a local capture tunnel on this device only, and nothing is sent to any server.")
+                    Text("This starts a local capture tunnel on your device, and iOS will ask you to allow a VPN configuration. While capturing, mDNSShark can see the network traffic you send: DNS lookups, destination addresses and ports, and website hostnames. If TLS Inspection is on, it can also see decrypted HTTPS content.\n\nThis data is shown only in this app and saved only on this device, so you can inspect and export your own traffic. Captured traffic is never sent to us or any third party, and is not used for advertising, tracking, or analytics. Your TCP and UDP traffic is forwarded to its destination; ping (ICMP) is not forwarded, and when TLS Inspection is on, QUIC (UDP 443) is blocked so apps fall back to HTTPS. DNS lookups are sent to the resolver set in Settings, which defaults to Google Public DNS (8.8.8.8), so that provider can see them.\n\nYou may notice slower speeds or brief interruptions until you stop capture.")
                         .font(.body)
                         .foregroundColor(.primary)
                 }

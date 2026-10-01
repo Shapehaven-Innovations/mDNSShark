@@ -458,6 +458,7 @@ struct SettingsView: View {
                     .multilineTextAlignment(.trailing)
                     .onChange(of: dnsPrimary) { _, newValue in SharedSettings.dnsPrimary = newValue }
             }
+            dnsChips(for: $dnsPrimary) { SharedSettings.dnsPrimary = $0 }
             HStack {
                 Text("Secondary")
                 Spacer()
@@ -466,22 +467,30 @@ struct SettingsView: View {
                     .multilineTextAlignment(.trailing)
                     .onChange(of: dnsSecondary) { _, newValue in SharedSettings.dnsSecondary = newValue }
             }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(dnsSuggestions, id: \.label) { s in
-                        Button(s.label) { dnsPrimary = s.value; SharedSettings.dnsPrimary = s.value }
+            dnsChips(for: $dnsSecondary) { SharedSettings.dnsSecondary = $0 }
+        } header: {
+            Text("DNS Server")
+        } footer: {
+            Text("Used for DNS lookups while capturing; that provider can see them. Defaults to Google (8.8.8.8, 8.8.4.4). Invalid entries are ignored. Changes take effect on the next tunnel restart.")
+                .font(.caption)
+        }
+    }
+
+    /// Provider chips for one DNS field, so primary and secondary can each be any provider.
+    private func dnsChips(for field: Binding<String>, save: @escaping (String) -> Void) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(dnsSuggestions, id: \.label) { s in
+                    Button { field.wrappedValue = s.value; save(s.value) } label: {
+                        Text(s.label)
                             .font(.caption)
                             .padding(.horizontal, 10).padding(.vertical, 5)
                             .background(Color(.tertiarySystemBackground))
                             .clipShape(Capsule())
                     }
+                    .buttonStyle(.borderless)
                 }
             }
-        } header: {
-            Text("DNS Server")
-        } footer: {
-            Text("Changes take effect on the next tunnel restart.")
-                .font(.caption)
         }
     }
 

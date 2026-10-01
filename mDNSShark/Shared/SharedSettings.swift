@@ -74,6 +74,20 @@ enum SharedSettings {
         set { suite.set(newValue, forKey: "dnsSecondary") }
     }
 
+    /// Resolvers handed to the tunnel: trimmed, deduped, valid IPv4 literals only, falling back to
+    /// Google DNS when nothing usable is saved so a typo can't stop the tunnel from starting.
+    static var dnsServers: [String] {
+        var seen = Set<String>()
+        let valid = [dnsPrimary, dnsSecondary]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { addr in
+                // IPv4 only: the tunnel has no IPv6 settings or routes and PacketForwarder drops non-IPv4.
+                var v4 = in_addr()
+                return inet_pton(AF_INET, addr, &v4) == 1 && seen.insert(addr).inserted
+            }
+        return valid.isEmpty ? ["8.8.8.8", "8.8.4.4"] : valid
+    }
+
     // Default: all protocols enabled (empty data → all on)
     static var captureFilterProtocols: Set<String> {
         get {

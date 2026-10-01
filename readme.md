@@ -251,7 +251,7 @@ Pre-populate the bypass list with any certificate-pinned apps before enabling in
 
 ### DNS Server
 
-The PacketTunnel extension uses configurable upstream DNS resolvers. Two servers can be set (primary and secondary). Quick-select chips for common providers (Cloudflare `1.1.1.1`, Quad9 `9.9.9.9`, Google `8.8.8.8`) are available in Settings. Changes take effect on the next tunnel restart.
+The PacketTunnel extension uses configurable upstream DNS resolvers. Two servers can be set (primary and secondary). Quick-select chips for common providers (Cloudflare `1.1.1.1`, Quad9 `9.9.9.9`, Google `8.8.8.8`) are available in Settings. Defaults to Google Public DNS (`8.8.8.8`, `8.8.4.4`), so that provider sees lookups made during a capture. Only IPv4 addresses are accepted; invalid entries and duplicates are ignored, and if none are valid the defaults are used. Changes take effect on the next tunnel restart.
 
 ### Capture Filters
 
