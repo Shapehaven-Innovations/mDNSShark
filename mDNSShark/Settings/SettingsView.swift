@@ -543,7 +543,8 @@ struct SettingsView: View {
             Text("This product uses the NVD API but is not endorsed or certified by the NVD.")
                 .font(.caption)
                 .foregroundColor(.secondary)
-            legalLinks
+            // The TLS gate already shows these links while access is locked.
+            if purchase.hasAccess { legalLinks }
         }
     }
 }
