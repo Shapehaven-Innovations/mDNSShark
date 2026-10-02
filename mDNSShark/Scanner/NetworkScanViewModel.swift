@@ -85,12 +85,22 @@ final class NetworkScanViewModel: ObservableObject {
     }
 
     func startScan(duration: Double = 25.0) {
+        guard !scanner.isScanning else { return }
+        beginScan(duration: duration)
+    }
+
+    /// Cancels any in-flight scan and starts a fresh one, so its probes use whatever route is live right now.
+    func restartScan(duration: Double = 25.0) {
+        scanner.cancelScan()
+        beginScan(duration: duration)
+    }
+
+    private func beginScan(duration: Double) {
         // A fresh scan gets a genuinely fresh enrichment pass: cancel
         // whatever the previous scan still had in flight and clear all
         // per-scan enrichment state. `knownIDs` is deliberately untouched:
         // it serves only stable row-ID assignment across the device's
         // lifetime, unrelated to enrichment gating.
-        guard !scanner.isScanning else { return }
         hasScannedAtLeastOnce = true
         enrichmentCoordinator.cancelAll()
         enrichedIPsThisScan.removeAll()

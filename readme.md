@@ -14,60 +14,22 @@ mDNSShark was created by engineers who love transparent, lightweight solutions -
 
 mDNSShark is still **in active development**, with regular updates that refine performance, expand support for various network protocols, and polish the user experience. We welcome your ideas - whether it's a new device detection trick, an easier UI flow, or an innovative scanning feature. Our public repository provides a transparent view of current issues and ongoing discussions, letting you jump in wherever your skills or interests fit best.
 
-### Recent improvements
+## Terms in a Hurry
 
-- **More reliable first scans.** On some devices, the very first scan after
-  installing (or right after a fresh permission prompt) could come back
-  with no device details at all - the scan was starting a moment before
-  iOS finished confirming local-network access. Scans now wait for that
-  confirmation first.
-- **Better device identification for more routers.** Manufacturer and OS
-  detection now looks at more of what a device's admin page actually sends
-  back, rather than just the page title - catching vendors (GL.iNet
-  routers, among others) that were previously showing as Unknown despite
-  being fully reachable.
-- **TLS Inspection actually completes handshakes on real hardware.** A long
-  on-device debugging run fixed a chain of problems in the packet-tunnel
-  extension's hand-built TCP: zeroed IP/TCP checksums the kernel silently
-  dropped, a missing MSS option, response segments larger than the MSS,
-  FINs that were never acknowledged (the device retransmitted them for
-  ~18 seconds before giving up), and a packet capture that only recorded
-  one side of the conversation. The details are in
-  [Under the Hood](#under-the-hood-a-userspace-tcp-stack-inside-a-packet-tunnel)
-  below.
-- **Plain (non-TLS) TCP through the tunnel now completes a real handshake.**
-  The same packet-tunnel extension previously never synthesized a SYN-ACK
-  or tracked real sequence numbers for ordinary TCP, which meant LAN scan
-  probes routed through capture never actually connected. Fixed alongside
-  five routing issues that kept LAN traffic from ever reaching the tunnel
-  in the first place (`excludeLocalNetworks`, a tunnel/Wi-Fi subnet
-  collision, `enforceRoutes`, an explicit on-link route, and a `NetService`
-  retention bug that looked related but wasn't). Verified on-device against
-  a real 254-host subnet sweep with zero bad checksums and clean teardown
-  on every connection.
-- **Starting a capture with "Include LAN traffic" on now runs a scan
-  automatically.** Previously, seeing any LAN traffic in a capture required
-  separately tapping the header bar's **Scan** button — nothing in the UI
-  said this was necessary, and the toggle alone produced an empty capture.
-  The app now starts a scan itself once the tunnel actually connects.
-- **Security findings now check device manufacturers against live
-  vulnerability data.** The old system mapped a fixed handful of CVEs at
-  build time, and most of the ones labeled "CISA" were never actually in
-  CISA's catalog. The Security tab now matches each device's manufacturer
-  against CISA's Known Exploited Vulnerabilities (KEV) catalog and NIST's
-  National Vulnerability Database (NVD), and a refresh can surface CVEs
-  the app didn't ship with. Details in
-  [Security Assessment](#security-assessment) below.
-- **Fewer false CRITICAL findings.** Any device advertising FTP, Telnet, or
-  VNC used to be stamped CRITICAL for specific CVEs in software it might
-  not even run (e.g. the vsftpd 2.3.4 backdoor on any FTP server). Those
-  are gone; the plain "FTP exposed"-style findings remain.
-- **Open ports on TLS 1.2-only devices are no longer lost.** The port
-  scanner's HTTPS probe required TLS 1.3, so many routers and embedded
-  devices that only speak TLS 1.2 silently lost their open-port findings.
-- **Readable CVE lists.** A vendor with dozens of CVEs used to produce one
-  long comma-separated wall of IDs. Findings now show tappable severity
-  capsules that expand into a per-CVE list, each linking to its NVD page.
+- **TCP**: reliable, ordered connections (web pages, SSH). **UDP**: fire-and-forget packets (DNS, video calls).
+- **SYN**: "I'd like to connect." Step 1 of the TCP handshake.
+- **SYN-ACK**: the server's reply that accepts a connection request. Step 2.
+- **ACK**: "got it." Step 3 of the handshake, and sent after data to confirm receipt.
+- **FIN**: "I'm done sending." A polite close. **RST**: "abort this connection now."
+- **MSS**: the largest TCP payload per packet (1460 bytes here).
+- **DNS**: turns names into IP addresses. **mDNS**: the same, for `.local` names on your LAN, with no server.
+- **TLS**: the encryption behind HTTPS. **SNI**: the hostname a client announces at the start of a TLS handshake.
+- **CA**: a certificate authority, whose signature makes a certificate trusted. **SAN**: the hostnames listed inside a certificate.
+- **MITM**: a middle party that terminates TLS and re-encrypts it. That is what TLS Inspection does, with your consent.
+- **QUIC**: HTTP/3, encrypted web traffic over UDP.
+- **VPN / packet tunnel**: an iOS extension that receives all of the phone's IP packets. Here nothing leaves for a remote server.
+- **pcap**: the standard packet capture file format, openable in Wireshark.
+- **LAN**: your local Wi-Fi network.
 
 ## Core Features at a Glance
 
@@ -117,98 +79,106 @@ TLS Inspection lets mDNSShark act as a local man-in-the-middle proxy for HTTPS t
 
 If you only want to turn it on, jump to [Setting Up TLS Inspection](#setting-up-tls-inspection). If you want to know how an iPhone app manages to terminate TLS for Safari without a kernel driver, keep reading.
 
+### Which Mode Do I Want?
+
+Two Settings toggles combine: **Include LAN traffic in capture** and **Enable TLS Inspection**. Internet works in all four modes.
+
+| Mode | What is captured | What is not | Use it for |
+| ---- | ---------------- | ----------- | ---------- |
+| LAN off, TLS off | This phone's internet traffic, encrypted | Decrypted HTTPS, LAN traffic | Seeing who the phone talks to (DNS, SNI, ports) |
+| LAN off, TLS on | Same, plus decrypted HTTPS. UDP/QUIC on 443 is dropped on purpose so apps fall back to TCP | LAN traffic | Reading what apps send over HTTPS |
+| LAN on, TLS off | Adds this phone's traffic to other devices on the Wi-Fi subnet (scan probes appear) | Decrypted HTTPS | Seeing what a LAN scan sends |
+| LAN on, TLS on | Everything above, plus decrypted HTTPS to local devices with self-signed certs | Nothing extra | Inspecting a device's web interface |
+
+In every mode, these are never seen: the router's own traffic (iOS keeps it on Wi-Fi), other devices' traffic, AirDrop, and multicast.
+
 ### Pricing
 
 The rest of mDNSShark - discovery, subnet scans, OUI lookups - is free, full stop. TLS Inspection is the one feature behind a paywall: it is available as a **monthly subscription** with a **free 3-day trial** (cancel any time in Settings > Apple Account > Subscriptions). Prices are set in App Store Connect and shown live in Settings. This isn't about locking away the app - it's the mechanism that funds the ongoing work of maintaining a certificate-generating MITM proxy safely on-device. If you'd rather support the project by contributing code instead of paying, see [Contribute and Collaborate](#contribute-and-collaborate) below - PRs are always welcome.
 
-### How It Works
-
-`NEPacketTunnelProvider` hands the extension raw IPv4 packets and expects raw IPv4 packets back. There is no socket API in between: if the extension wants a connection to succeed, it has to answer the device's packets itself. For an intercepted HTTPS flow the extension therefore plays three roles at once: it is the device's **TCP peer**, the device's **TLS server**, and a **TLS client** to the real site.
-
-When enabled, the tunnel intercepts outbound TCP connections on port 443. For each one it:
-
-1. Answers the device's SYN with a synthesized SYN-ACK, so the device's kernel believes it is talking to the real server.
-2. Buffers the device's first bytes and parses the TLS `ClientHello` to extract the **Server Name Indication (SNI)** hostname.
-3. Mints a short-lived leaf certificate for that hostname (valid 25 hours), signed by your installed CA, with a fresh EC P-256 key pair stored in the iOS Keychain inside the shared App Group.
-4. Terminates the device's TLS using that leaf cert, then opens a separate TLS connection to the real upstream server.
-5. Passes the decrypted request to the packet capture view, relays the response back through the device-facing TLS session, and re-packetizes the encrypted bytes into hand-built TCP segments. The device sees valid TLS throughout.
-
-Leaf certificates are cached in memory per domain (`LeafCertCache`) and cleaned up when the tunnel stops.
-
 ### Under the Hood: A Userspace TCP Stack Inside a Packet Tunnel
 
-Everything in this section lives in `PacketTunnel/`. `PacketForwarder.swift` routes packets, `TLSInterceptor.swift` holds the per-flow `TLSSession`, and `ChecksumHelpers.swift` is the shared checksum math. The code is heavily commented, and most comments describe a specific failure that was observed on a real iPhone, so reading the source alongside this section is worthwhile.
+`NEPacketTunnelProvider` hands the extension raw IPv4 packets and expects raw IPv4 packets back, with no socket API in between. To make a connection succeed, the extension must answer the device's packets itself. For an intercepted HTTPS flow it plays three roles at once: the device's **TCP peer**, the device's **TLS server**, and a **TLS client** to the real site.
 
-#### Two paths through the forwarder
+The code lives in `PacketTunnel/`: `PacketForwarder.swift` routes packets, `TLSInterceptor.swift` holds the per-flow `TLSSession`, and `ChecksumHelpers.swift` is the shared checksum math. Most code comments describe a failure observed on a real iPhone, so read the source alongside this section.
 
-`PacketForwarder` reads every outbound packet and does one of two things:
+#### 1. A packet enters the tunnel
 
-- **Plain relay** (everything that is not an intercepted 443 flow): open one `NWConnection` per flow, send the payload, and write replies back as hand-built IPv4/UDP or IPv4/TCP packets. This is a userspace NAT. It works for UDP (DNS through the tunnel is how the extension learns IP-to-hostname mappings for the bypass list) and, since the plain-relay rewrite noted under [Recent improvements](#recent-improvements), for TCP as well: the relay synthesizes its own SYN-ACK and tracks real sequence numbers, the same way the intercept path does.
-- **Intercept** (port 443, TLS Inspection purchased and enabled, CA key present): hand the flow to `TLSInterceptor`, which owns it until it closes. The forwarder keeps feeding it the device's later packets, including the empty ACK that completes the handshake, SYN retransmits, and the FIN or RST at the end.
+An app opens a connection and iOS routes its packets into the tunnel. `PacketForwarder` reads every outbound packet. Checksums matter from here on: `utun` sets no checksum-offload flags, so the receiving kernel verifies both the IPv4 header checksum and the TCP checksum, and a zeroed checksum is dropped without a trace. Every synthetic packet gets real RFC 1071 checksums via `PacketChecksum`. For a while this was the reason no synthetic packet was ever accepted.
 
-While the interceptor is active the forwarder also drops UDP port 443 outright. QUIC (HTTP/3) needs no synthetic handshake and would win the race against the intercepted TCP path every time, so inspection would silently see nothing for QUIC-capable sites. Dropping the UDP forces the HTTP/3-to-HTTPS fallback every real client already implements, which is the same trick commercial TLS-inspecting middleboxes use.
+#### 2. The forwarder picks a path
 
-#### Synthesizing the handshake
+- **Plain relay** (anything that is not an intercepted 443 flow): one `NWConnection` per flow, with replies written back as hand-built IPv4/UDP or IPv4/TCP packets. This is a userspace NAT. It handles UDP (DNS through the tunnel is how the extension learns IP-to-hostname mappings for the bypass list) and TCP, with its own SYN-ACK and real sequence numbers.
+- **Intercept** (port 443, TLS Inspection subscribed and enabled, CA key present): the flow goes to `TLSInterceptor`, which owns it until it closes. The forwarder keeps feeding it the device's later packets: the completing ACK, SYN retransmits, and the final FIN or RST.
 
-`TLSSession.sendSYNACK()` builds the SYN-ACK by hand. A few details matter more than they look:
+While the interceptor is active, UDP port 443 is dropped. QUIC needs no synthetic handshake and would beat the intercepted TCP path every time, so inspection would see nothing for QUIC-capable sites. Dropping it forces the HTTP/3-to-HTTPS fallback every real client implements, the same trick commercial TLS-inspecting middleboxes use.
 
-- **Initial sequence number.** Our ISN starts at a fixed value and is recorded the first time the SYN-ACK is sent. If the device retransmits its SYN (because our first SYN-ACK was rejected), the resent SYN-ACK reuses the exact same ISN. Changing it on retry is itself a protocol violation the device's kernel would reject.
-- **Ack number.** The SYN-ACK acknowledges the device's ISN plus one, and `clientSeq` (the next byte we expect from the device) is initialized from the device's ISN in the packet header.
-- **MSS option.** The SYN-ACK carries `kind=2 len=4 value=1460`. Without it, the device's kernel falls back to `tcp_mssdflt` (512 bytes). This showed up in a pcap as a 1512-byte ClientHello arriving in three 512-byte segments, which is also why the SNI parser accepts a `ClientHello` that spans more than one segment.
-- **Checksums.** `utun` sets no checksum-offload flags, so the receiving kernel verifies both the IPv4 header checksum and the TCP checksum. A zeroed checksum is indistinguishable from a corrupt packet and is dropped without a trace. Both paths now patch in real RFC 1071 checksums via `PacketChecksum`. For a while this was the reason no synthetic packet from either path was ever accepted at all.
+#### 3. Synthesizing the handshake
 
-#### Keeping sequence numbers honest
+The device's kernel needs a real-looking TCP handshake before it will send anything:
 
-`TLSSession` tracks two numbers under one lock: `serverSeq`, the next byte we will send, and `clientSeq`, the next byte we expect from the device (which doubles as our ack number). They are touched from two threads (the forwarder's queue on receive, the proxy thread on send), so every read-modify-write and the `writePackets` that consumes them happen under `seqLock`. Holding the lock across the write also keeps our synthetic packets leaving in sequence order.
+1. Device to us: **SYN** (carries the device's initial sequence number, ISN).
+2. Us to device: **SYN-ACK**, the forged server reply. Plain relay sends it only once its real upstream connection reaches `.ready`, so a dead destination never looks reachable. Intercept sends it right away.
+3. Device to us: **ACK**. The connection is now established, and the first real bytes (the TLS `ClientHello`) follow.
 
-`receive(_:seq:)` compares each incoming segment's sequence number against `clientSeq`. An in-window segment advances `clientSeq` and is appended to the inbound buffer. A retransmit or reordered segment is dropped rather than appended, because accepting it would advance `clientSeq` past bytes the device never sent and make our next ack unacceptable (RFC 9293 §3.10.7.4), after which the device's kernel silently drops everything we send. Every call still sends an ACK: in-window segments get their bytes acked, out-of-window ones get a duplicate ack telling the device what to resend.
+`TLSSession.sendSYNACK()` builds it by hand:
 
-#### MSS chunking on the way back
+- **Our ISN** starts at a fixed value, recorded on first send. If the device retransmits its SYN, the resent SYN-ACK reuses the exact same ISN, because changing it is a protocol violation the kernel rejects.
+- **Ack number** is the device's ISN plus one. `clientSeq` (the next byte we expect from the device) starts from that ISN.
+- **MSS option** `kind=2 len=4 value=1460`. Without it the kernel falls back to `tcp_mssdflt` (512 bytes). A pcap showed a 1512-byte ClientHello arriving as three 512-byte segments, which is why the SNI parser accepts a `ClientHello` spanning several segments.
 
-`writeToDevice(_:)` splits response data into segments of at most 1460 bytes. A real page easily exceeds that (an 11 KB search results page was the test case), and a single oversized synthetic segment violates both the MSS we advertised and the tunnel's 1500-byte MTU. The device's kernel simply never acks it, which from the outside looked exactly like "the server never answered" until the packet capture started recording our own outbound packets.
+#### 4. Keeping sequence numbers honest
 
-#### Closing without a retransmit storm
+`TLSSession` tracks `serverSeq` (the next byte we send) and `clientSeq` (the next byte we expect, which doubles as our ack number) under one `seqLock`. Two threads touch them (the forwarder's queue on receive, the proxy thread on send), so each read-modify-write and the `writePackets` that consumes them happen under the lock. That also keeps our packets leaving in sequence order.
 
-A FIN consumes one sequence number, but the FIN packet carries no payload and never goes through `receive`, so `clientSeq` was never advanced past it. Acking with the stale value is one byte short of acknowledging the FIN, and on-device the result was the same FIN retransmitted twelve or more times over about 18 seconds before the device gave up with an RST. `close(deviceFINSeq:)` therefore acks `deviceFINSeq + 1`.
+`receive(_:seq:)` compares each segment's sequence number to `clientSeq`. An in-window segment advances `clientSeq` and joins the inbound buffer. A retransmit or reordered segment is dropped, because accepting it would push `clientSeq` past bytes the device never sent and make our next ack unacceptable (RFC 9293 §3.10.7.4), after which the kernel silently drops everything we send. Every call still sends an ACK: new bytes get acked, out-of-window ones get a duplicate ack telling the device what to resend.
 
-Two related cases are handled explicitly in `PacketForwarder` and `close()`:
+#### 5. MSS chunking on the way back
 
-- Darwin routinely coalesces a final write with the FIN into one segment. The forwarder delivers that payload before closing, and computes the FIN's own sequence number as `tcpSeq + payload.count`.
-- Simultaneous close is common here, not an edge case: the upstream server finishing its response triggers our `close()` at nearly the same moment the device sends its own FIN. The FIN-seq correction is applied even when `close()` turns out to be a no-op, otherwise the device's FIN would never be acked in exactly that case.
+`writeToDevice(_:)` splits responses into segments of at most 1460 bytes. A real page easily exceeds that (an 11 KB search results page was the test case), and one oversized segment violates both the advertised MSS and the tunnel's 1500-byte MTU. The kernel never acks it, which looked exactly like "the server never answered" until the capture started recording our own outbound packets.
 
-The session also sends its own FIN when it closes. It does not run a full `FIN_WAIT`/`LAST_ACK` state machine; the session is being torn down regardless, and this is just enough for the device's kernel to stop waiting.
+#### 6. Closing without a retransmit storm
 
-#### The TLS bridge
+A FIN consumes one sequence number, but the FIN packet carries no payload and never goes through `receive`, so `clientSeq` never advanced past it. Acking the stale value is one byte short, and on-device the same FIN was retransmitted twelve or more times over about 18 seconds before the device gave up with an RST. `close(deviceFINSeq:)` therefore acks `deviceFINSeq + 1`.
 
-Rather than embed a TLS library, the extension uses Network.framework's TLS in both directions and bridges the two with a loopback socket:
+Two related cases:
 
-1. An `NWListener` configured with the per-domain leaf identity is started on `127.0.0.1`. It is pinned to loopback explicitly: inside a packet-tunnel provider, a wildcard-bound listener inherits NECP's VPN-loop-prevention scope to the physical interface, its accepted socket's SYN-ACK to `127.0.0.1` fails source-interface selection (`EADDRNOTAVAIL`) and is dropped silently, and the connect below times out. On-device that was 91 of 91 sessions dropped with `ETIMEDOUT`, all recorded in Settings.
-2. A POSIX socket connects to that listener (non-blocking connect plus `poll`, bounded at 5 seconds; a blocking `connect()` whose SYN gets no answer would sit for the kernel's ~75-second SYN-retransmit budget).
-3. Two threads move bytes: the device's raw TLS bytes from the inbound buffer are written into the socket, and the listener's encrypted output is read from the socket and packetized by `writeToDevice`.
-4. The listener's decrypted plaintext is handed to the capture view and forwarded to an upstream `NWConnection`. The upstream connects to the **IP the device itself resolved** (no second DNS lookup, no risk of a CDN handing the extension a different edge) while `sec_protocol_options_set_tls_server_name` supplies the real hostname from the ClientHello, so SNI and certificate hostname validation both use the right name.
+- Darwin often coalesces a final write with the FIN. The forwarder delivers that payload first and computes the FIN's sequence number as `tcpSeq + payload.count`.
+- Simultaneous close is common: the upstream server finishing triggers our `close()` just as the device sends its own FIN. The FIN-seq correction applies even when `close()` is a no-op, otherwise that FIN is never acked.
 
-Every wait in this pipeline is bounded (5 seconds for listener-ready and accept, 10 seconds for upstream) because Network.framework surfaces establishment-time failures as `.waiting`, not `.failed`, and `.waiting` never signals anything. An unbounded wait left sessions parked forever and the device staring at a connection that never answered.
+The session sends its own FIN on close but runs no full `FIN_WAIT`/`LAST_ACK` state machine. It is being torn down anyway, and this is enough for the kernel to stop waiting.
 
-#### Minting leaf certificates
+#### 7. The TLS bridge
 
-`LeafCertCache.identity(for:)` creates a P-256 key pair per SNI and asks `X509CertBuilder.buildLeafCert` for a certificate whose issuer field is the CA certificate's subject, byte for byte. That is how the device's chain builder finds the installed CA; anything else fails with `errSecCreateChainFailed`.
+Instead of embedding a TLS library, the extension uses Network.framework's TLS in both directions and joins them with a loopback socket. First it buffers the device's first bytes and parses the `ClientHello` for the **SNI** hostname. Then:
 
-Two things learned on hardware are enforced in code:
+1. An `NWListener` using the per-domain leaf identity starts on `127.0.0.1`. It is pinned to loopback on purpose: inside a packet-tunnel provider a wildcard-bound listener inherits NECP's VPN-loop-prevention scope to the physical interface, its accepted socket's SYN-ACK to `127.0.0.1` fails source-interface selection (`EADDRNOTAVAIL`) and is dropped silently, and the connect below times out. On-device that was 91 of 91 sessions dropped with `ETIMEDOUT`.
+2. A POSIX socket connects to the listener (non-blocking connect plus `poll`, bounded at 5 seconds; a blocking `connect()` could sit for the kernel's ~75-second SYN-retransmit budget).
+3. Two threads move bytes: the device's raw TLS bytes go from the inbound buffer into the socket, and the listener's encrypted output is read from the socket and packetized by `writeToDevice`.
+4. The listener's decrypted plaintext goes to the capture view and on to an upstream `NWConnection`. It connects to the **IP the device itself resolved** (no second DNS lookup, so a CDN cannot hand back a different edge) while `sec_protocol_options_set_tls_server_name` supplies the real hostname, so SNI and certificate validation use the right name. Upstream certificate verification is skipped only for LAN self-signed devices: private-IP destinations with no SNI, an IP SNI, or a `.local` or dotless name.
 
-- Only the **private** half of the leaf key pair is persisted to the keychain. Passing `kSecAttrIsPermanent` at the top level of `SecKeyCreateRandomKey` persists both halves under the same application tag, and the identity lookup then sometimes returned the public key as if it were the signing key. The symptom was Network.framework aborting the handshake with `-9858` while the connection was still `.preparing`, with no ServerHello ever sent.
-- Before an identity is cached, `verifyUsable` checks that its certificate is byte-for-byte the leaf just minted and that its private key can produce the ECDSA-SHA256 signature the handshake will ask for. A failure is recorded in Settings with the detail instead of surfacing as a generic dropped connection.
+Every wait is bounded (5 seconds for listener-ready and accept, 10 for upstream), because Network.framework reports establishment-time failures as `.waiting`, never `.failed`. An unbounded wait left sessions parked forever with the device staring at a connection that never answered.
 
-The cache holds up to 200 domains and deletes the evicted domain's keychain items; `purge()` runs when the tunnel stops.
+#### 8. Minting leaf certificates
+
+`LeafCertCache.identity(for:)` creates a short-lived (25 hour) EC P-256 key pair per SNI and asks `X509CertBuilder.buildLeafCert` for a certificate signed by your installed CA. Its issuer field is the CA's subject, byte for byte; that is how the device's chain builder finds the installed CA, and anything else fails with `errSecCreateChainFailed`. Keys live in the Keychain inside the shared App Group, and certificates are cached in memory per domain.
+
+Two lessons from hardware are enforced in code:
+
+- Only the **private** half of the leaf key pair is persisted. Passing `kSecAttrIsPermanent` at the top level of `SecKeyCreateRandomKey` persists both halves under one application tag, and the identity lookup then sometimes returned the public key as the signing key. The symptom was Network.framework aborting with `-9858` while still `.preparing`, with no ServerHello ever sent.
+- Before an identity is cached, `verifyUsable` checks that its certificate is byte-for-byte the leaf just minted and that its private key can produce the ECDSA-SHA256 signature the handshake will ask for. Failures are recorded in Settings with detail instead of surfacing as a generic dropped connection.
+
+The cache holds up to 200 domains and deletes an evicted domain's keychain items. `purge()` runs when the tunnel stops.
 
 ### Diagnostics: What to Look at When It Doesn't Work
 
-Console access to a running network extension on a real iPhone has been unreliable enough during development that the extension reports on itself in three places. All of them are intentional and worth keeping.
+Console access to a running network extension on a real iPhone has been unreliable, so the extension reports on itself in three places. All are intentional.
 
-- **Settings, drop count and "Last:" line.** `SharedSettings.tlsInterceptorDropCount` and `tlsInterceptorLastError` are written by the extension and shown under TLS Inspection in Settings. Every guard in the session runner records *why* it bailed and at which stage (`clientHelloWait`, `identity`, `listenerReadyWait`, `posixConnect`, `acceptWait`, `upstreamConnect`, `deviceTLSHandshake`, `bridged`, `decrypting`), and the bridge phase records whether the upstream ever sent application data. This is debug tooling that ships on purpose, not leftover scaffolding: it is what pinned down the loopback-scoping `ETIMEDOUT` and the FIN-storm investigation. Do not remove it as dead code.
-- **Unified log.** `log stream --predicate 'subsystem == "com.mDNSShark.PacketTunnel"'` shows the `forwarder`, `TLSInterceptor`, and `relay` categories. The lines that answer "did the device accept our SYN-ACK" are `sendSYNACK to ...`, the device's first pure ACK, and `first device bytes received ... handshake completed`; `device-facing TLS READY` means the device trusted the leaf, and `first write to device` gives the seq to compare against the device's later ack numbers. Every line is stamped with milliseconds since the session opened.
-- **Packet capture.** The Packet Capture view's export writes a `.pcap` that includes the extension's own synthetic packets (SYN-ACK, ServerHello flight, ACKs, FIN), tagged `[reconstructed]`. Until every synthetic packet was routed through the shared `onPacket` hook, captures showed only what the device sent and never what we sent back, which made the oversized-segment and FIN-storm bugs impossible to see from a pcap alone.
+- **Settings, drop count and "Last:" line.** `SharedSettings.tlsInterceptorDropCount` and `tlsInterceptorLastError` are written by the extension and shown under TLS Inspection. Each guard records why it bailed and at which stage (`clientHelloWait`, `identity`, `listenerReadyWait`, `posixConnect`, `acceptWait`, `upstreamConnect`, `deviceTLSHandshake`, `bridged`, `decrypting`). This shipped on purpose and pinned down the loopback `ETIMEDOUT` and the FIN storm. Do not remove it as dead code.
+- **Unified log.** `log stream --predicate 'subsystem == "com.mDNSShark.PacketTunnel"'` shows the `forwarder`, `TLSInterceptor`, and `relay` categories. Look for `sendSYNACK to ...` (did we answer), the device's first pure ACK, and `first device bytes received ... handshake completed`. `device-facing TLS READY` means the device trusted the leaf. `first write to device` gives the seq to compare with the device's later acks. Lines are stamped in milliseconds since the session opened.
+- **Packet capture.** The export writes a `.pcap` that includes the extension's own synthetic packets (SYN-ACK, ServerHello flight, ACKs, FIN), tagged `[reconstructed]`. Without them, captures showed only what the device sent, which hid the oversized-segment and FIN-storm bugs.
 
-The plain relay additionally wraps every flow in an `OSSignposter` interval (`relayFlow`, session open to first reply, or "no reply" on teardown), readable in Instruments' os_signpost template.
+The plain relay also wraps every flow in an `OSSignposter` interval (`relayFlow`, session open to first reply, or "no reply" on teardown), readable in Instruments' os_signpost template.
 
 ### Setting Up TLS Inspection
 
@@ -247,7 +217,7 @@ Not all apps tolerate a TLS proxy - apps that use certificate pinning (banking, 
 
 Pre-populate the bypass list with any certificate-pinned apps before enabling inspection.
 
-**Always add Apple's own services.** `push.apple.com` (APNs), `icloud.com` (including Private Relay), and `apple-native-relay.apple.com` (Private Relay's egress endpoint) are certificate-pinned and can never be intercepted — their handshakes are specifically designed to resist MITM re-encryption (ECH/QUIC-based), not a bug in `TLSInterceptor.swift`. Without these three entries, their failed sessions show up as a steady stream of drops in the Settings diagnostics (`apple-native-relay.apple.com` fails with `-9830: errSSLIllegalParam`) and bury the errors you actually care about. The bypass list is stored in the shared `UserDefaults` suite and **can be cleared by a rebuild or reinstall**, so re-add all three after a fresh install before reading the drop count as a signal.
+**Always add Apple's own services.** `push.apple.com` (APNs), `icloud.com` (including Private Relay), and `apple-native-relay.apple.com` (Private Relay's egress endpoint) are certificate-pinned and can never be intercepted, and their handshakes are specifically designed to resist MITM re-encryption (ECH/QUIC-based), not a bug in `TLSInterceptor.swift`. Without these three entries, their failed sessions show up as a steady stream of drops in the Settings diagnostics (`apple-native-relay.apple.com` fails with `-9830: errSSLIllegalParam`) and bury the errors you actually care about. The bypass list is stored in the shared `UserDefaults` suite and **can be cleared by a rebuild or reinstall**, so re-add all three after a fresh install before reading the drop count as a signal.
 
 ### DNS Server
 

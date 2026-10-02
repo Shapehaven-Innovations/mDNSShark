@@ -109,8 +109,9 @@ final class AppCoordinator: ObservableObject {
         // connecting takes a beat), kick off a scan automatically.
         // `removeDuplicates` + `dropFirst` turns this into a strict
         // false -> true edge: the initial `false` seed on subscription is
-        // dropped, and repeated `true`s can't re-fire. `startScan` is
-        // already a no-op while a scan is in flight. Left off when the
+        // dropped, and repeated `true`s can't re-fire. A scan already in
+        // flight sent its sweep over Wi-Fi before the route existed, so
+        // restart it rather than skip it. Left off when the
         // LAN toggle is off: a plain internet-traffic capture shouldn't
         // start a device sweep the user never asked for.
         packetCaptureManager.$isCapturing
@@ -119,7 +120,7 @@ final class AppCoordinator: ObservableObject {
             .filter { $0 }
             .sink { [weak self] _ in
                 guard let self, SharedSettings.includeAllNetworksInCapture else { return }
-                self.networkScanViewModel.startScan()
+                self.networkScanViewModel.restartScan()
             }
             .store(in: &cancellables)
 

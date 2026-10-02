@@ -394,6 +394,12 @@ final class TLSSession {
         get { stageLock.lock(); defer { stageLock.unlock() }; return _upstreamRespondedWithData }
         set { stageLock.lock(); defer { stageLock.unlock() }; _upstreamRespondedWithData = newValue }
     }
+    // Set when upstream finished cleanly so proxyToDevice closes on loopback EOF, written on upstream's queue and read on the proxyToDevice thread, hence the same stageLock.
+    private var _drainingToDevice = false
+    private var drainingToDevice: Bool {
+        get { stageLock.lock(); defer { stageLock.unlock() }; return _drainingToDevice }
+        set { stageLock.lock(); defer { stageLock.unlock() }; _drainingToDevice = newValue }
+    }
     private let t0 = Date()
     private var elapsedMs: Int { Int(Date().timeIntervalSince(t0) * 1000) }
     private lazy var tag = "\(srcIP):\(key.srcPort)→\(dstIP):\(dstPort)"
@@ -865,6 +871,9 @@ final class TLSSession {
             dropSession("socket() failed errno=\(errno)")
             close(); return
         }
+        // A send() racing close()'s shutdown or the cancelled loopback peer must fail with EPIPE instead of killing the extension with SIGPIPE.
+        var noSigPipe: Int32 = 1
+        setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, socklen_t(MemoryLayout<Int32>.size))
 
         var addr = sockaddr_in()
         addr.sin_len    = UInt8(MemoryLayout<sockaddr_in>.size)
@@ -963,6 +972,21 @@ final class TLSSession {
         let upstreamTLS = NWProtocolTLS.Options()
         if parsedSNI != nil {
             sec_protocol_options_set_tls_server_name(upstreamTLS.securityProtocolOptions, sni)
+        }
+        // LAN self-signed certs fail the default trust check and the device-facing ServerHello
+        // never goes out, so skip verification only for private IPs with no SNI, an IP SNI, or a local name.
+        let privateOctets = dstIP.split(separator: ".").compactMap { UInt8($0) }
+        let isPrivateDst = privateOctets.count == 4 && (privateOctets[0] == 10
+            || (privateOctets[0] == 172 && (16...31).contains(privateOctets[1]))
+            || (privateOctets[0] == 192 && privateOctets[1] == 168)
+            || (privateOctets[0] == 169 && privateOctets[1] == 254))
+        let lowerSNI = parsedSNI?.lowercased()
+        let isLocalSNI = lowerSNI.map { $0 == dstIP || $0.hasSuffix(".local") || !$0.contains(".") } ?? true
+        if isPrivateDst && isLocalSNI {
+            logger.debug("[\(self.tag, privacy: .public)] upstream verification bypassed for private destination \(self.dstIP, privacy: .public)")
+            sec_protocol_options_set_verify_block(upstreamTLS.securityProtocolOptions, { _, _, complete in
+                complete(true)
+            }, DispatchQueue.global())
         }
         let upstreamConn = NWConnection(
             host: NWEndpoint.Host(dstIP),
@@ -1108,6 +1132,8 @@ final class TLSSession {
             if n <= 0 { break }
             writeToDevice(Data(buf.prefix(n)))
         }
+        // Loopback EOF during a drain means every response byte and the close_notify already went through writeToDevice.
+        if drainingToDevice { close() }
     }
 
     // NWListener plaintext → callback + upstream send
@@ -1136,7 +1162,8 @@ final class TLSSession {
             } else {
                 self.logger.debug("[\(self.tag, privacy: .public)] +\(self.elapsedMs)ms device-facing TLS receive ended: isDone=\(isDone) error=\(String(describing: error), privacy: .public)")
                 self.recordBridgeEnd(side: "Device-facing TLS for \(sni)", isDone: isDone, error: error, state: tlsConn.state)
-                self.close()
+                // The drain's cancel() completes this receive before proxyToDevice has read the last records, so that thread owns the close.
+                if !self.drainingToDevice { self.close() }
             }
         }
     }
@@ -1163,7 +1190,20 @@ final class TLSSession {
             } else {
                 self.logger.debug("[\(self.tag, privacy: .public)] +\(self.elapsedMs)ms upstream receive ended: isDone=\(isDone) error=\(String(describing: error), privacy: .public)")
                 self.recordBridgeEnd(side: "Upstream TLS to \(self.dstIP):\(self.dstPort)", isDone: isDone, error: error, state: upstream.state)
-                self.close()
+                if error == nil && self.upstreamRespondedWithData && !self.sessionClosed {
+                    // finalMessage alone puts nothing on the wire over TLS, so cancel() in its completion, which runs after every queued response send, emits close_notify and the loopback FIN.
+                    self.drainingToDevice = true
+                    tlsConn.send(content: nil, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { [weak self] sendError in
+                        if sendError != nil { self?.close() } else { tlsConn.cancel() }
+                    })
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 5) { [weak self] in
+                        guard let self, !self.sessionClosed else { return }
+                        self.logger.debug("[\(self.tag, privacy: .public)] +\(self.elapsedMs)ms drain to device not finished within 5s, closing")
+                        self.close()
+                    }
+                } else {
+                    self.close()
+                }
             }
         }
     }

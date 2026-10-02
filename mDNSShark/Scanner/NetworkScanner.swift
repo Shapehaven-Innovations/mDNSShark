@@ -130,7 +130,13 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
     // Instance of the local subnet scanner.
     private let localScanner = LocalDeviceScanner()
     private var cancellables = Set<AnyCancellable>()
-    
+    // Held so cancelScan() can stop the pending end-of-scan block from ending a restarted scan early.
+    private var scanEndWorkItem: DispatchWorkItem?
+    // Held as one replaceable subscription so repeated scans do not stack duplicate $discoveredIPs sinks.
+    private var discoveredIPsSubscription: AnyCancellable?
+    // Held so cancelScan() can close the previous scan's SSDP socket instead of leaving it listening.
+    private var ssdpSource: DispatchSourceRead?
+
     // A device discovered on the network.
     class Device: ObservableObject, Identifiable {
         let id = UUID()
@@ -181,7 +187,7 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         
         // Start local TCP subnet scanning.
         localScanner.scanLocalSubnet(port: NWEndpoint.Port(rawValue: 80)!)
-        localScanner.$discoveredIPs
+        discoveredIPsSubscription = localScanner.$discoveredIPs
             .sink { [weak self] ips in
                 guard let self = self else { return }
                 for ip in ips {
@@ -193,16 +199,33 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
                     }
                 }
             }
-            .store(in: &cancellables)
-        
+
         // End the scan after the specified duration.
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
+        let endWorkItem = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
             for browser in self.bonjourBrowsers { browser.cancel() }
             self.bonjourBrowsers.removeAll()
             self.isScanning = false
+            self.scanEndWorkItem = nil
             self.logger.info("Scan ended after \(duration) seconds.")
         }
+        scanEndWorkItem = endWorkItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: endWorkItem)
+    }
+
+    /// Stops an in-flight scan immediately so a fresh one can start, and does nothing when no scan is running.
+    func cancelScan() {
+        guard isScanning else { return }
+        scanEndWorkItem?.cancel()
+        scanEndWorkItem = nil
+        for browser in bonjourBrowsers { browser.cancel() }
+        bonjourBrowsers.removeAll()
+        ssdpSource?.cancel()
+        ssdpSource = nil
+        discoveredIPsSubscription?.cancel()
+        discoveredIPsSubscription = nil
+        isScanning = false
+        logger.info("Scan cancelled for restart.")
     }
     
     // MARK: - Bonjour Scanning
@@ -339,7 +362,8 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
             close(sock)
         }
         source.resume()
-        
+        ssdpSource = source
+
         DispatchQueue.global().asyncAfter(deadline: .now() + duration) {
             source.cancel()
         }

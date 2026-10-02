@@ -166,6 +166,14 @@ struct SettingsView: View {
                 //             .foregroundColor(.secondary)
                 //     }
                 // }
+                #if DEBUG
+                TimelineView(.periodic(from: .now, by: 2)) { _ in
+                    let reason = SharedSettings.tlsInterceptorLastError
+                    Text("Drops: \(SharedSettings.tlsInterceptorDropCount) Last: \(reason.isEmpty ? "none" : reason)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                #endif
             } else {
                 tlsGateView
             }
@@ -532,7 +540,7 @@ struct SettingsView: View {
                 }
             ))
         } footer: {
-            Text("Experimental. Routes same-subnet LAN traffic through the capture relay. When this is on, starting a capture automatically runs a network scan so there is LAN traffic to capture; the relay can add latency to that scan. Takes effect the next time you start a capture.")
+            Text("Experimental. Routes same-subnet LAN traffic through the capture relay. When this is on, starting a capture automatically runs a network scan so there is LAN traffic to capture; the relay can add latency to that scan. Takes effect the next time you start a capture. Traffic to the router itself is not captured.")
         }
     }
 

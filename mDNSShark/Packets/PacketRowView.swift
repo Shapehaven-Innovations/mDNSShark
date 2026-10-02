@@ -17,6 +17,14 @@ struct PacketRowView: View {
                     HStack(spacing: 4) {
                         AppBadge(text: packet.protocolName,
                                  color: AppColors.PacketProtocol.color(for: packet.protocolName))
+                        if packet.info == PacketModel.tlsDecryptedInfo {
+                            Text("decrypted")
+                                .font(.caption2)
+                                .padding(.horizontal, 4).padding(.vertical, 2)
+                                .background(Color.green.opacity(0.12))
+                                .foregroundColor(.green)
+                                .cornerRadius(4)
+                        }
                         if packet.isReconstructed {
                             Text("reconstructed")
                                 .font(.caption2)

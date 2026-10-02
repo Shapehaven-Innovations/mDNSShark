@@ -58,12 +58,18 @@ struct PacketDetailView: View {
                         Divider()
                         if packet.protocolName == "HTTPS" {
                             VStack(alignment: .leading, spacing: 4) {
-                                Label("TLS payload is encrypted - hex shows ciphertext.", systemImage: "lock.fill")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundColor(.secondary)
-                                Text("Full plaintext capture requires a custom CA certificate. This can be configured in a future Settings option.")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                if packet.info == PacketModel.tlsDecryptedInfo {
+                                    Label("Decrypted by TLS Inspection - hex shows plaintext.", systemImage: "lock.open.fill")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundColor(.green)
+                                } else {
+                                    Label("TLS payload is encrypted - hex shows ciphertext.", systemImage: "lock.fill")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundColor(.secondary)
+                                    Text("Enable TLS Inspection in Settings to decrypt HTTPS.")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
                             }
                             .padding(8)
                             .background(Color(.secondarySystemBackground))

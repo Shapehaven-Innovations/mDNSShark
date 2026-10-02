@@ -2,6 +2,9 @@
 import Foundation
 
 struct PacketModel: Identifiable, Codable {
+    /// The `info` value marking an HTTPS packet whose payload was decrypted by TLS inspection.
+    static let tlsDecryptedInfo = "TLS-decrypted"
+
     let id: UUID
     let frameNumber: Int
     let timestamp: Date

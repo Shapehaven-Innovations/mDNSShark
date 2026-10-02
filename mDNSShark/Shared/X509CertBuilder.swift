@@ -98,10 +98,15 @@ enum X509CertBuilder {
         let now      = Calendar.current.date(byAdding: .hour, value: -1, to: Date())!
         let notAfter = Calendar.current.date(byAdding: .hour, value: 25, to: now)!
         let spki     = try subjectPublicKeyInfo(publicKey)
-        // SAN dNSName uses implicit context tag [2]
+        // SAN dNSName uses implicit tag [2]; an IPv4 literal needs iPAddress
+        // tag [7] with 4 raw bytes, or iOS rejects the name match.
+        var v4 = in_addr()
+        let sanName = inet_pton(AF_INET, domain, &v4) == 1
+            ? derImplicit(tag: 0x87, withUnsafeBytes(of: &v4) { Data($0) })
+            : derImplicit(tag: 0x82, Data(domain.utf8))
         let sanExt   = derSequence(
             derOID(oidSubjectAltName) +
-            derOctetString(derSequence(derImplicit(tag: 0x82, Data(domain.utf8))))
+            derOctetString(derSequence(sanName))
         )
         // ExtendedKeyUsage { id-kp-serverAuth }. Apple's trust evaluator has
         // required an EKU containing serverAuth on every TLS server certificate

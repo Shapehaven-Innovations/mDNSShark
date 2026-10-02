@@ -151,41 +151,10 @@ final class PacketCaptureManager: ObservableObject {
                 let proto = NETunnelProviderProtocol()
                 proto.providerBundleIdentifier = Self.expectedProviderBundleIdentifier
                 proto.serverAddress = "127.0.0.1"
-                // See SharedSettings.includeAllNetworksInCapture (todo.md item 1) —
-                // this is the actual switch (a property of the tunnel's saved
-                // NEVPNProtocol config, not something the extension can set on
-                // itself via NEPacketTunnelNetworkSettings at startTunnel time).
-                //
-                // History: this toggle originally drove includeAllNetworks.
-                // Four on-device LAN-scan pcaps with includeAllNetworks=true
-                // (plus the excludeLocalNetworks, tunnel-subnet, and
-                // included-route fixes below/in PacketTunnelProvider.swift)
-                // all still showed zero packets to any other LAN host. Apple's
-                // "Routing your VPN network traffic" doc explains why that
-                // approach can't work: the system routing table supersedes
-                // includedRoutes/excludedRoutes for routes of *equal*
-                // specificity to an on-link route (exactly our case: a /24
-                // included route for the Wi-Fi subnet vs. en0's own /24
-                // on-link route), and the documented way to force the tunnel's
-                // routes over the system table is NEVPNProtocol.enforceRoutes
-                // (iOS 14.2+), NOT includedRoutes alone. Critically, the same
-                // doc says enforceRoutes is ignored whenever includeAllNetworks
-                // is true, so includeAllNetworks must stay false here for the
-                // override to be honored at all.
                 proto.includeAllNetworks = false
-                proto.enforceRoutes = SharedSettings.includeAllNetworksInCapture
-                // NEVPNProtocol.excludeLocalNetworks defaults to true on iOS.
-                // Per the same doc it excludes local-network hosts "when
-                // includeAllNetworks or enforceRoutes is also true", so left at
-                // its default it would route LAN traffic (e.g. a device scan
-                // against 192.168.x.x) around the tunnel entirely no matter
-                // what enforceRoutes says. Confirmed on-device back when this
-                // was paired with includeAllNetworks: three separate LAN-scan
-                // pcaps still showed zero packets to any other LAN host. Must
-                // track includeAllNetworksInCapture inverted, same as it did
-                // for includeAllNetworks: this setting only makes sense as
-                // "route LAN traffic through capture too" if both flip
-                // together.
+                // Must stay false: with it on, all internet traffic stops ~1s after start (verified on-device).
+                proto.enforceRoutes = false
+                // No-op while both flags above are false, kept inverted so a future enforceRoutes change cannot silently exclude the LAN.
                 proto.excludeLocalNetworks = !SharedSettings.includeAllNetworksInCapture
                 manager.protocolConfiguration = proto
                 manager.localizedDescription = "Packet Capture Tunnel"
@@ -216,16 +185,9 @@ final class PacketCaptureManager: ObservableObject {
             }
 
             existing.isEnabled = true
-            // Re-applied every startCapture(), not just at creation, so a
-            // Settings change to includeAllNetworksInCapture takes effect
-            // on next capture start even when reusing a saved config. Must
-            // mirror saveFreshManager() exactly (see the comments there for
-            // why enforceRoutes rather than includeAllNetworks), and
-            // includeAllNetworks is written explicitly, not just left alone,
-            // because a config saved by an earlier build still has it
-            // persisted as true, which would silently disable enforceRoutes.
+            // Mirrors saveFreshManager(), re-applied on every start because an older saved config may differ.
             existingProto?.includeAllNetworks = false
-            existingProto?.enforceRoutes = SharedSettings.includeAllNetworksInCapture
+            existingProto?.enforceRoutes = false  // see saveFreshManager()
             existingProto?.excludeLocalNetworks = !SharedSettings.includeAllNetworksInCapture
             existing.saveToPreferences { error in
                 if let error { completion(error); return }

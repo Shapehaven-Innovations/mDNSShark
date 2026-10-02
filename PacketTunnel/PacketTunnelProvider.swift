@@ -15,7 +15,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
 
     // Recorded once at startTunnel so stopTunnel can put a real answer in
     // capture-meta.json instead of an empty string: without this, a pcap
-    // showing zero LAN traffic is unfalsifiable — there's no way to tell
+    // showing zero LAN traffic is unfalsifiable, so there's no way to tell
     // "the LAN route was never added" (en0 not found, wrong family, etc.)
     // apart from "the route was added but the on-link route still won".
     private var detectedWiFiIP = ""
@@ -42,49 +42,10 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     override func startTunnel(options: [String: NSObject]?,
                               completionHandler: @escaping (Error?) -> Void) {
         let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "127.0.0.1")
-        // 100.64.0.0/10 (RFC 6598, "Shared Address Space" / CGNAT range) rather
-        // than a regular private-range address: the tunnel's own virtual
-        // subnet must never collide with a real LAN the device might be on,
-        // or the two subnets being identical creates additional routing-table
-        // ambiguity on top of the on-link problem below — confirmed on-device
-        // 2026-09-26: the tunnel's old address (192.168.100.1/24) happened to
-        // exactly match the tester's real Wi-Fi subnet. No consumer router
-        // hands out addresses in this range, so that class of collision is
-        // now structurally impossible, not just unlikely.
+        // 100.64.0.0/10 (RFC 6598 CGNAT range) keeps the tunnel subnet from colliding with any real LAN, unlike the old 192.168.100.1/24 that matched a tester's Wi-Fi.
         let ipv4 = NEIPv4Settings(addresses: ["100.64.0.1"], subnetMasks: ["255.255.255.0"])
         var includedRoutes = [NEIPv4Route.default()]
-        // The subnet fix above is necessary but not sufficient: even with a
-        // non-colliding tunnel subnet and includeAllNetworks/
-        // excludeLocalNetworks=false set at the NEVPNProtocol level (app
-        // side, PacketCaptureManager.swift), traffic to the device's own
-        // currently-connected LAN still never reached this tunnel on-device.
-        // Multiple Apple Developer Forum threads report the identical
-        // symptom (search: "LAN traffic with NEPacketTunnelProvider"): an
-        // on-link route for a directly-connected interface's own subnet can
-        // win over a tunnel's default (0.0.0.0/0) route in iOS's routing
-        // table, regardless of includeAllNetworks/excludeLocalNetworks —
-        // those flags document affecting OTHER local networks, not
-        // necessarily the currently-active primary interface's own subnet.
-        // NOTE: Apple's own "Routing your VPN network traffic" doc says the
-        // system routing table supersedes includedRoutes/excludedRoutes for
-        // routes of *equal* specificity (which this /24 is, versus en0's
-        // own /24 on-link route), and names NEVPNProtocol.enforceRoutes
-        // (not includedRoutes alone) as the documented override mechanism.
-        // enforceRoutes is itself ignored whenever includeAllNetworks is
-        // true, which is what PacketCaptureManager.swift set until the
-        // fifth fix (todo.md item 1): it now sets includeAllNetworks=false
-        // and enforceRoutes=includeAllNetworksInCapture instead. The two
-        // halves are complementary, not alternatives: enforceRoutes only
-        // makes the system honor routes this tunnel actually requests, so
-        // the explicit Wi-Fi-subnet route below is still what names the
-        // LAN as tunnel-bound. The detectedWiFiIP/lanRouteStatus diagnostics
-        // below exist specifically so an on-device pcap showing zero LAN
-        // traffic after this change is still interpretable (route never
-        // added vs. route added but lost to the system table) instead of
-        // leaving that ambiguous yet again.
-        // Opt-in only (SharedSettings.includeAllNetworksInCapture, todo.md
-        // item 1's on-device A/B test), same as the app-side flags it pairs
-        // with.
+        // Opt-in LAN capture adds a Wi-Fi subnet route (recorded in lanRouteStatus), though iOS keeps router traffic on Wi-Fi so it is never captured.
         if SharedSettings.includeAllNetworksInCapture {
             if let wifi = currentWiFiIPv4Network() {
                 detectedWiFiIP = wifi.address
@@ -165,7 +126,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
                 destinationPort: 443,
                 protocolName: "HTTPS",
                 length: payload.count,
-                info: "TLS-decrypted",
+                info: PacketModel.tlsDecryptedInfo,
                 hexDump: payload.map { String(format: "%02x", $0) }.joined(separator: " "),
                 payloadText: text,
                 direction: .outbound,
@@ -207,8 +168,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     /// the network address the interface is actually on-link for (e.g.
     /// `192.168.100.42`/`255.255.255.0` → `192.168.100.0`/`255.255.255.0`).
     /// Used to add an explicit, more-specific `NEIPv4Route` for that subnet
-    /// alongside the tunnel's default route — see the comment at this
-    /// method's call site in `startTunnel` for why that's necessary at all.
+    /// alongside the tunnel's default route, so opt-in LAN capture sees that subnet.
     /// Same `getifaddrs`/`en0` technique `LocalDeviceScanner.getWiFiAddress()`
     /// uses in the main app target; duplicated rather than shared because
     /// that type lives in the app target, not this extension's.

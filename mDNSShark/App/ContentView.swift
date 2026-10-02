@@ -31,7 +31,11 @@ struct ContentView: View {
         }
         .preferredColorScheme(preferredColorScheme)
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await PurchaseManager.shared.refreshEntitlements() } }
+            if phase == .active {
+                Task { await PurchaseManager.shared.refreshEntitlements() }
+                let reason = SharedSettings.tlsInterceptorLastError
+                tlsError = SharedSettings.isBenignTLSDropReason(reason) ? "" : reason
+            }
         }
         .onAppear {
             if !hasShownOnboarding {
