@@ -515,7 +515,7 @@
 				INFOPLIST_FILE = mDNSShark/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = mDNSShark;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "This app requires access to your local network to scan for devices";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "mDNSShark uses your local network to discover Bonjour and SSDP devices and, when capture is on, to relay captured traffic to hosts on your LAN.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -556,7 +556,7 @@
 				INFOPLIST_FILE = mDNSShark/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = mDNSShark;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "This app requires access to your local network to scan for devices";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "mDNSShark uses your local network to discover Bonjour and SSDP devices and, when capture is on, to relay captured traffic to hosts on your LAN.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";

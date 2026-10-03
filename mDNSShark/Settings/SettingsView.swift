@@ -195,6 +195,9 @@ struct SettingsView: View {
             Text("TLS Inspection decrypts HTTPS traffic on this device so you can see what your apps are actually sending.")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
+            Text("Captured traffic stays on this device and is never sent to us. DNS lookups go to the resolver you choose in Settings.")
+                .font(.caption)
+                .foregroundColor(.secondary)
 
             Button(subscribeLabel) { run { await purchase.subscribe() } }
                 .buttonStyle(.borderedProminent)
