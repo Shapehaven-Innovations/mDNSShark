@@ -23,16 +23,6 @@ struct SettingsView: View {
     @State private var activeSheet: TLSSheet?
     @AppStorage("hasSeenTLSWarning") private var hasSeenTLSWarning = false
     @State private var purchaseInFlight = false
-    // dropCount/lastDropReason UI disabled 2026-09-26 — see todo.md item 7's
-    // "Last: line" note for why (SharedSettings.tlsInterceptorDropCount has
-    // no reset path anywhere, so once any session ever drops, this text
-    // never goes away again for the life of the install). Left commented
-    // rather than deleted: the underlying SharedSettings counters and the
-    // TLSInterceptor/PacketForwarder writers that feed them are still real
-    // diagnostics and may get a proper reset-on-relevant-event treatment
-    // later instead of just being cut.
-    // @State private var dropCount: Int = SharedSettings.tlsInterceptorDropCount
-    // @State private var lastDropReason: String = SharedSettings.tlsInterceptorLastError
 
     // Bypass list
     @State private var bypassList: [String] = SharedSettings.tlsBypassList
@@ -60,13 +50,6 @@ struct SettingsView: View {
             .listStyle(.insetGrouped)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
-            // .onAppear dropCount/lastDropReason refresh disabled alongside
-            // the "Last:" UI block above (see the @State comment near the
-            // top of this file).
-            // .onAppear {
-            //     dropCount = SharedSettings.tlsInterceptorDropCount
-            //     lastDropReason = SharedSettings.tlsInterceptorLastError
-            // }
             // Presentation modifiers (.sheet/.alert) must live on the List, not on a
             // Section inside it: List's row machinery (_VariadicView) enumerates a
             // Section's children and reapplies ambient modifiers to each one, so a
@@ -127,11 +110,12 @@ struct SettingsView: View {
                     }
                 ))
                 .tint(AppColors.info)
+                .disabled(installedCert == nil && !tlsEnabled)
 
                 if let cert = installedCert {
                     CertDetailCard(cert: cert).listRowInsets(EdgeInsets())
                 } else {
-                    Text("No certificate installed")
+                    Text("Install a CA certificate to enable")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -153,83 +137,70 @@ struct SettingsView: View {
                 restoreButton
 
                 // "N connection(s) dropped" / "Last: ..." UI disabled
-                // 2026-09-26 (todo.md item 7): tlsInterceptorDropCount never
-                // resets, so this text never goes away once any session has
-                // ever dropped, across every future launch until reinstall.
-                // if dropCount > 0 {
-                //     Text("\(dropCount) connection(s) dropped during TLS inspection")
-                //         .font(.caption)
-                //         .foregroundColor(AppColors.warning)
-                //     if !lastDropReason.isEmpty {
-                //         Text("Last: \(lastDropReason)")
-                //             .font(.caption2)
-                //             .foregroundColor(.secondary)
-                //     }
+                // Drop counters are hidden because tlsInterceptorDropCount has no reset path.
+                // #if DEBUG
+                // TimelineView(.periodic(from: .now, by: 2)) { _ in
+                //     let reason = SharedSettings.tlsInterceptorLastError
+                //     Text("Drops: \(SharedSettings.tlsInterceptorDropCount) Last: \(reason.isEmpty ? "none" : reason)")
+                //         .font(.caption2)
+                //         .foregroundColor(.secondary)
                 // }
-                #if DEBUG
-                TimelineView(.periodic(from: .now, by: 2)) { _ in
-                    let reason = SharedSettings.tlsInterceptorLastError
-                    Text("Drops: \(SharedSettings.tlsInterceptorDropCount) Last: \(reason.isEmpty ? "none" : reason)")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-                #endif
+                // #endif
             } else {
                 tlsGateView
             }
-
-            Link("How to configure →",
-                 destination: URL(string: "https://github.com/Shapehaven-Innovations/mDNSShark")!)
-                .font(.subheadline)
         } header: {
             Text("TLS Inspection")
         } footer: {
-            Text("Install a trusted CA certificate on this device before enabling. See the README for steps. The TLS Inspection toggle only controls whether HTTPS traffic is MITM-proxied for decryption; packet capture runs regardless, recording either decrypted or still-encrypted payloads.")
+            Text(purchase.hasAccess ? "Needs a trusted CA certificate. HTTPS is decrypted only while this is on." : "")
                 .font(.caption)
         }
     }
 
     @ViewBuilder
     private var tlsGateView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("TLS Inspection decrypts HTTPS traffic on this device so you can see what your apps are actually sending.")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            Text("Captured traffic stays on this device and is never sent to us. DNS lookups go to the resolver you choose in Settings.")
-                .font(.caption)
-                .foregroundColor(.secondary)
-
-            Button(subscribeLabel) { run { await purchase.subscribe() } }
+        VStack(spacing: 6) {
+            if let name = purchase.productName {
+                Text(name).font(.headline)
+            }
+            if let price = purchase.monthlyPrice {
+                // Guideline 3.1.2(c): the billed amount must outrank any trial wording.
+                Text("\(price)\(purchase.periodText.map { " / \($0)" } ?? "")")
+                    .font(.largeTitle.weight(.bold))
+                if let trial = purchase.trialLengthText, purchase.trialEligible {
+                    Text("Starts with a \(trial)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            } else {
+                ProgressView()
+            }
+            Button("Subscribe") { run { await purchase.subscribe() } }
                 .buttonStyle(.borderedProminent)
                 .disabled(purchaseInFlight)
+                .padding(.top, 8)
             Text(subscriptionDisclosure)
-                .font(.caption)
+                .font(.caption2)
                 .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
             // Billing retry drops the entitlement, so the payment-issue hint and Manage
             // button must also be reachable from the gate.
             subscriptionStatusRows
             restoreButton
-            legalLinks
         }
+        .frame(maxWidth: .infinity)
         .padding(.vertical, 4)
+        // The launch-time fetch can fail (offline, sandbox); retry so the price is never missing.
+        .task { await purchase.loadProducts(reportErrors: false) }
     }
 
-    private var subscribeLabel: String {
-        if purchase.trialLengthText != nil, purchase.trialEligible { return "Start Free Trial" }
-        return purchase.monthlyPrice.map { "Subscribe for \($0)/month" } ?? "Subscribe"
-    }
-
-    // Guideline 3.1.2: name, length, price, trial terms, auto-renewal and how to cancel.
+    // Guideline 3.1.2: auto-renewal, charge timing and how to cancel.
     private var subscriptionDisclosure: String {
-        guard let price = purchase.monthlyPrice else {
-            return "TLS Inspection Monthly is an auto-renewing monthly subscription. The price is shown once the App Store responds."
-        }
-        let renewal = "\(price) per month, renewing automatically until cancelled."
-        let cancel = "Cancel anytime in Settings > Apple Account > Subscriptions."
-        if let trial = purchase.trialLengthText, purchase.trialEligible {
-            return "TLS Inspection Monthly: free for \(trial), then \(renewal) Payment is charged to your Apple Account when the trial ends. Cancel at least 24 hours before the trial ends to avoid being charged. \(cancel)"
-        }
-        return "TLS Inspection Monthly: \(renewal) Payment is charged to your Apple Account. \(cancel)"
+        var text = "Auto-renews until cancelled. Charged to your Apple Account"
+        text += purchase.trialEligible && purchase.trialLengthText != nil ? " when the trial ends." : " at purchase."
+        text += " Cancel at least 24 hours before renewal in Settings > Apple Account > Subscriptions."
+        text += " Traffic stays on this device; DNS lookups go to your chosen resolver."
+        return text
     }
 
     /// Status line and Manage Subscription, shown whenever StoreKit reports a subscription state.
@@ -444,7 +415,7 @@ struct SettingsView: View {
         } header: {
             Text("TLS Bypass List")
         } footer: {
-            Text("Domains excluded from TLS inspection. Add certificate-pinned apps (banking, health) here.")
+            Text("Domains excluded from inspection. Add certificate-pinned apps (banking, health) or they will fail.")
                 .font(.caption)
         }
     }
@@ -482,7 +453,7 @@ struct SettingsView: View {
         } header: {
             Text("DNS Server")
         } footer: {
-            Text("Used for DNS lookups while capturing; that provider can see them. Defaults to Google (8.8.8.8, 8.8.4.4). Invalid entries are ignored. Changes take effect on the next tunnel restart.")
+            Text("Defaults to Google. This provider sees your DNS lookups. Applies on next capture.")
                 .font(.caption)
         }
     }
@@ -514,16 +485,26 @@ struct SettingsView: View {
     // MARK: - Capture Filters
 
     private var captureFiltersSection: some View {
-        Section("Capture Filters") {
-            ForEach(SharedSettings.allProtocols.sorted(), id: \.self) { proto in
-                Toggle(proto, isOn: Binding(
-                    get:  { activeFilters.contains(proto) },
-                    set:  { on in
-                        if on { activeFilters.insert(proto) } else { activeFilters.remove(proto) }
+        Section("Capture") {
+            FlowLayout(spacing: 8) {
+                ForEach(SharedSettings.allProtocols.sorted(), id: \.self) { proto in
+                    let on = activeFilters.contains(proto)
+                    Button {
+                        if on { activeFilters.remove(proto) } else { activeFilters.insert(proto) }
                         SharedSettings.captureFilterProtocols = activeFilters
+                    } label: {
+                        Text(proto)
+                            .font(.subheadline)
+                            .padding(.horizontal, 14).padding(.vertical, 7)
+                            .background(on ? AppColors.info : Color(.tertiarySystemFill))
+                            .foregroundColor(on ? .white : .primary)
+                            .clipShape(Capsule())
                     }
-                ))
+                    .buttonStyle(.borderless)
+                    .accessibilityAddTraits(on ? .isSelected : [])
+                }
             }
+            .padding(.vertical, 4)
         }
     }
 
@@ -535,7 +516,7 @@ struct SettingsView: View {
     // so the user never has to know about the separate header Scan button.
     private var captureRoutingSection: some View {
         Section {
-            Toggle("Include LAN traffic in capture", isOn: Binding(
+            Toggle("Include LAN traffic", isOn: Binding(
                 get: { includeAllNetworks },
                 set: { val in
                     includeAllNetworks = val
@@ -543,7 +524,7 @@ struct SettingsView: View {
                 }
             ))
         } footer: {
-            Text("Experimental. Routes same-subnet LAN traffic through the capture relay. When this is on, starting a capture automatically runs a network scan so there is LAN traffic to capture; the relay can add latency to that scan. Takes effect the next time you start a capture. Traffic to the router itself is not captured.")
+            Text("Beta. Also scans your network when capture starts. Applies next capture.")
         }
     }
 
@@ -551,11 +532,13 @@ struct SettingsView: View {
 
     private var aboutSection: some View {
         Section("About") {
+            Link(destination: URL(string: "https://github.com/Shapehaven-Innovations/mDNSShark#setting-up-tls-inspection")!) {
+                Label("Setup guide", systemImage: "arrow.up.right.square")
+            }
             Text("This product uses the NVD API but is not endorsed or certified by the NVD.")
                 .font(.caption)
                 .foregroundColor(.secondary)
-            // The TLS gate already shows these links while access is locked.
-            if purchase.hasAccess { legalLinks }
+            legalLinks
         }
     }
 }
@@ -651,25 +634,54 @@ private struct GenerateCASheet: View {
 private struct TLSWarningSheet: View {
     let onEnable: () -> Void
     let onCancel: () -> Void
+
+    private let points: [(icon: String, text: String)] = [
+        ("checkmark.seal", "Your CA certificate must be installed and trusted."),
+        ("building.columns", "Add certificate-pinned apps (banking, health) to the Bypass List or they will fail."),
+        ("bolt.slash", "QUIC (HTTP/3) is blocked so sites fall back to inspectable HTTPS, which may feel slightly slower.")
+    ]
+
     var body: some View {
-        NavigationView {
-            VStack(spacing: 20) {
+        VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 8) {
                 Image(systemName: "exclamationmark.shield.fill")
                     .font(.largeTitle)
                     .foregroundColor(AppColors.warning)
-                Text("Before enabling TLS Inspection").font(.headline)
-                Text("mDNSShark will act as a TLS proxy for all HTTPS traffic.\n\n• Your CA certificate must be installed and trusted in iOS Settings → General → VPN & Device Management.\n• Add certificate-pinned apps (banking, health) to the Bypass List or they will fail.\n• QUIC (HTTP/3) traffic is blocked while this is on, so sites fall back to regular HTTPS that can actually be inspected. Some sites may feel slightly slower.\n• See the README for full setup steps.")
-                    .font(.body)
-                    .multilineTextAlignment(.center)
-                    .padding()
-                Button("I understand - Enable", action: onEnable)
-                    .buttonStyle(.borderedProminent)
-                    .tint(AppColors.warning)
-                Button("Cancel", role: .cancel, action: onCancel)
+                Text("Before you enable")
+                    .font(.title2.weight(.bold))
+                Text("mDNSShark will act as a TLS proxy for all HTTPS traffic.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
             }
-            .padding()
-            .navigationTitle("TLS Warning")
-            .navigationBarTitleDisplayMode(.inline)
+
+            VStack(alignment: .leading, spacing: 16) {
+                ForEach(points, id: \.text) { point in
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: point.icon)
+                            .font(.body)
+                            .foregroundColor(AppColors.info)
+                            .frame(width: 24)
+                        Text(point.text)
+                            .font(.subheadline)
+                    }
+                }
+            }
+
+            Spacer()
+
+            VStack(spacing: 8) {
+                Button(action: onEnable) {
+                    Text("Enable TLS Inspection")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .tint(AppColors.warning)
+                Button("Cancel", role: .cancel, action: onCancel)
+                    .controlSize(.large)
+            }
         }
+        .padding(24)
     }
 }

@@ -85,6 +85,11 @@ final class PurchaseManager: ObservableObject {
                 logger.error("loadProducts: StoreKit returned no product for \(stillMissing); check the scheme's StoreKit Configuration is active for this run destination")
             }
             productsLoaded = products[TLSInspectionProduct.monthly] != nil
+            // Eligibility is otherwise only computed in refreshEntitlements, which can
+            // run before products exist and leave the gate hiding a trial Apple will offer.
+            if let sub = products[TLSInspectionProduct.monthly]?.subscription {
+                trialEligible = await sub.isEligibleForIntroOffer
+            }
         } catch {
             logger.error("loadProducts: \(error.localizedDescription) (\(String(describing: error)))")
             if reportErrors { lastError = error.localizedDescription }
@@ -95,20 +100,37 @@ final class PurchaseManager: ObservableObject {
 
     var monthlyPrice: String? { products[TLSInspectionProduct.monthly]?.displayPrice }
 
-    /// e.g. "3 days"; nil unless the subscription has a free-trial introductory offer.
+    /// Store-provided subscription title, e.g. "TLS Inspection Monthly".
+    var productName: String? { products[TLSInspectionProduct.monthly]?.displayName }
+
+    /// Billing period from the Store, e.g. "month" or "3 months".
+    var periodText: String? {
+        guard let period = products[TLSInspectionProduct.monthly]?.subscription?.subscriptionPeriod else { return nil }
+        let unit: String
+        switch period.unit {
+        case .day:   unit = "day"
+        case .week:  unit = "week"
+        case .month: unit = "month"
+        case .year:  unit = "year"
+        @unknown default: return nil
+        }
+        return period.value == 1 ? unit : "\(period.value) \(unit)s"
+    }
+
+    /// e.g. "3-day free trial"; nil unless the subscription has a free-trial introductory offer.
     var trialLengthText: String? {
         guard let offer = products[TLSInspectionProduct.monthly]?.subscription?.introductoryOffer,
               offer.paymentMode == .freeTrial else { return nil }
         let n = offer.period.value * offer.periodCount
         let unit: String
         switch offer.period.unit {
-        case .day:   unit = n == 1 ? "day" : "days"
-        case .week:  unit = n == 1 ? "week" : "weeks"
-        case .month: unit = n == 1 ? "month" : "months"
-        case .year:  unit = n == 1 ? "year" : "years"
+        case .day:   unit = "day"
+        case .week:  unit = "week"
+        case .month: unit = "month"
+        case .year:  unit = "year"
         @unknown default: return nil
         }
-        return "\(n) \(unit)"
+        return "\(n)-\(unit) free trial"
     }
 
     // MARK: - Actions

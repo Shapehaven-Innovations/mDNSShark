@@ -9,7 +9,7 @@ mDNSShark is an **open-source** iPhone app that shows what is on your local netw
 Every scan runs on your phone, with **no external servers**. The one exception is a button you tap yourself: **Refresh CISA Data** on the Security tab downloads CISA's public vulnerability catalog and asks NIST's National Vulnerability Database (NVD) about specific device vendors. Your device list and scan results are never uploaded, but those NVD queries do name vendors seen on your network (see [Security Assessment](#security-assessment)). There is no telemetry, no analytics, and no trackers. The only permission the app needs is local network access.
 
 <details>
-<summary>## Terms in a Hurry</summary>
+<summary><strong>Terms in a Hurry</strong></summary>
 
 - **TCP**: reliable, ordered connections (web pages, SSH). **UDP**: fire-and-forget packets (DNS, video calls).
 - **SYN / SYN-ACK / ACK**: the three steps of a TCP handshake. **FIN**: "I'm done sending." **RST**: "abort now."
@@ -77,7 +77,7 @@ To turn it on, jump to [Setting Up TLS Inspection](#setting-up-tls-inspection).
 
 ### Which Mode Do I Want?
 
-Two Settings toggles combine: **Include LAN traffic in capture** and **Enable TLS Inspection**. Internet works in all four modes.
+Two Settings toggles combine: **Include LAN traffic** and **Enable TLS Inspection**. Internet works in all four modes.
 
 | Mode | What is captured | What is not | Use it for |
 | ---- | ---------------- | ----------- | ---------- |
@@ -141,7 +141,7 @@ Settings offers three ways to get a CA:
 
 **Installing and trusting the CA:**
 
-1. In mDNSShark, go to **Settings → TLS Inspection** and tap **Generate CA…**.
+1. In mDNSShark, go to **Settings → TLS Inspection**, subscribe (the free trial starts here), then tap **Generate CA…**. The certificate buttons appear once you have access.
 2. In the share sheet, choose **Save to Files**.
 3. In the **Files** app, tap the saved `mDNSShark-CA.cer`. iOS shows "Profile Downloaded".
 4. Go to iOS **Settings → General → VPN & Device Management**, tap the mDNSShark CA profile, and tap **Install**.
@@ -150,7 +150,7 @@ Settings offers three ways to get a CA:
 
 A warning sheet appears the first time you enable the feature.
 
-The iOS trust profile survives rebuilds and reinstalls. If Settings shows "No certificate installed" after a reinstall, generate or import again and repeat from step 3. A new CA is a different certificate, and the old profile won't trust its leaves.
+The iOS trust profile survives rebuilds and reinstalls. If Settings shows "Install a CA certificate to enable" after a reinstall, generate or import again and repeat from step 3. A new CA is a different certificate, and the old profile won't trust its leaves.
 
 ### TLS Bypass List
 
@@ -160,7 +160,7 @@ Apps that use certificate pinning (banking, health, government) fail if intercep
 - Any connection whose SNI ends with a listed suffix is passed through uninspected.
 - Swipe left to delete an entry.
 
-**Always add Apple's own services.** `push.apple.com` (APNs), `icloud.com` (including Private Relay), and `apple-native-relay.apple.com` (Private Relay's egress) are certificate-pinned and resist MITM by design. This is not a bug in `TLSInterceptor.swift`. Without these entries, their failed sessions flood the Settings drop count (`apple-native-relay.apple.com` fails with `-9830: errSSLIllegalParam`) and bury real errors. The bypass list **can be cleared by a rebuild or reinstall**, so re-add all three after a fresh install.
+**Always add Apple's own services.** `push.apple.com` (APNs), `icloud.com` (including Private Relay), and `apple-native-relay.apple.com` (Private Relay's egress) are certificate-pinned and resist MITM by design. This is not a bug in `TLSInterceptor.swift`. Without these entries, their failed sessions flood the extension's drop log (`apple-native-relay.apple.com` fails with `-9830: errSSLIllegalParam`) and bury real errors. The bypass list **can be cleared by a rebuild or reinstall**, so re-add all three after a fresh install.
 
 ### DNS Server
 
@@ -168,7 +168,7 @@ The extension uses configurable upstream DNS resolvers, a primary and a secondar
 
 ### Capture Filters
 
-**Capture Filters** in Settings choose which protocols the capture view shows: `DNS`, `mDNS`, `HTTPS`, `HTTP`, `TCP`, `UDP`, `ICMP`. All are on by default.
+The **Capture** section in Settings has a chip for each protocol the capture view can show: `DNS`, `mDNS`, `HTTPS`, `HTTP`, `TCP`, `UDP`, `ICMP`. Tap a chip to turn it on or off. All are on by default.
 
 <details>
 <summary>Shared settings and certificate storage (for contributors)</summary>
