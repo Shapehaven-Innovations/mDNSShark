@@ -27,10 +27,9 @@ import os
 /// `kDNSServiceErr_PolicyDenied` via `.waiting`, confirmed still true after
 /// a short debounce, means it resolved as denied. A raw multicast
 /// `NWConnection` canary was tried first and rejected: it's gated behind
-/// `com.apple.developer.networking.multicast` (currently unapproved, see
-/// todo.md), so it would never reach `.ready` and would always hit the
-/// timeout below, defeating the point. Bonjour APIs need no such
-/// entitlement.
+/// `com.apple.developer.networking.multicast`, so it would never reach
+/// `.ready` without that entitlement and would hit the timeout below.
+/// Bonjour APIs need no such entitlement.
 enum LocalNetworkPermissionGate {
     private static let logger = Logger(subsystem: "com.mDNSShark", category: "LocalNetworkPermissionGate")
 

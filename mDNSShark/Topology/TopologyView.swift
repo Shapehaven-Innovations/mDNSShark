@@ -34,7 +34,7 @@ struct TopologyView: View {
         let toShow    = pinned + auto
 
         let filtered = toShow.filter { device in
-            let worst = findings.filter { $0.deviceID == device.id }.map(\.severity).max()
+            let worst = findings.filter { $0.deviceID == device.id }.worstDeviceSeverity
             let secStatus: SecurityStatus
             switch worst {
             case .some(.critical):      secStatus = .critical
@@ -259,7 +259,7 @@ struct TopologyView: View {
     private func prioritySorted(_ devices: [DiscoveredDevice], findings: [SecurityFinding]) -> [DiscoveredDevice] {
         func rank(_ d: DiscoveredDevice) -> Int {
             if d.isGateway { return 0 }
-            let worst = findings.filter { $0.deviceID == d.id }.map(\.severity).max()
+            let worst = findings.filter { $0.deviceID == d.id }.worstDeviceSeverity
             if worst == .critical { return 1 }
             if worst == .warning  { return 2 }
             switch d.deviceType {

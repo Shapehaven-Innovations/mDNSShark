@@ -1,8 +1,8 @@
 {
   "title": "CISA KEV Snapshot - mDNSShark referenced subset",
-  "catalogVersion": "2026.09.27",
-  "dateReleased": "2026-09-27T21:30:35.5521Z",
-  "snapshotDate": "2026-09-27",
+  "catalogVersion": "2026.10.04",
+  "dateReleased": "2026-10-04T18:52:56.0635Z",
+  "snapshotDate": "2026-10-05",
   "vulnerabilities": [
     {
       "cveID": "CVE-2010-5330",
@@ -31,6 +31,20 @@
       "product": "DIR-600 Router",
       "vulnerabilityName": "D-Link DIR-600 Router Cross-Site Request Forgery (CSRF) Vulnerability",
       "shortDescription": "D-Link DIR-600 routers contain a cross-site request forgery (CSRF) vulnerability that allows an attacker to change router configurations by hijacking an existing administrator session."
+    },
+    {
+      "cveID": "CVE-2014-4404",
+      "vendorProject": "Apple",
+      "product": "OS X",
+      "vulnerabilityName": "Apple OS X Heap-Based Buffer Overflow Vulnerability",
+      "shortDescription": "Heap-based buffer overflow in IOHIDFamily in Apple OS X, which affects, iOS before 8 and Apple TV before 7, allows attackers to execute arbitrary code in a privileged context."
+    },
+    {
+      "cveID": "CVE-2015-1130",
+      "vendorProject": "Apple",
+      "product": "OS X",
+      "vulnerabilityName": "Apple OS X Authentication Bypass Vulnerability",
+      "shortDescription": "The XPC implementation in Admin Framework in Apple OS X before 10.10.3 allows local users to bypass authentication and obtain admin privileges."
     },
     {
       "cveID": "CVE-2015-1187",
@@ -80,6 +94,27 @@
       "product": "DSL-2750B Devices",
       "vulnerabilityName": "D-Link DSL-2750B Devices Command Injection Vulnerability",
       "shortDescription": "D-Link DSL-2750B devices contain a command injection vulnerability that allows remote, unauthenticated command injection via the login.cgi cli parameter."
+    },
+    {
+      "cveID": "CVE-2016-4655",
+      "vendorProject": "Apple",
+      "product": "iOS",
+      "vulnerabilityName": "Apple iOS Information Disclosure Vulnerability",
+      "shortDescription": "The Apple iOS kernel allows attackers to obtain sensitive information from memory via a crafted application."
+    },
+    {
+      "cveID": "CVE-2016-4656",
+      "vendorProject": "Apple",
+      "product": "iOS",
+      "vulnerabilityName": "Apple iOS Memory Corruption Vulnerability",
+      "shortDescription": "A memory corruption vulnerability in Apple iOS kernel allows attackers to execute code in a privileged context or cause a denial-of-service (DoS) via a crafted application."
+    },
+    {
+      "cveID": "CVE-2016-4657",
+      "vendorProject": "Apple",
+      "product": "iOS",
+      "vulnerabilityName": "Apple iOS Webkit Memory Corruption Vulnerability",
+      "shortDescription": "Apple iOS WebKit contains a memory corruption vulnerability that allows attackers to execute remote code or cause a denial-of-service (DoS) via a crafted web site. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
     },
     {
       "cveID": "CVE-2016-6277",
@@ -187,6 +222,13 @@
       "shortDescription": "A cross-site scripting vulnerability affecting QNAP NAS File Station could allow remote attackers to inject malicious code."
     },
     {
+      "cveID": "CVE-2018-4344",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Memory Corruption Vulnerability",
+      "shortDescription": "Apple iOS, macOS, tvOS, and watchOS contain a memory corruption vulnerability which can allow for code execution."
+    },
+    {
       "cveID": "CVE-2018-6530",
       "vendorProject": "D-Link",
       "product": "Multiple Routers",
@@ -243,6 +285,13 @@
       "shortDescription": "D-Link DWL-2600AP access point contains an authenticated command injection vulnerability via the Save Configuration functionality in the Web interface, using shell metacharacters in the admin.cgi?action=config_save configBackup or downloadServerip parameter."
     },
     {
+      "cveID": "CVE-2019-6223",
+      "vendorProject": "Apple",
+      "product": "iOS and macOS",
+      "vulnerabilityName": "Apple iOS and macOS Group Facetime Vulnerability",
+      "shortDescription": "Apple iOS and macOS Group FaceTime contains an unspecified vulnerability where the call initiator can cause the recipient's Apple device to answer unknowingly or without user interaction."
+    },
+    {
       "cveID": "CVE-2019-7192",
       "vendorProject": "QNAP",
       "product": "Photo Station",
@@ -269,6 +318,41 @@
       "product": "Photo Station",
       "vulnerabilityName": "QNAP Photo Station Path Traversal Vulnerability",
       "shortDescription": "QNAP devices running Photo Station contain an external control of file name or path vulnerability allowing remote attackers to access or modify system files."
+    },
+    {
+      "cveID": "CVE-2019-7286",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Memory Corruption Vulnerability",
+      "shortDescription": "Apple iOS, macOS, watchOS, and tvOS contain a memory corruption vulnerability that could allow for privilege escalation."
+    },
+    {
+      "cveID": "CVE-2019-7287",
+      "vendorProject": "Apple",
+      "product": "iOS",
+      "vulnerabilityName": "Apple iOS Memory Corruption Vulnerability",
+      "shortDescription": "Apple iOS contains a memory corruption vulnerability which could allow an attacker to perform remote code execution."
+    },
+    {
+      "cveID": "CVE-2019-8506",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Type Confusion Vulnerability",
+      "shortDescription": "A type confusion issue affecting multiple Apple products allows processing of maliciously crafted web content, leading to arbitrary code execution."
+    },
+    {
+      "cveID": "CVE-2019-8526",
+      "vendorProject": "Apple",
+      "product": "macOS",
+      "vulnerabilityName": "Apple macOS Use-After-Free Vulnerability",
+      "shortDescription": "Apple macOS contains a use-after-free vulnerability that could allow for privilege escalation."
+    },
+    {
+      "cveID": "CVE-2019-8605",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Use-After-Free Vulnerability",
+      "shortDescription": "A use-after-free vulnerability in Apple iOS, macOS, tvOS, and watchOS could allow a malicious application to execute code with system privileges."
     },
     {
       "cveID": "CVE-2020-10987",
@@ -334,6 +418,27 @@
       "shortDescription": "Netgear JGS516PE devices contain a missing function level access control vulnerability."
     },
     {
+      "cveID": "CVE-2020-27930",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Memory Corruption Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, and watchOS FontParser contain a memory corruption vulnerability which may allow for code execution when processing maliciously crafted front."
+    },
+    {
+      "cveID": "CVE-2020-27932",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Type Confusion Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, and watchOS contain a type confusion vulnerability that may allow a malicious application to execute code with kernel privileges."
+    },
+    {
+      "cveID": "CVE-2020-27950",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Memory Initialization Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, and watchOS contain a memory initialization vulnerability that may allow a malicious application to disclose kernel memory."
+    },
+    {
       "cveID": "CVE-2020-29557",
       "vendorProject": "D-Link",
       "product": "DIR-825 R1 Devices",
@@ -346,6 +451,13 @@
       "product": "Multiple Products",
       "vulnerabilityName": "Zyxel Multiple Products Use of Hard-Coded Credentials Vulnerability",
       "shortDescription": "Zyxel firewalls (ATP, USG, VM) and AP Controllers (NXC2500 and NXC5500) contain a use of hard-coded credentials vulnerability in an undocumented account (\"zyfwp\") with an unchangeable password."
+    },
+    {
+      "cveID": "CVE-2020-3837",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Memory Corruption Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, tvOS, and watchOS contain a memory corruption vulnerability that could allow an application to execute code with kernel privileges."
     },
     {
       "cveID": "CVE-2020-8515",
@@ -367,6 +479,76 @@
       "product": "DIR-610 Devices",
       "vulnerabilityName": "D-Link DIR-610 Devices Remote Command Execution",
       "shortDescription": "D-Link DIR-610 devices allow remote code execution via the cmd parameter to command.php."
+    },
+    {
+      "cveID": "CVE-2020-9818",
+      "vendorProject": "Apple",
+      "product": "iOS, iPadOS, and watchOS",
+      "vulnerabilityName": "Apple iOS, iPadOS, and watchOS Out-of-Bounds Write Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, and watchOS Mail contains an out-of-bounds write vulnerability which may allow memory modification or application termination when processing a maliciously crafted mail message."
+    },
+    {
+      "cveID": "CVE-2020-9819",
+      "vendorProject": "Apple",
+      "product": "iOS, iPadOS, and watchOS",
+      "vulnerabilityName": "Apple iOS, iPadOS, and watchOS Memory Corruption Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, and watchOS Mail contains a memory corruption vulnerability that may allow heap corruption when processing a maliciously crafted mail message."
+    },
+    {
+      "cveID": "CVE-2020-9859",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Code Execution Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, watchOS, and tvOS contain an unspecified vulnerability that may allow an application to execute code with kernel privileges."
+    },
+    {
+      "cveID": "CVE-2020-9907",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Memory Corruption Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, and tvOS contain a memory corruption vulnerability that could allow an application to execute code with kernel privileges."
+    },
+    {
+      "cveID": "CVE-2020-9934",
+      "vendorProject": "Apple",
+      "product": "iOS, iPadOS, and macOS",
+      "vulnerabilityName": "Apple iOS, iPadOS, and macOS Input Validation Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, and macOS contain an unspecified vulnerability involving input validation which can allow a local attacker to view sensitive user information."
+    },
+    {
+      "cveID": "CVE-2021-1782",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Race Condition Vulnerability",
+      "shortDescription": "Apple iOS, iPadOs, macOS, watchOS, and tvOS contain a race condition vulnerability that may allow a malicious application to elevate privileges."
+    },
+    {
+      "cveID": "CVE-2021-1789",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Type Confusion Vulnerability",
+      "shortDescription": "A type confusion issue affecting multiple Apple products allows processing of maliciously crafted web content, leading to arbitrary code execution."
+    },
+    {
+      "cveID": "CVE-2021-1870",
+      "vendorProject": "Apple",
+      "product": "iOS, iPadOS, and macOS",
+      "vulnerabilityName": "Apple iOS, iPadOS, and macOS WebKit Remote Code Execution Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, and macOS WebKit contain an unspecified logic vulnerability that allows a remote attacker to execute code. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
+      "cveID": "CVE-2021-1871",
+      "vendorProject": "Apple",
+      "product": "iOS, iPadOS, and macOS",
+      "vulnerabilityName": "Apple iOS, iPadOS, and macOS WebKit Remote Code Execution Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, and macOS WebKit contain an unspecified logic vulnerability that allows a remote attacker to execute code. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
+      "cveID": "CVE-2021-1879",
+      "vendorProject": "Apple",
+      "product": "iOS, iPadOS, and watchOS",
+      "vulnerabilityName": "Apple iOS, iPadOS, and watchOS WebKit Cross-Site Scripting (XSS) Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, and watchOS WebKit contain an unspecified vulnerability that allows for universal cross-site scripting (XSS) when processing maliciously crafted web content. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
     },
     {
       "cveID": "CVE-2021-20090",
@@ -395,6 +577,125 @@
       "product": "Network Attached Storage (NAS)",
       "vulnerabilityName": "QNAP NAS Improper Authorization Vulnerability",
       "shortDescription": "QNAP NAS running HBS 3 contains an improper authorization vulnerability which can allow remote attackers to log in to a device."
+    },
+    {
+      "cveID": "CVE-2021-30657",
+      "vendorProject": "Apple",
+      "product": "macOS",
+      "vulnerabilityName": "Apple macOS Unspecified Vulnerability",
+      "shortDescription": "Apple macOS contains an unspecified logic issue in System Preferences that may allow a malicious application to bypass Gatekeeper checks."
+    },
+    {
+      "cveID": "CVE-2021-30661",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products WebKit Storage Use-After-Free Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, tvOS, watchOS, and Safari WebKit Storage contain a use-after-free vulnerability that leads to code execution when processing maliciously crafted web content. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
+      "cveID": "CVE-2021-30663",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products WebKit Integer Overflow Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, tvOS, and Safari WebKit contain an integer overflow vulnerability that leads to code execution when processing maliciously crafted web content. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
+      "cveID": "CVE-2021-30665",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products WebKit Memory Corruption Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, watchOS, and tvOS WebKit contain a memory corruption vulnerability that leads to code execution when processing maliciously crafted web content. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
+      "cveID": "CVE-2021-30666",
+      "vendorProject": "Apple",
+      "product": "iOS",
+      "vulnerabilityName": "Apple iOS WebKit Buffer Overflow Vulnerability",
+      "shortDescription": "Apple iOS WebKit contains a buffer-overflow vulnerability that leads to code execution when processing maliciously crafted web content. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
+      "cveID": "CVE-2021-30713",
+      "vendorProject": "Apple",
+      "product": "macOS",
+      "vulnerabilityName": "Apple macOS Unspecified Vulnerability",
+      "shortDescription": "Apple macOS Transparency, Consent, and Control (TCC) contains an unspecified permissions issue which may allow a malicious application to bypass privacy preferences."
+    },
+    {
+      "cveID": "CVE-2021-30761",
+      "vendorProject": "Apple",
+      "product": "iOS",
+      "vulnerabilityName": "Apple iOS WebKit Memory Corruption Vulnerability",
+      "shortDescription": "Apple iOS WebKit contains a memory corruption vulnerability that leads to code execution when processing maliciously crafted web content. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
+      "cveID": "CVE-2021-30762",
+      "vendorProject": "Apple",
+      "product": "iOS",
+      "vulnerabilityName": "Apple iOS WebKit Use-After-Free Vulnerability",
+      "shortDescription": "Apple iOS WebKit contains a use-after-free vulnerability that leads to code execution when processing maliciously crafted web content. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
+      "cveID": "CVE-2021-30807",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Memory Corruption Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, and watchOS IOMobileFrameBuffer contain a memory corruption vulnerability which may allow an application to execute code with kernel privileges."
+    },
+    {
+      "cveID": "CVE-2021-30858",
+      "vendorProject": "Apple",
+      "product": "iOS, iPadOS, and macOS",
+      "vulnerabilityName": "Apple iOS, iPadOS, macOS Use-After-Free Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, and macOS WebKit contain a use-after-free vulnerability that leads to code execution when processing maliciously crafted web content. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
+      "cveID": "CVE-2021-30860",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Integer Overflow Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, and watchOS CoreGraphics contain an integer overflow vulnerability which may allow code execution when processing a maliciously crafted PDF. The vulnerability is also known under the moniker of FORCEDENTRY."
+    },
+    {
+      "cveID": "CVE-2021-30869",
+      "vendorProject": "Apple",
+      "product": "iOS, iPadOS, and macOS",
+      "vulnerabilityName": "Apple iOS, iPadOS, and macOS Type Confusion Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, and macOS contain a type confusion vulnerability in the XNU which may allow a malicious application to execute code with kernel privileges."
+    },
+    {
+      "cveID": "CVE-2021-30883",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Memory Corruption Vulnerability",
+      "shortDescription": "Apple iOS, macOS, watchOS, and tvOS contain a memory corruption vulnerability that could allow for remote code execution."
+    },
+    {
+      "cveID": "CVE-2021-30900",
+      "vendorProject": "Apple",
+      "product": "iOS, iPadOS, and macOS",
+      "vulnerabilityName": "Apple iOS, iPadOS, and macOS Out-of-Bounds Write Vulnerability",
+      "shortDescription": "Apple GPU drivers, included in iOS, iPadOS, and macOS, contain an out-of-bounds write vulnerability that may allow a malicious application to execute code with kernel privileges."
+    },
+    {
+      "cveID": "CVE-2021-30952",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Integer Overflow or Wraparound Vulnerability",
+      "shortDescription": "Apple tvOS, macOS, Safari, iPadOS and watchOS contain an integer overflow or wraparound vulnerability due to the processing of maliciously crafted web content that may lead to arbitrary code execution."
+    },
+    {
+      "cveID": "CVE-2021-30983",
+      "vendorProject": "Apple",
+      "product": "iOS and iPadOS",
+      "vulnerabilityName": "Apple iOS and iPadOS Buffer Overflow Vulnerability",
+      "shortDescription": "Apple iOS and iPadOS contain a buffer overflow vulnerability that could allow an application to execute code with kernel privileges."
+    },
+    {
+      "cveID": "CVE-2021-31010",
+      "vendorProject": "Apple",
+      "product": "iOS, macOS, watchOS",
+      "vulnerabilityName": "Apple iOS, macOS, watchOS Sandbox Bypass Vulnerability",
+      "shortDescription": "In affected versions of Apple iOS, macOS, and watchOS, a sandboxed process may be able to circumvent sandbox restrictions."
     },
     {
       "cveID": "CVE-2021-31755",
@@ -453,6 +754,34 @@
       "shortDescription": "A remote code execution vulnerability exists in all series H/W revisions routers via the DDNS function in ncc2 binary file."
     },
     {
+      "cveID": "CVE-2022-22587",
+      "vendorProject": "Apple",
+      "product": "iOS and macOS",
+      "vulnerabilityName": "Apple Memory Corruption Vulnerability",
+      "shortDescription": "Apple IOMobileFrameBuffer contains a memory corruption vulnerability which can allow a malicious application to execute arbitrary code with kernel privileges."
+    },
+    {
+      "cveID": "CVE-2022-22620",
+      "vendorProject": "Apple",
+      "product": "iOS, iPadOS, and macOS",
+      "vulnerabilityName": "Apple iOS, iPadOS, and macOS Webkit Use-After-Free Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, and macOS WebKit contain a use-after-free vulnerability that leads to code execution when processing maliciously crafted web content. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
+      "cveID": "CVE-2022-22674",
+      "vendorProject": "Apple",
+      "product": "macOS",
+      "vulnerabilityName": "Apple macOS Out-of-Bounds Read Vulnerability",
+      "shortDescription": "macOS Monterey contains an out-of-bounds read vulnerability that could allow an application to read kernel memory."
+    },
+    {
+      "cveID": "CVE-2022-22675",
+      "vendorProject": "Apple",
+      "product": "macOS",
+      "vulnerabilityName": "Apple macOS Out-of-Bounds Write Vulnerability",
+      "shortDescription": "macOS Monterey contains an out-of-bounds write vulnerability that could allow an application to execute arbitrary code with kernel privileges."
+    },
+    {
       "cveID": "CVE-2022-24990",
       "vendorProject": "TerraMaster",
       "product": "TerraMaster OS",
@@ -481,6 +810,27 @@
       "shortDescription": "A command injection vulnerability in the CGI program of some Zyxel firewall versions could allow an attacker to modify specific files and then execute some OS commands on a vulnerable device."
     },
     {
+      "cveID": "CVE-2022-32893",
+      "vendorProject": "Apple",
+      "product": "iOS and macOS",
+      "vulnerabilityName": "Apple iOS and macOS Out-of-Bounds Write Vulnerability",
+      "shortDescription": "Apple iOS and macOS contain an out-of-bounds write vulnerability that could allow for remote code execution when processing malicious crafted web content."
+    },
+    {
+      "cveID": "CVE-2022-32894",
+      "vendorProject": "Apple",
+      "product": "iOS and macOS",
+      "vulnerabilityName": "Apple iOS and macOS Out-of-Bounds Write Vulnerability",
+      "shortDescription": "Apple iOS and macOS contain an out-of-bounds write vulnerability that could allow an application to execute code with kernel privileges."
+    },
+    {
+      "cveID": "CVE-2022-32917",
+      "vendorProject": "Apple",
+      "product": "iOS, iPadOS, and macOS",
+      "vulnerabilityName": "Apple iOS, iPadOS, and macOS Remote Code Execution Vulnerability",
+      "shortDescription": "Apple kernel, which is included in iOS, iPadOS, and macOS, contains an unspecified vulnerability where an application may be able to execute code with kernel privileges."
+    },
+    {
       "cveID": "CVE-2022-37055",
       "vendorProject": "D-Link",
       "product": "Routers",
@@ -495,11 +845,46 @@
       "shortDescription": "D-Link DNR-322L contains a download of code without integrity check vulnerability that could allow an authenticated attacker to execute OS level commands on the device. The impacted products could be end-of-life (EoL) and/or end-of-service (EoS). Users should discontinue product utilization."
     },
     {
+      "cveID": "CVE-2022-42827",
+      "vendorProject": "Apple",
+      "product": "iOS and iPadOS",
+      "vulnerabilityName": "Apple iOS and iPadOS Out-of-Bounds Write Vulnerability",
+      "shortDescription": "Apple iOS and iPadOS kernel contain an out-of-bounds write vulnerability which can allow an application to perform code execution with kernel privileges."
+    },
+    {
+      "cveID": "CVE-2022-42856",
+      "vendorProject": "Apple",
+      "product": "iOS",
+      "vulnerabilityName": "Apple iOS Type Confusion Vulnerability",
+      "shortDescription": "Apple iOS contains a type confusion vulnerability when processing maliciously crafted web content leading to code execution."
+    },
+    {
+      "cveID": "CVE-2022-48503",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Unspecified Vulnerability",
+      "shortDescription": "Apple macOS, iOS, tvOS, Safari, and watchOS contain an unspecified vulnerability in JavaScriptCore that when processing web content may lead to arbitrary code execution. The impacted product could be end-of-life (EoL) and/or end-of-service (EoS). Users should discontinue product utilization."
+    },
+    {
+      "cveID": "CVE-2022-48618",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Memory Corruption Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, tvOS, and watchOS contain a time-of-check/time-of-use (TOCTOU) memory corruption vulnerability that allows an attacker with read and write capabilities to bypass Pointer Authentication."
+    },
+    {
       "cveID": "CVE-2023-1389",
       "vendorProject": "TP-Link",
       "product": "Archer AX21",
       "vulnerabilityName": "TP-Link Archer AX-21 Command Injection Vulnerability",
       "shortDescription": "TP-Link Archer AX-21 contains a command injection vulnerability that allows for remote code execution."
+    },
+    {
+      "cveID": "CVE-2023-23529",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products WebKit Type Confusion Vulnerability",
+      "shortDescription": "Apple iOS, MacOS, Safari and iPadOS WebKit contain a type confusion vulnerability that leads to code execution when processing maliciously crafted web content. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
     },
     {
       "cveID": "CVE-2023-25280",
@@ -516,11 +901,67 @@
       "shortDescription": "Multiple Zyxel network-attached storage (NAS) devices contain a pre-authentication command injection vulnerability that could allow an unauthenticated attacker to execute commands remotely via a crafted HTTP request."
     },
     {
+      "cveID": "CVE-2023-28204",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products WebKit Out-of-Bounds Read Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, tvOS, watchOS, and Safari WebKit contain an out-of-bounds read vulnerability that may disclose sensitive information when processing maliciously crafted web content. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
+      "cveID": "CVE-2023-28205",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products WebKit Use-After-Free Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, and Safari WebKit contain a use-after-free vulnerability that leads to code execution when processing maliciously crafted web content. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
+      "cveID": "CVE-2023-28206",
+      "vendorProject": "Apple",
+      "product": "iOS, iPadOS, and macOS",
+      "vulnerabilityName": "Apple iOS, iPadOS, and macOS IOSurfaceAccelerator Out-of-Bounds Write Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, and macOS IOSurfaceAccelerator contain an out-of-bounds write vulnerability that allows an app to execute code with kernel privileges."
+    },
+    {
       "cveID": "CVE-2023-28771",
       "vendorProject": "Zyxel",
       "product": "Multiple Firewalls",
       "vulnerabilityName": "Zyxel Multiple Firewalls OS Command Injection Vulnerability",
       "shortDescription": "Zyxel ATP, USG FLEX, VPN, and ZyWALL/USG firewalls allow for improper error message handling which could allow an unauthenticated attacker to execute OS commands remotely by sending crafted packets to an affected device."
+    },
+    {
+      "cveID": "CVE-2023-32373",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products WebKit Use-After-Free Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, tvOS, watchOS, and Safari WebKit contain a use-after-free vulnerability that leads to code execution when processing maliciously crafted web content. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
+      "cveID": "CVE-2023-32409",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products WebKit Sandbox Escape Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, tvOS, watchOS, and Safari WebKit contain an unspecified vulnerability that can allow a remote attacker to break out of the Web Content sandbox. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
+      "cveID": "CVE-2023-32434",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Integer Overflow Vulnerability",
+      "shortDescription": "Apple iOS. iPadOS, macOS, and watchOS contain an integer overflow vulnerability that could allow an application to execute code with kernel privileges."
+    },
+    {
+      "cveID": "CVE-2023-32435",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products WebKit Memory Corruption Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, and Safari WebKit contain a memory corruption vulnerability that leads to code execution when processing maliciously crafted web content. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
+      "cveID": "CVE-2023-32439",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products WebKit Type Confusion Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, and Safari WebKit contain a type confusion vulnerability that leads to code execution when processing maliciously crafted web content. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
     },
     {
       "cveID": "CVE-2023-33009",
@@ -544,11 +985,102 @@
       "shortDescription": "TP-Link TL-WR940N V2/V4, TL-WR841N V8/V10, and TL-WR740N V1/V2 contain a command injection vulnerability via the component /userRpm/WlanNetworkRpm. The impacted products could be end-of-life (EoL) and/or end-of-service (EoS). Users should discontinue product utilization."
     },
     {
+      "cveID": "CVE-2023-37450",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products WebKit Code Execution Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, and Safari WebKit contain an unspecified vulnerability that leads to code execution when processing maliciously crafted web content. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
+      "cveID": "CVE-2023-38606",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Kernel Unspecified Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, tvOS, and watchOS contain an unspecified vulnerability allowing an app to modify a sensitive kernel state."
+    },
+    {
       "cveID": "CVE-2023-39780",
       "vendorProject": "ASUS",
       "product": "RT-AX55 Routers",
       "vulnerabilityName": "ASUS RT-AX55 Routers OS Command Injection Vulnerability",
       "shortDescription": "ASUS RT-AX55 devices contain an OS command injection vulnerability that could allow a remote, authenticated attacker to execute arbitrary commands. As represented by CVE-2023-41346."
+    },
+    {
+      "cveID": "CVE-2023-41061",
+      "vendorProject": "Apple",
+      "product": "iOS, iPadOS, and watchOS",
+      "vulnerabilityName": "Apple iOS, iPadOS, and watchOS Wallet Code Execution Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, and watchOS contain an unspecified vulnerability due to a validation issue affecting Wallet in which a maliciously crafted attachment may result in code execution. This vulnerability was chained with CVE-2023-41064."
+    },
+    {
+      "cveID": "CVE-2023-41064",
+      "vendorProject": "Apple",
+      "product": "iOS, iPadOS, and macOS",
+      "vulnerabilityName": "Apple iOS, iPadOS, and macOS ImageIO Buffer Overflow Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, and macOS contain a buffer overflow vulnerability in ImageIO when processing a maliciously crafted image, which may lead to code execution. This vulnerability was chained with CVE-2023-41061."
+    },
+    {
+      "cveID": "CVE-2023-41974",
+      "vendorProject": "Apple",
+      "product": "iOS and iPadOS",
+      "vulnerabilityName": "Apple iOS and iPadOS Use-After-Free Vulnerability",
+      "shortDescription": "Apple iOS and iPadOS contain a use-after-free vulnerability. An app may be able to execute arbitrary code with kernel privileges."
+    },
+    {
+      "cveID": "CVE-2023-41990",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Code Execution Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, tvOS, and watchOS contain an unspecified vulnerability that allows for code execution when processing a font file."
+    },
+    {
+      "cveID": "CVE-2023-41991",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Improper Certificate Validation Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, and watchOS contain an improper certificate validation vulnerability that can allow a malicious app to bypass signature validation."
+    },
+    {
+      "cveID": "CVE-2023-41992",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Kernel Privilege Escalation Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, and watchOS contain an unspecified vulnerability that allows for local privilege escalation."
+    },
+    {
+      "cveID": "CVE-2023-41993",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products WebKit Code Execution Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, and Safari WebKit contain an unspecified vulnerability that leads to code execution when processing maliciously crafted web content. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
+      "cveID": "CVE-2023-42824",
+      "vendorProject": "Apple",
+      "product": "iOS and iPadOS",
+      "vulnerabilityName": "Apple iOS and iPadOS Kernel Privilege Escalation Vulnerability",
+      "shortDescription": "Apple iOS and iPadOS contain an unspecified vulnerability that allows for local privilege escalation."
+    },
+    {
+      "cveID": "CVE-2023-42916",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products WebKit Out-of-Bounds Read Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, and Safari WebKit contain an out-of-bounds read vulnerability that may disclose sensitive information when processing maliciously crafted web content. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
+      "cveID": "CVE-2023-42917",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products WebKit Memory Corruption Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, and Safari WebKit contain a memory corruption vulnerability that leads to code execution when processing maliciously crafted web content. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
+      "cveID": "CVE-2023-43000",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple products Use-After-Free Vulnerability",
+      "shortDescription": "Apple macOS, iOS, iPadOS, and Safari 16.6 contain a use-after-free vulnerability due to the processing of maliciously crafted web content that may lead to memory corruption."
     },
     {
       "cveID": "CVE-2023-47565",
@@ -586,6 +1118,27 @@
       "shortDescription": "DrayTek Vigor2960, Vigor300B, and Vigor3900 routers contain an OS command injection vulnerability due to an unknown function of the file /cgi-bin/mainfunction.cgi/apmcfgupload of the component web management interface."
     },
     {
+      "cveID": "CVE-2024-23222",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products WebKit Type Confusion Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, tvOS, and Safari WebKit contain a type confusion vulnerability that leads to code execution when processing maliciously crafted web content. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
+      "cveID": "CVE-2024-23225",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Memory Corruption Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, tvOS, watchOS, and visionOS kernel contain a memory corruption vulnerability that allows an attacker with arbitrary kernel read and write capability to bypass kernel memory protections."
+    },
+    {
+      "cveID": "CVE-2024-23296",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Memory Corruption Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, tvOS, and watchOS RTKit contain a memory corruption vulnerability that allows an attacker with arbitrary kernel read and write capability to bypass kernel memory protections."
+    },
+    {
       "cveID": "CVE-2024-3272",
       "vendorProject": "D-Link",
       "product": "Multiple NAS Devices",
@@ -614,6 +1167,20 @@
       "shortDescription": "Multiple Zyxel DSL CPE devices contain a post-authentication command injection vulnerability in the management commands that could allow an authenticated attacker to execute OS commands via Telnet."
     },
     {
+      "cveID": "CVE-2024-44308",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Code Execution Vulnerability",
+      "shortDescription": "Apple iOS, macOS, and other Apple products contain an unspecified vulnerability when processing maliciously crafted web content that may lead to arbitrary code execution."
+    },
+    {
+      "cveID": "CVE-2024-44309",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Cross-Site Scripting (XSS) Vulnerability",
+      "shortDescription": "Apple iOS, macOS, and other Apple products contain an unspecified vulnerability when processing maliciously crafted web content that may lead to a cross-site scripting (XSS) attack."
+    },
+    {
       "cveID": "CVE-2025-1316",
       "vendorProject": "Edimax",
       "product": "IC-7100 IP Camera",
@@ -621,11 +1188,88 @@
       "shortDescription": "Edimax IC-7100 IP camera contains an OS command injection vulnerability due to improper input sanitization that allows an attacker to achieve remote code execution via specially crafted requests. The impacted product could be end-of-life (EoL) and/or end-of-service (EoS). Users should discontinue product utilization."
     },
     {
+      "cveID": "CVE-2025-24085",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Use-After-Free Vulnerability",
+      "shortDescription": "Apple iOS, macOS, and other Apple products contain a user-after-free vulnerability that could allow a malicious application to elevate privileges."
+    },
+    {
+      "cveID": "CVE-2025-24200",
+      "vendorProject": "Apple",
+      "product": "iOS and iPadOS",
+      "vulnerabilityName": "Apple iOS and iPadOS Incorrect Authorization Vulnerability",
+      "shortDescription": "Apple iOS and iPadOS contains an incorrect authorization vulnerability that allows a physical attacker to disable USB Restricted Mode on a locked device."
+    },
+    {
+      "cveID": "CVE-2025-24201",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products WebKit Out-of-Bounds Write Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, and other Apple products contain an out-of-bounds write vulnerability in WebKit that may allow maliciously crafted web content to break out of Web Content sandbox. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
+    },
+    {
       "cveID": "CVE-2025-29635",
       "vendorProject": "D-Link",
       "product": "DIR-823X",
       "vulnerabilityName": "D-Link DIR-823X Command Injection Vulnerability",
       "shortDescription": "D-Link DIR-823X contains a command injection vulnerability that allows an authorized attacker to execute arbitrary commands on remote devices by sending a POST request to /goform/set_prohibiting via the corresponding function. The impacted product could be end-of-life (EoL) and/or end-of-service (EoS). Users should discontinue product utilization."
+    },
+    {
+      "cveID": "CVE-2025-31200",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Memory Corruption Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, and other Apple products contain a memory corruption vulnerability that allows for code execution when processing an audio stream in a maliciously crafted media file."
+    },
+    {
+      "cveID": "CVE-2025-31201",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Arbitrary Read and Write Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, and other Apple products contain an arbitrary read and write vulnerability that allows an attacker to bypass Pointer Authentication."
+    },
+    {
+      "cveID": "CVE-2025-31277",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Buffer Overflow Vulnerability",
+      "shortDescription": "Apple Safari, iOS, watchOS, visionOS, iPadOS, macOS, and tvOS contain a buffer overflow vulnerability that could allow the processing of maliciously crafted web content which may lead to memory corruption."
+    },
+    {
+      "cveID": "CVE-2025-43200",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Unspecified Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, watchOS, and visionOS, contain an unspecified vulnerability when processing a maliciously crafted photo or video shared via an iCloud Link."
+    },
+    {
+      "cveID": "CVE-2025-43300",
+      "vendorProject": "Apple",
+      "product": "iOS, iPadOS, and macOS",
+      "vulnerabilityName": "Apple iOS, iPadOS, and macOS Out-of-Bounds Write Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, and macOS contain an out-of-bounds write vulnerability in the Image I/O framework."
+    },
+    {
+      "cveID": "CVE-2025-43510",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Improper Locking Vulnerability",
+      "shortDescription": "Apple watchOS, iOS, iPadOS, macOS, visionOS, and tvOS contain an improper locking vulnerability that could allow a malicious application to cause unexpected changes in memory shared between processes."
+    },
+    {
+      "cveID": "CVE-2025-43520",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Classic Buffer Overflow Vulnerability",
+      "shortDescription": "Apple watchOS, iOS, iPadOS, macOS, visionOS, and tvOS contain a classic buffer overflow vulnerability which could allow a malicious application to cause unexpected system termination or write kernel memory."
+    },
+    {
+      "cveID": "CVE-2025-43529",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Use-After-Free WebKit Vulnerability",
+      "shortDescription": "Apple iOS, iPadOS, macOS, and other Apple products contain a use-after-free vulnerability in WebKit. Processing maliciously crafted web content may lead to memory corruption. This vulnerability could impact HTML parsers that use WebKit, including but not limited to Apple Safari and non-Apple products which rely on WebKit for HTML processing."
     },
     {
       "cveID": "CVE-2025-59374",
@@ -640,6 +1284,13 @@
       "product": "Multiple Routers",
       "vulnerabilityName": "TP-Link Archer C7(EU) and TL-WR841N/ND(MS) OS Command Injection Vulnerability",
       "shortDescription": "TP-Link Archer C7(EU) and TL-WR841N/ND(MS) contain an OS command injection vulnerability that exists in the Parental Control page. The impacted products could be end-of-life (EoL) and/or end-of-service (EoS). Users should discontinue product utilization."
+    },
+    {
+      "cveID": "CVE-2026-20700",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Buffer Overflow Vulnerability",
+      "shortDescription": "Apple iOS, macOS, tvOS, watchOS, and visionOS contain an improper restriction of operations within the bounds of a memory buffer vulnerability that could allow an attacker with memory write the capability to execute arbitrary code."
     },
     {
       "cveID": "CVE-2026-34908",
@@ -661,6 +1312,13 @@
       "product": "UniFi OS",
       "vulnerabilityName": "Ubiquiti UniFi OS Improper Input Validation Vulnerability",
       "shortDescription": "Ubiquiti UniFi OS contains an improper input validation vulnerability which could allow a malicious actor with access to the network to conduct command injection."
+    },
+    {
+      "cveID": "CVE-2026-65400",
+      "vendorProject": "Apple",
+      "product": "macOS",
+      "vulnerabilityName": "Apple macOS Improper Authentication Vulnerability",
+      "shortDescription": "Apple macOS contains an improper authentication vulnerability that could allow an attacker on the network to authenticate to Screen Sharing without valid credentials."
     },
     {
       "cveID": "CVE-2026-67277",
@@ -689,6 +1347,13 @@
       "product": "RouterOS",
       "vulnerabilityName": "MikroTik RouterOS Improper Neutralization of Argument Delimiters in a Command Vulnerability",
       "shortDescription": "MikroTik RouterOS contains an improper neutralization of argument delimiters in a command vulnerability which allows an attacker to change the trusted RouterOS policy mask, leading to privilege escalation."
+    },
+    {
+      "cveID": "CVE-2026-86950",
+      "vendorProject": "Apple",
+      "product": "Multiple Products",
+      "vulnerabilityName": "Apple Multiple Products Out-of-Bounds Write Vulnerability",
+      "shortDescription": "Apple iOS, macOS, and iPadOS contain an out-of-bounds write vulnerability in CoreGraphics that may lead to arbitrary code execution."
     }
   ]
 }

@@ -80,3 +80,12 @@ struct SecurityFinding: Identifiable, Equatable {
         self.cveTiers = cveTiers
     }
 }
+
+extension Sequence where Element == SecurityFinding {
+    /// Worst severity from findings about this device itself; vendor advisories are excluded because they flag the manufacturer, not the device.
+    var worstDeviceSeverity: Severity? {
+        filter { $0.source != .vendorAdvisory }.map(\.severity).max()
+    }
+
+    var hasVendorAdvisory: Bool { contains { $0.source == .vendorAdvisory } }
+}

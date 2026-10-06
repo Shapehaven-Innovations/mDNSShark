@@ -52,7 +52,6 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         "_time-machine._tcp",
         "_airport._tcp",
         "_device-info._tcp",
-        "_services._dns-sd._udp",
 
         // MARK: - Printing & Scanning
         "_ipp._tcp",
@@ -150,6 +149,8 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         @Published var port: Int? = nil
         @Published var txtRecords: [String: String]? = nil
         @Published var locationURL: URL? = nil
+        /// Bonjour host name from the resolve (e.g. "Users-MacBook-Pro.local."), shared by every service one host advertises.
+        var hostName: String?
         
         var identifier: String { friendlyName ?? serviceName }
         
@@ -256,18 +257,9 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         for result in results {
             switch result.endpoint {
             case .service(let name, let type, let domain, _):
-                // Never surface this app's own internal Bonjour preflight
-                // probe (LocalNetworkPermissionGate.swift) as a discovered
-                // device: it's a same-device self-advertisement used only
-                // to detect Local Network Privacy's decision, not a real
-                // host. NWBrowser reports service types with a trailing
-                // dot, hence the prefix check. Checked on both `type` AND
-                // `name`: a direct browse of this type reports it in
-                // `type`, but this app's meta-query browse
-                // ("_services._dns-sd._udp", a DNS-SD type-enumeration
-                // query) surfaces discovered type strings in `name`
-                // instead, with `type` fixed to the meta-service string, so
-                // checking only one field lets it slip through the other path.
+                // Never surface this app's own Bonjour preflight probe
+                // (LocalNetworkPermissionGate.swift) as a discovered device.
+                // NWBrowser reports service types with a trailing dot, hence the prefix check.
                 guard !type.hasPrefix("_mdnssharklnp._tcp"),
                       !name.hasPrefix("_mdnssharklnp._tcp") else { continue }
                 DispatchQueue.main.async {
@@ -455,6 +447,7 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         
         DispatchQueue.main.async {
             device.resolvedIPAddress = foundIP
+            device.hostName = sender.hostName
             device.port = sender.port
             self.logger.info("Resolved \(sender.name) to IP: \(foundIP!) on port: \(sender.port)")
         }

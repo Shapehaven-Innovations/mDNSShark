@@ -33,15 +33,10 @@ final class DeviceEnrichmentCoordinator {
     private let limiter = ProbeConcurrencyLimiter(maxConcurrent: 32)
     private let udpPacer = UDPSendPacer(minimumSpacing: .milliseconds(15))
 
-    /// TODO(multicast-entitlement): flip to `true` once
-    /// `com.apple.developer.networking.multicast` is approved and
-    /// restored in both `.entitlements` files (see todo.md). ASUS's reply
-    /// is a UDP broadcast the OS silently drops without that entitlement,
-    /// so `limitedASUSProbe` can never succeed while this is `false`; skip
-    /// firing it at all rather than burning the full `probeTimeout` and a
-    /// `ProbeConcurrencyLimiter` slot on every single scanned host for a
-    /// probe that's guaranteed to fail.
-    private let asusEntitlementAvailable = false
+    /// ASUS's reply is a UDP broadcast the OS drops without
+    /// `com.apple.developer.networking.multicast`, which is now approved and
+    /// present in both `.entitlements` files.
+    private let asusEntitlementAvailable = true
 
     private let ubiquitiProbe = UbiquitiDiscoveryProbe()
     private let asusProbe = ASUSDiscoveryProbe()

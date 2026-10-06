@@ -23,6 +23,16 @@ struct TopologyNodeView: View {
                 Image(systemName: node.device.deviceIcon)
                     .font(.title2).foregroundColor(borderColor)
             }
+            .overlay(alignment: .topTrailing) {
+                if node.device.securityFindings.hasVendorAdvisory {
+                    Image(systemName: "info.circle.fill")
+                        .font(.system(size: 20, weight: .bold))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, AppColors.info)
+                        .background(Circle().fill(Color(.systemBackground)).padding(-2))
+                        .offset(x: 8, y: -8)
+                }
+            }
             Text(node.device.hostname)
                 .font(.system(size: 9, weight: .medium))
                 .lineLimit(1).frame(maxWidth: 72)

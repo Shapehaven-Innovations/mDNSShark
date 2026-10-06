@@ -12,7 +12,7 @@ struct TopologyNode: Identifiable {
 
     init(device: DiscoveredDevice, position: CGPoint = .zero) {
         self.id = device.id; self.device = device; self.position = position
-        let max = device.securityFindings.map { $0.severity }.max()
+        let max = device.securityFindings.worstDeviceSeverity
         switch max {
         case .critical:      self.securityStatus = .critical
         case .warning:       self.securityStatus = .warning

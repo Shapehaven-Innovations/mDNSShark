@@ -117,8 +117,14 @@ final class NetworkScanViewModel: ObservableObject {
 
     private func merge(raw: [NetworkScanner.Device]) -> [DiscoveredDevice] {
         var byIP: [String: DiscoveredDevice] = [:]
+        // One host can resolve to different address families per service (AirPlay IPv6-only, RAOP IPv4-only), so rows that share a host name collapse onto its IPv4.
+        var ipv4ByHost: [String: String] = [:]
         for device in raw {
-            let ip = device.resolvedIPAddress ?? device.serviceName
+            if let host = device.hostName, let ip = device.resolvedIPAddress, !ip.contains(":") { ipv4ByHost[host] = ip }
+        }
+        for device in raw {
+            var ip = device.resolvedIPAddress ?? device.serviceName
+            if ip.contains(":"), let host = device.hostName, let v4 = ipv4ByHost[host] { ip = v4 }
             if var existing = byIP[ip] {
                 let svc = BonjourService(
                     serviceType: device.serviceType,
@@ -131,6 +137,9 @@ final class NetworkScanViewModel: ObservableObject {
                 }
                 if let p = device.port, !existing.openPorts.contains(p) {
                     existing.openPorts.append(p)
+                }
+                if existing.manufacturer == nil {
+                    existing.manufacturer = appleManufacturer(serviceType: device.serviceType, txtRecords: device.txtRecords)
                 }
                 byIP[ip] = existing
                 dispatchDescriptionFetchIfNeeded(ip: ip, locationURL: device.locationURL)
@@ -146,6 +155,7 @@ final class NetworkScanViewModel: ObservableObject {
                    let model = device.txtRecords?["md"], model.localizedCaseInsensitiveContains("eero") {
                     mfr = "eero"
                 }
+                if mfr == nil { mfr = appleManufacturer(serviceType: device.serviceType, txtRecords: device.txtRecords) }
                 let svc = BonjourService(
                     serviceType: device.serviceType,
                     serviceName: device.serviceName,
@@ -216,11 +226,18 @@ final class NetworkScanViewModel: ObservableObject {
         enrichmentCoordinator.enrichGoogleWifi(ip: ip)
     }
 
+    /// AirPlay/RAOP advertise the hardware model ("model" / "am", e.g. "MacBookPro16,2"). Only those rows are
+    /// trusted: NAS boxes put fake Mac models in `_device-info._tcp`, and the service types alone are used by third-party speakers and TVs.
+    private func appleManufacturer(serviceType: String, txtRecords: [String: String]?) -> String? {
+        guard serviceType == "_airplay._tcp" || serviceType == "_raop._tcp",
+              let model = txtRecords?["model"] ?? txtRecords?["am"] else { return nil }
+        let applePrefixes = ["Mac", "iMac", "iPhone", "iPad", "iPod", "AppleTV", "AudioAccessory", "AirPort", "Watch", "RealityDevice"]
+        return applePrefixes.contains(where: { model.hasPrefix($0) }) ? "Apple" : nil
+    }
+
     private func inferOS(serviceType: String, manufacturer: String?, txtRecords: [String: String]? = nil) -> String? {
-        let appleServices: Set<String> = [
-            "_apple-mobdev2._tcp", "_airdrop._tcp", "_airplay._tcp",
-            "_raop._tcp", "_device-info._tcp", "_daap._tcp"
-        ]
+        // Only Apple-exclusive types: AirPlay, RAOP, DAAP and device-info are also used by Sonos, Samsung TVs and NAS boxes.
+        let appleServices: Set<String> = ["_apple-mobdev2._tcp", "_airdrop._tcp"]
         if appleServices.contains(serviceType) { return "Apple" }
         if serviceType == "_googlecast._tcp",
            let model = txtRecords?["md"], !model.isEmpty,

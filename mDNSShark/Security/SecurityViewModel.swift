@@ -76,6 +76,8 @@ final class SecurityViewModel: ObservableObject {
         "_smb._tcp":              (.warning,      "SMB File Sharing Advertised",    "Windows-compatible file sharing is enabled.",                                        "Keep SMB patched. Restrict shares."),
         "_workstation._tcp":      (.warning,      "SMB Workstation Advertised",     "A workstation SMB service is discoverable.",                                         "Ensure SMB shares require authentication."),
         "_http._tcp":             (.informational,"HTTP Service Advertised",        "Unencrypted web service detected.",                                                  "Prefer HTTPS."),
+        "_airplay._tcp":          (.informational,"AirPlay Receiver Advertised",    "This device accepts AirPlay streams from other devices on the network.",             "Limit AirPlay to the current user or turn it off when unused."),
+        "_raop._tcp":             (.informational,"AirPlay Receiver Advertised",    "This device accepts AirPlay streams from other devices on the network.",             "Limit AirPlay to the current user or turn it off when unused."),
         "_hap._tcp":              (.informational,"HomeKit Accessory Present",      "A HomeKit device is on your network.",                                               "Ensure HomeKit uses a secure home hub."),
         "_printer._tcp":          (.informational,"Network Printer Discovered",     "A network printer is available.",                                                    "Keep printer firmware up to date."),
         "_ipp._tcp":              (.informational,"IPP Printer Discovered",         "An IPP-capable printer is discoverable.",                                            "Keep printer firmware up to date.")
@@ -204,13 +206,13 @@ final class SecurityViewModel: ObservableObject {
     var warningFindings:  [SecurityFinding]      { findings.filter { $0.severity == .warning       } }
     var informationalFindings: [SecurityFinding] { findings.filter { $0.severity == .informational } }
 
-    /// Excludes `.vendorAdvisory` findings: a vendor-name match is not a
-    /// confirmed vulnerability on this specific device (no firmware/version
-    /// fingerprinting backs it), so it shouldn't inflate the headline count
-    /// the critical/warning findings above it are meant to represent.
-    var vulnerableDeviceCount: Int {
-        Set(findings.filter { $0.source != .vendorAdvisory }.map { $0.deviceID }).count
+    /// Devices with a warning or critical finding about the device itself. Excludes `.vendorAdvisory` (a
+    /// vendor-name match is not a confirmed vulnerability on this device) and informational findings.
+    var vulnerableDeviceIDs: Set<UUID> {
+        Set(findings.filter { $0.source != .vendorAdvisory && $0.severity >= .warning }.map { $0.deviceID })
     }
+
+    var vulnerableDeviceCount: Int { vulnerableDeviceIDs.count }
 
     var allFindingsSorted: [SecurityFinding] {
         findings.sorted { $0.severity > $1.severity }

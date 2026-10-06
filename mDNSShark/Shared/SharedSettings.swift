@@ -45,12 +45,9 @@ enum SharedSettings {
         set { suite.set(newValue, forKey: "ownerAppTransactionID") }
     }
 
-    /// Domains that always fail TLS Inspection by design, not by bug, so
-    /// they're bypassed by default until the user sets their own list. Apple
-    /// Private Relay's egress rejects any TLS-inspecting proxy outright
-    /// (upstream connect fails with -9830 illegal parameter), silently
-    /// breaking Private Relay instead of just showing a diagnostic.
-    static let defaultTLSBypassDomains: [String] = ["mask.icloud.com", "mask-h2.icloud.com"]
+    /// Domains that always fail TLS Inspection by design, so they're bypassed by default until the user sets their own list.
+    /// Private Relay egress rejects inspecting proxies (-9830), and gateway.icloud.com pins its certificate (-9825).
+    static let defaultTLSBypassDomains: [String] = ["mask.icloud.com", "mask-h2.icloud.com", "gateway.icloud.com"]
 
     static var tlsBypassList: [String] {
         get {

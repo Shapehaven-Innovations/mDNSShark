@@ -15,7 +15,7 @@ struct DevicePickerSheet: View {
 
     private func rank(_ d: DiscoveredDevice) -> Int {
         if d.isGateway { return 0 }
-        let worst = findings.filter { $0.deviceID == d.id }.map(\.severity).max()
+        let worst = findings.filter { $0.deviceID == d.id }.worstDeviceSeverity
         if worst == .critical { return 1 }
         if worst == .warning  { return 2 }
         switch d.deviceType {

@@ -46,7 +46,11 @@ struct DiscoveredDevice: Identifiable, Equatable {
     var deviceType: DeviceType {
         if isGateway { return .router }
         let types = bonjourServices.map { $0.serviceType }
-        if types.contains("_airplay._tcp") || types.contains("_raop._tcp") { return .tv }
+        if types.contains("_airplay._tcp") || types.contains("_raop._tcp") {
+            guard manufacturer?.contains("Apple") == true else { return .tv }
+            let model = bonjourServices.lazy.compactMap { $0.txtRecords["model"] ?? $0.txtRecords["am"] }.first
+            return model.map { $0.hasPrefix("Mac") || $0.hasPrefix("iMac") } == true ? .computer : .apple
+        }
         if types.contains("_ipp._tcp") || types.contains("_printer._tcp") { return .printer }
         if types.contains("_apple-mobdev2._tcp") || types.contains("_airdrop._tcp") { return .apple }
         if types.contains("_afpovertcp._tcp") || types.contains("_smb._tcp") { return .computer }

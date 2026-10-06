@@ -335,6 +335,17 @@
       "nvdAliases": [
         "GL.iNet"
       ]
+    },
+    "apple": {
+      "displayName": "Apple",
+      "manufacturerAliases": [
+        "apple"
+      ],
+      "kevVendorProjects": [
+        "Apple"
+      ],
+      "nvdCPEVendors": [],
+      "nvdAliases": []
     }
   }
 }
