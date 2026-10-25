@@ -9,9 +9,6 @@ struct SettingsView: View {
     @StateObject private var purchase = PurchaseManager.shared
     @State private var showManageSubscriptions = false
 
-    // Appearance
-    @AppStorage("preferredColorScheme") private var colorSchemeRaw: Int = 0
-
     // TLS toggle state
     @State private var tlsEnabled: Bool = SharedSettings.tlsInspectionEnabled
     @State private var installedCert: SecCertificate? = KeychainStore.loadCACert()
@@ -44,7 +41,6 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             List {
-                appearanceSection
                 tlsSection
                 bypassListSection
                 dnsSection
@@ -100,19 +96,6 @@ struct SettingsView: View {
             .alert("Remove the iOS Profile Too", isPresented: $showRemoveProfileReminder,
                    actions: { Button("OK") {} },
                    message: { Text("iOS still trusts the \"mDNSShark CA\" profile. Remove it in Settings > General > VPN & Device Management.") })
-        }
-    }
-
-    // MARK: - Appearance
-
-    private var appearanceSection: some View {
-        Section("Appearance") {
-            Picker("Theme", selection: $colorSchemeRaw) {
-                Text("System").tag(0)
-                Text("Light").tag(1)
-                Text("Dark").tag(2)
-            }
-            .pickerStyle(.segmented)
         }
     }
 

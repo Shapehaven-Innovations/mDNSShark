@@ -43,6 +43,7 @@ final class AppCoordinator: ObservableObject {
         packetCaptureManager  = pcm
         analysisViewModel     = AnalysisViewModel()
         wire()
+        UserDefaults.standard.removeObject(forKey: "preferredColorScheme") // retired theme override
         Task { await securityViewModel.loadThreatDataStatus() }
         // Waits out iOS's Local Network Privacy decision before the very
         // first scan fires. Starting immediately here raced the system
