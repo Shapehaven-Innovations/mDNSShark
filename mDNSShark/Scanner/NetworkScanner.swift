@@ -10,16 +10,7 @@ import Darwin
 // MARK: - NetworkScanner
 class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
     @Published var devices: [Device] = []
-    // Diagnostic for a 2026-09-27 on-device report that the header Scan
-    // button (disabled while this is true) seemed to re-enable after ~5s
-    // instead of the full 25s `scanNetwork` duration. Code trace found no
-    // path that flips this early (only set true at scan start, false in
-    // the single end-of-duration asyncAfter, guarded against re-entry),
-    // and ~5s is exactly when the port-80 sweep / port-scan enrichment
-    // stops producing visible activity, so the likely explanation is an
-    // eyeball estimate of the wrong sub-phase. Logs every transition with
-    // an absolute timestamp and seconds-since-scan-start so a Console
-    // capture can settle it without guessing.
+    // Logs every transition with seconds since scan start, to debug reports of the Scan button re-enabling early.
     @Published var isScanning: Bool = false {
         didSet {
             guard oldValue != isScanning else { return }
@@ -109,21 +100,7 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
     
     private var bonjourBrowsers: [NWBrowser] = []
     private var serviceToDeviceId: [ObjectIdentifier: UUID] = [:]
-    // NetService.schedule(in:forMode:) does NOT retain the instance the way
-    // e.g. Timer does — resolveService()'s local `netService` had no other
-    // strong reference anywhere (serviceToDeviceId only stores its
-    // ObjectIdentifier, not the object), so ARC deallocated it as soon as
-    // resolveService() returned, mid-resolve, every single time. Confirmed
-    // as the real cause of a 2026-09-26/27 on-device "scan freezes the app"
-    // report: Console showed "cannot add handler to 0 from 0 — dropping"
-    // and "invalid mode 'kCFRunLoopCommonModes' provided to
-    // CFRunLoopRunSpecific" during a scan, both signatures of a
-    // CFNetService/mDNSResponder connection being torn down mid-flight
-    // rather than of anything in the packet-tunnel/capture path this was
-    // first suspected to be. Every discovered Bonjour service triggers one
-    // of these, so a device-rich LAN turns this into a repeated,
-    // main-thread-adjacent teardown storm for the whole ~20s Bonjour
-    // portion of a scan.
+    // Strong references for in-flight resolves: NetService.schedule(in:forMode:) does not retain it, so without this it is deallocated mid-resolve.
     private var activeNetServices: [ObjectIdentifier: NetService] = [:]
     
     // Logger
