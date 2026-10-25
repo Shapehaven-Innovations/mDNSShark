@@ -30,11 +30,8 @@ final class AnalysisViewModel: ObservableObject {
 
     func update(findings: [SecurityFinding]) {
         var recs: [SecurityRecommendation] = []
-        // Count devices, not findings, and skip vendor advisories since they flag the manufacturer only.
-        func deviceCount(_ severity: Severity) -> Int {
-            Set(findings.filter { $0.severity == severity && $0.source != .vendorAdvisory }.map(\.deviceID)).count
-        }
-        let critCount = deviceCount(.critical)
+        // Distinct devices, vendor advisories excluded.
+        let critCount = Set(findings.filter { $0.severity == .critical && $0.source != .vendorAdvisory }.map(\.deviceID)).count
         if critCount > 0 {
             recs.append(SecurityRecommendation(
                 severity: .critical,
@@ -43,12 +40,13 @@ final class AnalysisViewModel: ObservableObject {
                 actionTitle: "View Issues", action: .navigateToSecurity
             ))
         }
-        let warnCount = deviceCount(.warning)
-        if warnCount > 0 {
+        // Same rule as the header's "vulnerable" count.
+        let vulnerableCount = findings.vulnerableDeviceIDs.count
+        if vulnerableCount > 0 {
             recs.append(SecurityRecommendation(
                 severity: .warning,
                 title: "Network Segmentation",
-                description: "Consider segmenting your network to isolate \(warnCount) \(warnCount == 1 ? "device" : "devices") with exposed services.",
+                description: "Consider segmenting your network to isolate \(vulnerableCount) vulnerable \(vulnerableCount == 1 ? "device" : "devices").",
                 actionTitle: nil, action: nil
             ))
         }

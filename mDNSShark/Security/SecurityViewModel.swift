@@ -149,7 +149,7 @@ final class SecurityViewModel: ObservableObject {
 
     /// Cancels an in-flight refresh. Called when LAN capture starts, since
     /// a refresh's request to cisa.gov would otherwise get routed into the
-    /// capture tunnel (and MITM'd by TLSInterceptor, if active) — see the
+    /// capture tunnel (and MITM'd by TLSInterceptor, if active); see the
     /// `isTunnelActive` pre-flight check in `performThreatDataRefresh`.
     func cancelThreatDataRefresh() {
         refreshTask?.cancel()
@@ -226,9 +226,7 @@ final class SecurityViewModel: ObservableObject {
 
     /// Devices with a warning or critical finding about the device itself. Excludes `.vendorAdvisory` (a
     /// vendor-name match is not a confirmed vulnerability on this device) and informational findings.
-    var vulnerableDeviceIDs: Set<UUID> {
-        Set(findings.filter { $0.source != .vendorAdvisory && $0.severity >= .warning }.map { $0.deviceID })
-    }
+    var vulnerableDeviceIDs: Set<UUID> { findings.vulnerableDeviceIDs }
 
     var vulnerableDeviceCount: Int { vulnerableDeviceIDs.count }
 
@@ -392,5 +390,12 @@ final class SecurityViewModel: ObservableObject {
             referenceURL: referenceURL,
             cveTiers: cveTiers
         )
+    }
+}
+
+extension Array where Element == SecurityFinding {
+    /// Single source of truth for "vulnerable device", shared by the header, Security and Analysis tabs.
+    var vulnerableDeviceIDs: Set<UUID> {
+        Set(filter { $0.source != .vendorAdvisory && $0.severity >= .warning }.map(\.deviceID))
     }
 }
