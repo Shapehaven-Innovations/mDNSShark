@@ -102,4 +102,29 @@ struct ThreatDataStatusTests {
         #expect(text.contains("NVD: refreshed"))
         #expect(!text.contains("no covered vendors"))
     }
+
+    @Test("short summary shows the newest update time, or the bundled date")
+    func shortSummary() {
+        let now = Date()
+        let refreshed = now.addingTimeInterval(-day)
+        let status = ThreatDataStatus(
+            bundledSnapshotDate: now.addingTimeInterval(-5 * day),
+            bundledCatalogVersion: "2026.01.01",
+            lastSuccessfulRefresh: refreshed,
+            refreshedCatalogVersion: "2026.01.02",
+            vendorCount: 20
+        )
+        let expected = "Updated \(refreshed.formatted(.dateTime.month(.abbreviated).day().hour().minute()))"
+        #expect(status.shortSummary(now: now) == expected)
+
+        let bundled = ThreatDataStatus(
+            bundledSnapshotDate: now.addingTimeInterval(-40 * day),
+            bundledCatalogVersion: "2026.01.01",
+            lastSuccessfulRefresh: nil,
+            refreshedCatalogVersion: nil,
+            vendorCount: 20
+        )
+        #expect(bundled.shortSummary(now: now).hasPrefix("Using bundled data from "))
+        #expect(bundled.shortSummary(now: now).hasSuffix(", over 30 days old"))
+    }
 }

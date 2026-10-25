@@ -106,6 +106,24 @@ struct ThreatDataStatus: Equatable, Sendable {
 
         return ("\(kevText) \(nvdText)", kevStale || nvdStale)
     }
+
+    /// One-line footer status: the newest KEV or NVD update time, or the bundled snapshot date if never refreshed.
+    func shortSummary(now: Date = Date()) -> String {
+        let isStale = summary(now: now).isStale
+        let latest = [lastSuccessfulRefresh, nvdLastSuccessfulRefresh, nvdLastCheckedAt].compactMap { $0 }.max()
+        var text: String
+        var newestIsFresh = false
+        if let latest {
+            newestIsFresh = now.timeIntervalSince(latest) <= Self.staleThreshold
+            text = "Updated \(latest.formatted(.dateTime.month(.abbreviated).day().hour().minute()))"
+        } else if let bundled = bundledSnapshotDate {
+            text = "Using bundled data from \(bundled.formatted(date: .abbreviated, time: .omitted))"
+        } else {
+            text = "Using bundled data"
+        }
+        if isStale { text += newestIsFresh ? ", some data over 30 days old" : ", over 30 days old" }
+        return text
+    }
 }
 
 actor ThreatDatabase {

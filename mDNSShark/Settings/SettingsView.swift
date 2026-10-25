@@ -5,6 +5,7 @@ import UIKit
 import StoreKit
 
 struct SettingsView: View {
+    @EnvironmentObject var coordinator: AppCoordinator
     @StateObject private var purchase = PurchaseManager.shared
     @State private var showManageSubscriptions = false
 
@@ -582,9 +583,11 @@ struct SettingsView: View {
             Link(destination: URL(string: "https://github.com/Shapehaven-Innovations/mDNSShark#setting-up-tls-inspection")!) {
                 Label("Setup guide", systemImage: "arrow.up.right.square")
             }
-            Text("This product uses the NVD API but is not endorsed or certified by the NVD.")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            NavigationLink {
+                LegalAdvisoriesView(viewModel: coordinator.securityViewModel)
+            } label: {
+                Label("Legal and Advisories", systemImage: "info.circle")
+            }
             legalLinks
         }
     }

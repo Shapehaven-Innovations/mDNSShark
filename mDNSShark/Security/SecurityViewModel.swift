@@ -27,7 +27,7 @@ final class SecurityViewModel: ObservableObject {
     @Published private(set) var isRefreshing: Bool = false
     @Published private(set) var threatDataStatus: ThreatDataStatus?
     @Published private(set) var refreshError: ThreatRefreshFailure?
-    /// When the last refresh attempt finished, so the footer can briefly confirm it ran.
+    /// When the last refresh finished both its KEV and NVD phases.
     @Published private(set) var lastRefreshCompletedAt: Date?
     @Published var groupMode:    GroupMode = .severity
 
@@ -96,11 +96,12 @@ final class SecurityViewModel: ObservableObject {
 
     // MARK: - Public API
 
-    func assess(devices: [DiscoveredDevice]) async {
+    /// `showProgress: false` is for refresh-triggered re-assessment, which updates findings in place without the "Assessing" bar.
+    func assess(devices: [DiscoveredDevice], showProgress: Bool = true) async {
         lastAssessedDevices = devices
         let assessmentID = UUID()
         currentAssessmentID = assessmentID
-        isAssessing = true
+        if showProgress { isAssessing = true }
         var all: [SecurityFinding] = []
         for device in devices {
             async let pf = portFindings(device: device)
@@ -114,9 +115,16 @@ final class SecurityViewModel: ObservableObject {
         // still computing).
         guard currentAssessmentID == assessmentID else { return }
         var seen = Set<String>()
-        findings = all.filter { f in seen.insert("\(f.deviceID)-\(f.title)").inserted }
-        isAssessing = false
+        let deduped = all.filter { f in seen.insert(findingKey(f)).inserted }
+        // Reuse existing IDs so unchanged rows keep their identity, and skip publishing an identical result.
+        let existingIDs = Dictionary(findings.map { (findingKey($0), $0.id) }, uniquingKeysWith: { first, _ in first })
+        let updated = deduped.map { f in existingIDs[findingKey(f)].map { f.withID($0) } ?? f }
+        if updated != findings { findings = updated }
+        // Also clears a superseded progress-showing call's bar, which returned early without resetting it.
+        if isAssessing { isAssessing = false }
     }
+
+    private func findingKey(_ f: SecurityFinding) -> String { "\(f.deviceID)-\(f.title)" }
 
     /// Loads the current threat-data status (bundled snapshot date, last
     /// successful refresh if any) without fetching anything. Called once
@@ -173,7 +181,7 @@ final class SecurityViewModel: ObservableObject {
             kevCompleted = true
             threatDataStatus = status
             if !lastAssessedDevices.isEmpty {
-                await assess(devices: lastAssessedDevices)
+                await assess(devices: lastAssessedDevices, showProgress: false)
             }
         } catch let error as ThreatRefreshError {
             switch error {
@@ -198,7 +206,7 @@ final class SecurityViewModel: ObservableObject {
             nvdCompleted = true
             threatDataStatus = await threatDatabase.status()
             if !lastAssessedDevices.isEmpty {
-                await assess(devices: lastAssessedDevices)
+                await assess(devices: lastAssessedDevices, showProgress: false)
             }
         } catch ThreatRefreshError.cancelled {
             if refreshError == nil { refreshError = .cancelledByCapture }

@@ -7,7 +7,7 @@ struct SecurityView: View {
     @State private var warningExpanded  = true
     @State private var infoExpanded     = false
     @State private var sharePresented   = false
-    @State private var showUpdatedJustNow = false
+    @State private var showRefreshSuccess = false
 
     private var vm: SecurityViewModel { coordinator.securityViewModel }
 
@@ -152,60 +152,68 @@ struct SecurityView: View {
 
     private var footerButtons: some View {
         VStack(spacing: 8) {
-            Text("Security checks run entirely on this device. Refreshing downloads CISA's public catalog; your devices and scan results are never uploaded.")
-                .font(.caption).foregroundColor(.secondary).multilineTextAlignment(.center)
-
             Button {
                 vm.startThreatDataRefresh()
             } label: {
-                if vm.isRefreshing {
-                    HStack(spacing: 6) {
-                        ProgressView().progressViewStyle(.circular)
-                        Text("Refreshing…")
+                HStack(spacing: 6) {
+                    // Icon and spinner share one fixed slot, and both titles are laid out, so the button never resizes.
+                    ZStack {
+                        Image(systemName: "arrow.clockwise").opacity(vm.isRefreshing ? 0 : 1)
+                        if vm.isRefreshing { ProgressView().controlSize(.small) }
                     }
-                    .font(.subheadline)
-                } else {
-                    Label("Refresh CISA Data", systemImage: "arrow.clockwise")
-                        .font(.subheadline)
+                    .frame(width: 18, height: 18)
+                    ZStack {
+                        Text("Refresh CISA Data").opacity(vm.isRefreshing ? 0 : 1)
+                        Text("Refreshing…").opacity(vm.isRefreshing ? 1 : 0)
+                    }
                 }
+                .font(.subheadline)
             }
             .buttonStyle(.bordered)
             .disabled(vm.isRefreshing || isCapturing)
+            .accessibilityLabel(vm.isRefreshing ? "Refreshing CISA Data" : "Refresh CISA Data")
 
-            if showUpdatedJustNow {
-                Label("Updated just now", systemImage: "checkmark.circle.fill")
-                    .font(.caption2).foregroundColor(AppColors.secure)
-            }
-
-            if let status = vm.threatDataStatus {
-                let summary = status.summary()
-                Text(summary.text)
-                    .font(.caption2)
-                    .foregroundColor(summary.isStale ? AppColors.warning : .secondary)
-                Text("Findings flag exposed services and manufacturers with published advisories. mDNSShark does not confirm that a specific vulnerability is present on a device.")
-                    .font(.caption2).foregroundColor(.secondary).multilineTextAlignment(.center)
-                Text("This product uses the NVD API but is not endorsed or certified by the NVD.")
-                    .font(.caption2).foregroundColor(.secondary).multilineTextAlignment(.center)
-            }
-
-            if isCapturing {
-                Text("Stop packet capture to refresh. Otherwise the download would pass through the capture tunnel.")
-                    .font(.caption2).foregroundColor(AppColors.warning).multilineTextAlignment(.center)
-            } else if let reason = vm.refreshError {
-                Text(refreshErrorText(reason))
-                    .font(.caption2).foregroundColor(AppColors.warning).multilineTextAlignment(.center)
-            }
+            footerStatusLine
         }
-        .padding(.top, 8)
         .task(id: vm.lastRefreshCompletedAt) {
-            // Briefly confirm a successful refresh, since the date-based status line may not visibly change.
-            guard let completedAt = vm.lastRefreshCompletedAt else { return }
-            let remaining = 5 - Date().timeIntervalSince(completedAt)
-            guard remaining > 0 else { showUpdatedJustNow = false; return }
-            showUpdatedJustNow = true
-            try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
-            if !Task.isCancelled { showUpdatedJustNow = false }
+            // Show the success line for 4 s only for a refresh that just finished, not on reappearance.
+            guard let done = vm.lastRefreshCompletedAt, Date().timeIntervalSince(done) < 4 else {
+                showRefreshSuccess = false
+                return
+            }
+            showRefreshSuccess = true
+            try? await Task.sleep(for: .seconds(4))
+            if !Task.isCancelled { showRefreshSuccess = false }
         }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 8)
+        .padding(.bottom, 16)
+    }
+
+    /// Fixed two-line slot, so swapping between the status and an error never shifts the layout.
+    private var footerStatusLine: some View {
+        ZStack {
+            Text(" \n ").font(.caption2).hidden().accessibilityHidden(true)
+            if let message = footerErrorText {
+                Text(message)
+                    .foregroundColor(AppColors.warning)
+            } else if showRefreshSuccess, let done = vm.lastRefreshCompletedAt {
+                Text("Refreshed successfully at \(done.formatted(date: .omitted, time: .shortened))")
+                    .foregroundColor(AppColors.secure)
+            } else if let status = vm.threatDataStatus {
+                Text(status.shortSummary())
+                    .foregroundColor(status.summary().isStale ? AppColors.warning : .secondary)
+            }
+        }
+        .font(.caption2)
+        .lineLimit(2)
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
+    }
+
+    private var footerErrorText: String? {
+        if isCapturing { return refreshErrorText(.captureActive) }
+        return vm.refreshError.map(refreshErrorText)
     }
 
     private func refreshErrorText(_ reason: ThreatRefreshFailure) -> String {

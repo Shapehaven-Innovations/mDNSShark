@@ -79,6 +79,16 @@ struct SecurityFinding: Identifiable, Equatable {
         self.referenceURL = referenceURL
         self.cveTiers = cveTiers
     }
+
+    /// Same finding with a different identity, so a re-assessment can keep an unchanged row's ID.
+    func withID(_ id: UUID) -> SecurityFinding {
+        SecurityFinding(
+            id: id, deviceID: deviceID, deviceName: deviceName, deviceIcon: deviceIcon,
+            severity: severity, title: title, description: description,
+            recommendation: recommendation, source: source,
+            cveID: cveID, referenceURL: referenceURL, cveTiers: cveTiers
+        )
+    }
 }
 
 extension Sequence where Element == SecurityFinding {

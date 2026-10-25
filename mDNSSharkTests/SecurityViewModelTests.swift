@@ -1,6 +1,7 @@
 // mDNSSharkTests/SecurityViewModelTests.swift
 import Testing
 import Foundation
+import Combine
 @testable import mDNSShark
 
 @MainActor
@@ -196,6 +197,42 @@ struct SecurityViewModelTests {
         await vm.assess(devices: [device])
         #expect(!vm.findings.isEmpty)
         #expect(vm.vulnerableDeviceCount == 0)
+    }
+
+    @Test("refresh-triggered re-assessment never shows the Assessing progress bar")
+    func refreshAssessDoesNotShowProgress() async throws {
+        let feed = Fixture.liveFeedJSON(catalogVersion: "2026.03.01", matching: [
+            ("CVE-2026-4444", "ASUS New Bug", "new desc"),
+        ], vendorProjects: ["ASUS"])
+        let vm = makeViewModel(fetchFeed: immediateFetcher { (feed, Fixture.httpResponse()) })
+        await vm.assess(devices: [makeDevice(manufacturer: "ASUS")])
+
+        var sawAssessing = false
+        let cancellable = vm.$isAssessing.sink { if $0 { sawAssessing = true } }
+        vm.startThreatDataRefresh()
+        try await waitUntil { !vm.isRefreshing }
+        cancellable.cancel()
+
+        #expect(!sawAssessing)
+        #expect(vm.findings.contains { $0.cveTiers.flatMap(\.cveIDs).contains("CVE-2026-4444") })
+    }
+
+    @Test("re-assessing unchanged devices keeps finding IDs and does not republish")
+    func identicalAssessDoesNotRepublish() async {
+        let vm = makeViewModel()
+        let device = makeDevice()
+        await vm.assess(devices: [device])
+        let firstIDs = vm.findings.map(\.id)
+        #expect(!firstIDs.isEmpty)
+
+        var publishCount = 0
+        let cancellable = vm.$findings.dropFirst().sink { _ in publishCount += 1 }
+        await vm.assess(devices: [device], showProgress: false)
+        cancellable.cancel()
+
+        #expect(publishCount == 0)
+        #expect(vm.findings.map(\.id) == firstIDs)
+        #expect(!vm.isAssessing)
     }
 }
 
