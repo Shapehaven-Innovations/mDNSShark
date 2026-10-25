@@ -58,7 +58,8 @@ struct DiscoveredDevice: Identifiable, Equatable {
             return model.map { $0.hasPrefix("Mac") || $0.hasPrefix("iMac") } == true ? .computer : .apple
         }
         if types.contains("_ipp._tcp") || types.contains("_printer._tcp") { return .printer }
-        if types.contains("_apple-mobdev2._tcp") || types.contains("_airdrop._tcp") { return .apple }
+        // _rdlink._tcp is advertised only by iPhone and iPad, so it marks an Apple device without saying which.
+        if types.contains("_apple-mobdev2._tcp") || types.contains("_airdrop._tcp") || types.contains("_rdlink._tcp") { return .apple }
         if types.contains("_afpovertcp._tcp") || types.contains("_smb._tcp") { return .computer }
         if manufacturer?.contains("Apple") == true { return .apple }
         return .unknown
@@ -69,9 +70,17 @@ struct DiscoveredDevice: Identifiable, Equatable {
         case .router:   return "wifi.router"
         case .tv:       return "tv"
         case .printer:  return "printer"
-        case .apple:    return "iphone"
+        case .apple:    return appleModelIcon ?? "laptopcomputer.and.iphone"
         case .computer: return "laptopcomputer"
         case .unknown:  return "questionmark.circle"
         }
+    }
+
+    /// Phone or tablet glyph only when a service's model string names one; otherwise nil so the generic Apple icon shows.
+    private var appleModelIcon: String? {
+        let model = bonjourServices.lazy.compactMap { $0.txtRecords["model"] ?? $0.txtRecords["am"] }.first
+        if model?.hasPrefix("iPhone") == true { return "iphone" }
+        if model?.hasPrefix("iPad") == true { return "ipad" }
+        return nil
     }
 }

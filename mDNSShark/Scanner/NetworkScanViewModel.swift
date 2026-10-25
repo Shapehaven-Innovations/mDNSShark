@@ -224,6 +224,8 @@ final class NetworkScanViewModel: ObservableObject {
     /// AirPlay/RAOP advertise the hardware model ("model" / "am", e.g. "MacBookPro16,2"). Only those rows are
     /// trusted: NAS boxes put fake Mac models in `_device-info._tcp`, and the service types alone are used by third-party speakers and TVs.
     private func appleManufacturer(serviceType: String, txtRecords: [String: String]?) -> String? {
+        // Continuity services no third-party device is known to advertise.
+        if serviceType == "_rdlink._tcp" || serviceType == "_companion-link._tcp" { return "Apple" }
         guard serviceType == "_airplay._tcp" || serviceType == "_raop._tcp",
               let model = txtRecords?["model"] ?? txtRecords?["am"] else { return nil }
         let applePrefixes = ["Mac", "iMac", "iPhone", "iPad", "iPod", "AppleTV", "AudioAccessory", "AirPort", "Watch", "RealityDevice"]
