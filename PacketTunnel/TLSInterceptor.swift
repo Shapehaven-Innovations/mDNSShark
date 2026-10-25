@@ -753,7 +753,7 @@ final class TLSSession {
 
         if SharedSettings.tlsBypassList.contains(where: { sni == $0 || sni.hasSuffix(".\($0)") }) {
             stage = "bypassed"
-            logger.debug("[\(self.tag, privacy: .public)] sni=\(sni, privacy: .public) is on the bypass list; closing (device gets no RST, its socket is now orphaned)")
+            logger.debug("[\(self.tag, privacy: .public)] sni=\(sni, privacy: .public) is on the bypass list; closing (device gets a FIN, not a passthrough connection)")
             close(); return
         }
 

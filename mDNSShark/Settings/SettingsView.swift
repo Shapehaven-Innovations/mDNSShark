@@ -15,6 +15,10 @@ struct SettingsView: View {
     @State private var tlsEnabled: Bool = SharedSettings.tlsInspectionEnabled
     @State private var installedCert: SecCertificate? = KeychainStore.loadCACert()
     @State private var showImportError: String? = nil
+    @State private var showRemoveCertConfirm = false
+    @State private var showRemoveProfileReminder = false
+    @State private var pendingProfileReminder = false
+    @State private var lastTLSError = ""
 
     // TLS sheet / warning state
     // A single item-driven sheet instead of four chained .sheet(isPresented:) modifiers
@@ -66,7 +70,10 @@ struct SettingsView: View {
                 }
             }
             .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
-            .onAppear { purchase.lastError = nil }
+            .onAppear {
+                purchase.lastError = nil
+                lastTLSError = SharedSettings.tlsInterceptorLastError
+            }
             .alert("Import Error", isPresented: Binding(
                 get: { showImportError != nil },
                 set: { if !$0 { showImportError = nil } }
@@ -77,6 +84,21 @@ struct SettingsView: View {
                 set: { if !$0 { purchase.lastError = nil } }
             ), actions: { Button("OK") { purchase.lastError = nil } },
                message: { Text(purchase.lastError ?? "") })
+            // Present the reminder only after the dialog has fully closed, or the alert can fail to show.
+            .onChange(of: showRemoveCertConfirm) { _, isShowing in
+                guard !isShowing, pendingProfileReminder else { return }
+                pendingProfileReminder = false
+                showRemoveProfileReminder = true
+            }
+            .confirmationDialog("Remove the CA certificate?", isPresented: $showRemoveCertConfirm, titleVisibility: .visible) {
+                Button("Remove Certificate", role: .destructive) { removeCertificate() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This deletes the CA and its private key from mDNSShark and turns off TLS Inspection.")
+            }
+            .alert("Remove the iOS Profile Too", isPresented: $showRemoveProfileReminder,
+                   actions: { Button("OK") {} },
+                   message: { Text("iOS still trusts the \"mDNSShark CA\" profile. Remove it in Settings > General > VPN & Device Management.") })
         }
     }
 
@@ -125,13 +147,10 @@ struct SettingsView: View {
                 Button("Generate CA…")       { activeSheet = .generateCA }
 
                 if installedCert != nil {
-                    Button("Remove Certificate", role: .destructive) {
-                        KeychainStore.deleteCAItems()
-                        installedCert = nil
-                        tlsEnabled = false
-                        SharedSettings.tlsInspectionEnabled = false
-                    }
+                    Button("Remove Certificate", role: .destructive) { showRemoveCertConfirm = true }
                 }
+
+                lastTLSErrorRow
 
                 subscriptionStatusRows
                 restoreButton
@@ -226,6 +245,29 @@ struct SettingsView: View {
         }
     }
 
+    // The app keeps only its own copy of the CA, so remind the user the trusted iOS profile stays installed.
+    private func removeCertificate() {
+        KeychainStore.deleteCAItems()
+        installedCert = nil
+        tlsEnabled = false
+        SharedSettings.tlsInspectionEnabled = false
+        pendingProfileReminder = true
+    }
+
+    /// Raw extension drop reason, kept here for diagnostics while the banner shows a plain-language version.
+    @ViewBuilder
+    private var lastTLSErrorRow: some View {
+        if !lastTLSError.isEmpty {
+            DisclosureGroup("Last TLS drop reason") {
+                Text(lastTLSError)
+                    .font(.caption2.monospaced())
+                    .foregroundColor(.secondary)
+                    .textSelection(.enabled)
+            }
+            .font(.footnote)
+        }
+    }
+
     private var restoreButton: some View {
         Button("Restore Purchases") { run { await purchase.restore() } }
             .font(.footnote)
@@ -312,6 +354,7 @@ struct SettingsView: View {
             if let c = certRef { try KeychainStore.saveCACert(c) }
             if let k = keyRef  { try KeychainStore.saveCAKey(k) }
             installedCert = certRef
+            hasSeenTLSWarning = false
         } else {
             let certData: Data
             if let pem = String(data: data, encoding: .utf8), pem.contains("-----BEGIN") {
@@ -324,6 +367,7 @@ struct SettingsView: View {
             }
             try KeychainStore.saveCACert(cert)
             installedCert = cert
+            hasSeenTLSWarning = false
         }
     }
 
@@ -335,6 +379,7 @@ struct SettingsView: View {
             }
             try KeychainStore.saveCACert(cert)
             installedCert = cert
+            hasSeenTLSWarning = false
         }
         if text.contains("PRIVATE KEY") {
             let keyDER = try decodePEMBlock(text)
@@ -380,6 +425,8 @@ struct SettingsView: View {
         try KeychainStore.saveCACert(cert)
         try KeychainStore.saveCAKey(privateKey)
         installedCert = cert
+        // A new CA must be trusted in iOS again, so show the warning sheet on next enable.
+        hasSeenTLSWarning = false
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("mDNSShark-CA.cer")
         try certDER.write(to: url)
         DispatchQueue.main.async {

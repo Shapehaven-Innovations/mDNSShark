@@ -29,7 +29,7 @@ Every scan runs on your phone, with **no external servers**. The one exception i
 
 - **Bonjour/mDNS (DNS-SD)**: Finds AirPlay receivers, printers, file sharing, and more.
 - **SSDP**: Finds UPnP devices such as smart TVs and internet gateways.
-- **Local Subnet Scans**: Optionally scans the /24 subnet for common TCP services that don't broadcast.
+- **Local Subnet Scans**: Always sweeps the /24 subnet on TCP port 80; other ports are probed only on hosts already found.
 - **OUI Lookups**: Matches a device's MAC-like address to its manufacturer.
 - **Security Assessment**: Flags risky exposed services and checks each manufacturer against CISA's Known Exploited Vulnerabilities (KEV) catalog and the NVD.
 - **TLS Inspection**: A local HTTPS proxy, built on a PacketTunnel extension, that decrypts and logs HTTPS traffic for analysis. Available as a monthly subscription with a free 3-day trial.
@@ -42,10 +42,10 @@ The Security tab turns scan results into findings, grouped by severity, by devic
 
 Each device is assessed in three layers (code: `mDNSShark/Security/SecurityViewModel.swift`):
 
-- **Exposed ports.** Telnet, FTP, VNC, and RDP are Critical. SMB, NetBIOS, SSH, and RTSP are Warnings. UPnP and plain or admin HTTP/HTTPS are Informational.
-- **Bonjour services.** The same idea for services a device announces over mDNS (`_telnet._tcp`, `_ssh._tcp`, `_smb._tcp`, and so on).
-- **Manufacturer advisories.** The device's manufacturer, as identified by the scan, is matched by whole word against 27 vendors in `mDNSShark/Resources/nist_cpe_map.json` (`vendorAdvisories`). A matched vendor is then checked against:
-  - **CISA KEV** for 18 vendors (ASUS, NETGEAR, D-Link, TP-Link, Zyxel, QNAP, MikroTik, Ubiquiti, Hikvision, Dahua, DrayTek, Tenda, Reolink, TerraMaster, Netis, Edimax, Arcadyan, DZS).
+- **Exposed ports.** Telnet and FTP (cleartext logins) are Critical. VNC, RDP, SMB, NetBIOS, SSH, and RTSP are Warnings. UPnP and plain or admin HTTP/HTTPS are Informational.
+- **Bonjour services.** Services a device announces over mDNS (`_telnet._tcp`, `_ssh._tcp`, `_smb._tcp`, and so on) are Informational, since an advertisement does not confirm an open port.
+- **Manufacturer advisories.** The device's manufacturer, as identified by the scan, is matched by whole word against 28 vendors in `mDNSShark/Resources/nist_cpe_map.json` (`vendorAdvisories`). A matched vendor is then checked against:
+  - **CISA KEV** for 19 vendors (ASUS, NETGEAR, D-Link, TP-Link, Zyxel, QNAP, MikroTik, Ubiquiti, Hikvision, Dahua, DrayTek, Tenda, Reolink, TerraMaster, Netis, Edimax, Arcadyan, DZS, Apple).
   - **NVD** for 10 vendors that KEV barely covers, mostly ISP gateway makers (Arris/CommScope, Technicolor/Vantiva, Sagemcom, Humax, Sercomm, Askey, Hitron, Calix, GL.iNet, DZS). Rejected and Low-rated CVEs are dropped.
 
 A manufacturer match means the vendor has known vulnerabilities somewhere in its product line, **not** that this device does. The app doesn't know the model or firmware version. So each device gets at most one grouped vendor finding, rated **Warning** (any KEV entry, or any NVD Critical/High) or **Informational** (NVD Medium only), and these are left out of the "vulnerable devices" count. CVEs appear as tappable capsules by tier, and each expands into a list linking to nvd.nist.gov.
@@ -160,7 +160,7 @@ Apps that use certificate pinning (banking, health, government) fail if intercep
 - Any connection whose SNI ends with a listed suffix is passed through uninspected.
 - Swipe left to delete an entry.
 
-**Always add Apple's own services.** `push.apple.com` (APNs), `icloud.com` (including Private Relay), and `apple-native-relay.apple.com` (Private Relay's egress) are certificate-pinned and resist MITM by design. This is not a bug in `TLSInterceptor.swift`. Without these entries, their failed sessions flood the extension's drop log (`apple-native-relay.apple.com` fails with `-9830: errSSLIllegalParam`) and bury real errors. The bypass list **can be cleared by a rebuild or reinstall**, so re-add all three after a fresh install.
+**Apple's own services are bypassed by default.** The list ships with `mask.icloud.com` and `mask-h2.icloud.com` (Private Relay egress, which rejects inspecting proxies with `-9830`) and `gateway.icloud.com` (certificate-pinned, fails with `-9825`). This is not a bug in `TLSInterceptor.swift`; these services resist MITM by design. These defaults are pre-filled in the list and stay in effect unless you swipe to remove them. Other pinned Apple hosts, such as `push.apple.com` (APNs) or a host named in the error banner, can be added the same way. The bypass list **can be cleared by a rebuild or reinstall**, which restores the three defaults.
 
 ### DNS Server
 
@@ -179,7 +179,7 @@ TLS settings live in a shared `UserDefaults` suite (`group.beta.mDNSShark`) so t
 | ------------------------- | --------------- | ------------- |
 | `tlsInspectionEnabled`    | Bool            | `false`       |
 | `tlsSubscriptionExpiry`   | Date?           | `nil`         |
-| `tlsBypassList`           | JSON `[String]` | `[]`          |
+| `tlsBypassList`           | JSON `[String]` | `["mask.icloud.com","mask-h2.icloud.com","gateway.icloud.com"]` |
 | `dnsPrimary`              | String          | `8.8.8.8`     |
 | `dnsSecondary`            | String          | `8.8.4.4`     |
 | `captureFilterProtocols`  | JSON `[String]` | all protocols |

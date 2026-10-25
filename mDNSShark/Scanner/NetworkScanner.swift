@@ -52,6 +52,9 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         "_time-machine._tcp",
         "_airport._tcp",
         "_device-info._tcp",
+        "_companion-link._tcp",
+        "_rdlink._tcp",
+        "_sleep-proxy._udp",
 
         // MARK: - Printing & Scanning
         "_ipp._tcp",

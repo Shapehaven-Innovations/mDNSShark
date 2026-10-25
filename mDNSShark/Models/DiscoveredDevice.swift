@@ -27,7 +27,13 @@ struct DiscoveredDevice: Identifiable, Equatable {
         self.bonjourServices = bonjourServices; self.securityFindings = securityFindings
     }
 
-    static func == (l: DiscoveredDevice, r: DiscoveredDevice) -> Bool { l.id == r.id }
+    // Compares the late-enriched fields too, so SwiftUI redraws a row when enrichment lands; securityFindings is left out.
+    static func == (l: DiscoveredDevice, r: DiscoveredDevice) -> Bool {
+        l.id == r.id && l.hostname == r.hostname && l.ipAddress == r.ipAddress
+            && l.macAddress == r.macAddress && l.manufacturer == r.manufacturer
+            && l.inferredOS == r.inferredOS && l.openPorts == r.openPorts
+            && l.bonjourServices == r.bonjourServices
+    }
 
     var isGateway: Bool { ipAddress.hasSuffix(".1") }
 

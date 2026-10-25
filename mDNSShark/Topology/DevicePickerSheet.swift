@@ -67,7 +67,7 @@ struct DevicePickerSheet: View {
             VStack(spacing: 0) {
                 HStack {
                     Image(systemName: "magnifyingglass").foregroundColor(.secondary)
-                    TextField("Hostname or IP", text: $searchText)
+                    TextField("Filter by hostname or IP", text: $searchText)
                         .autocapitalization(.none)
                         .disableAutocorrection(true)
                 }
@@ -112,7 +112,7 @@ struct DevicePickerSheet: View {
                     .buttonStyle(.plain)
                 }
             }
-            .navigationTitle("Add Devices")
+            .navigationTitle("Pin Devices")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

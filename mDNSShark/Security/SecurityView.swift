@@ -7,6 +7,7 @@ struct SecurityView: View {
     @State private var warningExpanded  = true
     @State private var infoExpanded     = false
     @State private var sharePresented   = false
+    @State private var showUpdatedJustNow = false
 
     private var vm: SecurityViewModel { coordinator.securityViewModel }
 
@@ -55,7 +56,7 @@ struct SecurityView: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 HStack {
-                    stat(vm.findings.count,        "Total Vulnerabilities", AppColors.critical)
+                    stat(vm.findings.count,        "Findings",              AppColors.critical)
                     Divider().frame(height: 40)
                     stat(vm.vulnerableDeviceCount, "Vulnerable Devices",    AppColors.warning)
                 }
@@ -171,6 +172,11 @@ struct SecurityView: View {
             .buttonStyle(.bordered)
             .disabled(vm.isRefreshing || isCapturing)
 
+            if showUpdatedJustNow {
+                Label("Updated just now", systemImage: "checkmark.circle.fill")
+                    .font(.caption2).foregroundColor(AppColors.secure)
+            }
+
             if let status = vm.threatDataStatus {
                 let summary = status.summary()
                 Text(summary.text)
@@ -191,6 +197,15 @@ struct SecurityView: View {
             }
         }
         .padding(.top, 8)
+        .task(id: vm.lastRefreshCompletedAt) {
+            // Briefly confirm a successful refresh, since the date-based status line may not visibly change.
+            guard let completedAt = vm.lastRefreshCompletedAt else { return }
+            let remaining = 5 - Date().timeIntervalSince(completedAt)
+            guard remaining > 0 else { showUpdatedJustNow = false; return }
+            showUpdatedJustNow = true
+            try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
+            if !Task.isCancelled { showUpdatedJustNow = false }
+        }
     }
 
     private func refreshErrorText(_ reason: ThreatRefreshFailure) -> String {

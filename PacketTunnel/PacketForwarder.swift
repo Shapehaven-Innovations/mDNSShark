@@ -447,7 +447,10 @@ final class PacketForwarder {
     /// protocol and silently dropped on the other.
     private func isHostBypassed(dstIP: String) -> Bool {
         guard let hostname = dnsCache[dstIP] else { return false }
-        return SharedSettings.tlsBypassList.contains(where: { hostname.hasSuffix($0) })
+        return SharedSettings.tlsBypassList.contains(where: {
+            let d = $0.lowercased()
+            return hostname == d || hostname.hasSuffix("." + d)
+        })
     }
 
     private func dstPort443Intercepted(key: SessionKey, srcIP: String,
@@ -888,45 +891,10 @@ final class PacketForwarder {
         return Data(bytes)
     }
 
+    /// `udpPayload` is the bare DNS message (NWConnection strips the UDP header).
     private func cacheDNSResponse(_ udpPayload: Data) {
-        guard udpPayload.count > 8 else { return }
-        let dns = [UInt8](udpPayload.dropFirst(8))
-        guard dns.count > 12 else { return }
-        let qdCount = Int(dns[4]) << 8 | Int(dns[5])
-        let anCount = Int(dns[6]) << 8 | Int(dns[7])
-        guard anCount > 0 else { return }
-        var i = 12
-        for _ in 0..<qdCount {
-            while i < dns.count { let len = Int(dns[i]); i += 1; if len == 0 { break }; i += len }
-            i += 4
-        }
-        for _ in 0..<anCount {
-            guard i < dns.count else { break }
-            let hostname = parseDNSName(dns, at: &i)
-            guard i + 10 <= dns.count else { break }
-            let rtype = Int(dns[i]) << 8 | Int(dns[i+1])
-            let rdLen = Int(dns[i+8]) << 8 | Int(dns[i+9])
-            i += 10
-            if rtype == 1 && rdLen == 4 && i + 4 <= dns.count {
-                let ip = "\(dns[i]).\(dns[i+1]).\(dns[i+2]).\(dns[i+3])"
-                dnsCache[ip] = hostname
-            }
-            i += rdLen
-        }
-    }
-
-    private func parseDNSName(_ dns: [UInt8], at i: inout Int) -> String {
-        var labels = [String]()
-        while i < dns.count {
-            let len = Int(dns[i])
-            if len == 0 { i += 1; break }
-            if len & 0xC0 == 0xC0 { i += 2; break }
-            i += 1
-            guard i + len <= dns.count else { break }
-            labels.append(String(bytes: dns[i..<i+len], encoding: .utf8) ?? "")
-            i += len
-        }
-        return labels.joined(separator: ".")
+        guard let parsed = DNSResponseParser.aRecords([UInt8](udpPayload)) else { return }
+        for ip in parsed.ips { dnsCache[ip] = parsed.hostname }
     }
 
     // MARK: - Cleanup
@@ -1061,5 +1029,72 @@ extension Data {
     }
     mutating func append(ipOctets ip: String) {
         ip.split(separator: ".").compactMap { UInt8($0) }.forEach { append($0) }
+    }
+}
+
+// MARK: - DNS response parsing
+
+/// Pure DNS response parser for the TLS bypass cache. Bounds-checks every read
+/// and returns nil on any malformed input instead of trapping.
+enum DNSResponseParser {
+    /// Returns the first question's name and every IPv4 A record address in the answer section.
+    static func aRecords(_ dns: [UInt8]) -> (hostname: String, ips: [String])? {
+        guard dns.count >= 12, dns[2] & 0x80 != 0 else { return nil }   // QR bit: response
+        let qdCount = Int(dns[4]) << 8 | Int(dns[5])
+        let anCount = Int(dns[6]) << 8 | Int(dns[7])
+        guard qdCount >= 1, anCount > 0 else { return nil }
+        var i = 12
+        var hostname = ""
+        for q in 0..<qdCount {
+            guard let q1 = readName(dns, at: i), q1.next + 4 <= dns.count else { return nil }
+            if q == 0 { hostname = q1.name.lowercased() }
+            i = q1.next + 4
+        }
+        guard !hostname.isEmpty else { return nil }
+        var ips: [String] = []
+        for _ in 0..<anCount {
+            guard let rr = readName(dns, at: i), rr.next + 10 <= dns.count else { break }
+            i = rr.next
+            let rtype = Int(dns[i]) << 8 | Int(dns[i+1])
+            let rclass = Int(dns[i+2]) << 8 | Int(dns[i+3])
+            let rdLen = Int(dns[i+8]) << 8 | Int(dns[i+9])
+            i += 10
+            guard i + rdLen <= dns.count else { break }
+            if rtype == 1, rclass & 0x7FFF == 1, rdLen == 4 {
+                ips.append("\(dns[i]).\(dns[i+1]).\(dns[i+2]).\(dns[i+3])")
+            }
+            i += rdLen
+        }
+        return ips.isEmpty ? nil : (hostname, ips)
+    }
+
+    /// Reads a possibly compressed name at `start`; returns it and the offset just past it in the
+    /// original record. Pointer hops are capped so a pointer loop cannot spin forever.
+    static func readName(_ dns: [UInt8], at start: Int) -> (name: String, next: Int)? {
+        var labels: [String] = []
+        var i = start
+        var end: Int?
+        var hops = 0
+        var total = 0
+        while true {
+            guard i >= 0, i < dns.count else { return nil }
+            let len = Int(dns[i])
+            if len == 0 {
+                return (labels.joined(separator: "."), end ?? i + 1)
+            } else if len & 0xC0 == 0xC0 {
+                guard i + 1 < dns.count, hops < 16 else { return nil }
+                if end == nil { end = i + 2 }
+                i = (len & 0x3F) << 8 | Int(dns[i+1])
+                hops += 1
+            } else if len & 0xC0 == 0 {
+                guard i + 1 + len <= dns.count else { return nil }
+                total += len + 1
+                guard total <= 255 else { return nil }
+                labels.append(String(decoding: dns[(i+1)..<(i+1+len)], as: UTF8.self))
+                i += 1 + len
+            } else {
+                return nil   // 0x40/0x80 label types are reserved
+            }
+        }
     }
 }

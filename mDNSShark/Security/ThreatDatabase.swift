@@ -76,7 +76,7 @@ struct ThreatDataStatus: Equatable, Sendable {
         if let refreshed = lastSuccessfulRefresh {
             let age = now.timeIntervalSince(refreshed)
             kevStale = age > Self.staleThreshold
-            kevText = "CISA exploit data: refreshed \(refreshed.formatted(date: .abbreviated, time: .omitted))."
+            kevText = "CISA exploit data: refreshed \(refreshed.formatted(date: .abbreviated, time: .shortened))."
             if kevStale { kevText += " Over 30 days old." }
         } else if let bundled = bundledSnapshotDate {
             let age = now.timeIntervalSince(bundled)
@@ -96,7 +96,7 @@ struct ThreatDataStatus: Equatable, Sendable {
         if let refreshed = nvdLastSuccessfulRefresh {
             let age = now.timeIntervalSince(refreshed)
             nvdStale = age > Self.staleThreshold
-            nvdText = "NVD: refreshed \(refreshed.formatted(date: .abbreviated, time: .omitted))."
+            nvdText = "NVD: refreshed \(refreshed.formatted(date: .abbreviated, time: .shortened))."
             if nvdStale { nvdText += " Over 30 days old." }
         } else if let checked = nvdLastCheckedAt {
             nvdText = "NVD: checked \(checked.formatted(date: .abbreviated, time: .omitted)), no covered vendors on this network."
@@ -715,7 +715,10 @@ actor ThreatDatabase {
             }
         }
 
-        return results.sorted { ($0.dateAdded ?? "") > ($1.dateAdded ?? "") }
+        return results.sorted {
+            let l = $0.dateAdded ?? "", r = $1.dateAdded ?? ""
+            return l != r ? l > r : $0.cveID < $1.cveID
+        }
     }
 
     /// Tokenizes `manufacturer` (hyphens stripped before splitting, so

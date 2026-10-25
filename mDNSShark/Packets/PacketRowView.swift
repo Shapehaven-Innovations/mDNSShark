@@ -6,9 +6,11 @@ struct PacketRowView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Text("#\(packet.frameNumber)")
+            // Verbatim avoids locale grouping ("#17,202") that wrapped in the narrow column.
+            Text(verbatim: "#\(packet.frameNumber)")
                 .font(.caption.monospacedDigit()).foregroundColor(.secondary)
-                .frame(width: 40, alignment: .trailing)
+                .lineLimit(1).minimumScaleFactor(0.8)
+                .frame(width: 52, alignment: .trailing)
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text("\(packet.sourceIP) → \(packet.destinationIP)")

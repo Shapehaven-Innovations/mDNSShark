@@ -14,8 +14,8 @@ struct SecurityRecommendation: Identifiable {
 
 @MainActor
 final class AnalysisViewModel: ObservableObject {
-    @Published var inboundKB: Double = 0
-    @Published var outboundKB: Double = 0
+    @Published var inboundBytes: Int64 = 0
+    @Published var outboundBytes: Int64 = 0
     @Published var totalPackets: Int = 0
     @Published var protocolDistribution: [String: Double] = [:]
     @Published var recommendations: [SecurityRecommendation] = []
@@ -30,21 +30,25 @@ final class AnalysisViewModel: ObservableObject {
 
     func update(findings: [SecurityFinding]) {
         var recs: [SecurityRecommendation] = []
-        let critCount = findings.filter { $0.severity == .critical }.count
+        // Count devices, not findings, and skip vendor advisories since they flag the manufacturer only.
+        func deviceCount(_ severity: Severity) -> Int {
+            Set(findings.filter { $0.severity == severity && $0.source != .vendorAdvisory }.map(\.deviceID)).count
+        }
+        let critCount = deviceCount(.critical)
         if critCount > 0 {
             recs.append(SecurityRecommendation(
                 severity: .critical,
-                title: "\(critCount) Critical \(critCount == 1 ? "Issue" : "Issues") Found",
-                description: "\(critCount) \(critCount == 1 ? "device has" : "devices have") critical vulnerabilities requiring immediate attention.",
+                title: "Critical Issues on \(critCount) \(critCount == 1 ? "Device" : "Devices")",
+                description: "\(critCount) \(critCount == 1 ? "device has" : "devices have") an exposed cleartext-login service (Telnet or FTP) that needs attention.",
                 actionTitle: "View Issues", action: .navigateToSecurity
             ))
         }
-        let warnCount = findings.filter { $0.severity == .warning }.count
+        let warnCount = deviceCount(.warning)
         if warnCount > 0 {
             recs.append(SecurityRecommendation(
                 severity: .warning,
                 title: "Network Segmentation",
-                description: "Consider segmenting your network to isolate \(warnCount) vulnerable \(warnCount == 1 ? "device" : "devices").",
+                description: "Consider segmenting your network to isolate \(warnCount) \(warnCount == 1 ? "device" : "devices") with exposed services.",
                 actionTitle: nil, action: nil
             ))
         }
@@ -60,8 +64,8 @@ final class AnalysisViewModel: ObservableObject {
     private func updateTraffic(packets: [PacketModel]) {
         let inbound  = packets.filter { $0.direction == .inbound  }.reduce(0) { $0 + $1.length }
         let outbound = packets.filter { $0.direction == .outbound }.reduce(0) { $0 + $1.length }
-        inboundKB  = Double(inbound)  / 1024.0
-        outboundKB = Double(outbound) / 1024.0
+        inboundBytes  = Int64(inbound)
+        outboundBytes = Int64(outbound)
     }
 
     private func updateDistribution(packets: [PacketModel]) {

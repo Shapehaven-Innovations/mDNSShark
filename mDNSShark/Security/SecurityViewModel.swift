@@ -27,6 +27,8 @@ final class SecurityViewModel: ObservableObject {
     @Published private(set) var isRefreshing: Bool = false
     @Published private(set) var threatDataStatus: ThreatDataStatus?
     @Published private(set) var refreshError: ThreatRefreshFailure?
+    /// When the last refresh attempt finished, so the footer can briefly confirm it ran.
+    @Published private(set) var lastRefreshCompletedAt: Date?
     @Published var groupMode:    GroupMode = .severity
 
     private let threatDatabase: ThreatDatabase
@@ -50,12 +52,13 @@ final class SecurityViewModel: ObservableObject {
     // MARK: - Rules
 
     private let portRules: [Int: (Severity, String, String, String)] = [
-        23:   (.critical,     "Telnet Exposed",            "Telnet transmits credentials in cleartext and has known RCE vulnerabilities.",               "Disable Telnet. Use SSH instead."),
-        21:   (.critical,     "FTP Exposed",               "FTP transmits credentials in cleartext. Known exploited vulnerabilities exist.",             "Disable FTP. Use SFTP/SCP instead."),
-        5900: (.critical,     "VNC Exposed",               "VNC has known authentication bypass and RCE vulnerabilities.",                               "Disable VNC or restrict to trusted IPs."),
-        5800: (.critical,     "VNC Web Interface Exposed", "VNC web console is exposed on the local network.",                                           "Disable VNC web interface."),
-        3389: (.critical,     "RDP Exposed",               "Remote Desktop Protocol is a frequent brute-force and RCE target.",                          "Disable RDP or restrict to VPN only."),
-        445:  (.warning,      "SMB Exposed",               "SMB has a history of critical vulnerabilities including EternalBlue.",                       "Keep SMB patched. Disable if unused."),
+        // Only cleartext-credential ports are critical; nothing here checks versions, so every other rule caps at .warning.
+        23:   (.critical,     "Telnet Exposed",            "Exposed Telnet service. Telnet sends logins and passwords in cleartext.",                    "Disable Telnet. Use SSH instead."),
+        21:   (.critical,     "FTP Exposed",               "Exposed FTP service. FTP sends logins and passwords in cleartext.",                          "Disable FTP. Use SFTP/SCP instead."),
+        5900: (.warning,      "VNC Exposed",               "Exposed VNC remote desktop service on the local network.",                                   "Disable VNC or restrict to trusted IPs."),
+        5800: (.warning,      "VNC Web Interface Exposed", "Exposed VNC web console on the local network.",                                              "Disable VNC web interface."),
+        3389: (.warning,      "RDP Exposed",               "Exposed Remote Desktop service. RDP is a common brute-force target.",                        "Disable RDP or restrict to VPN only."),
+        445:  (.warning,      "SMB Exposed",               "Exposed SMB file sharing service on the local network.",                                     "Keep SMB patched. Disable if unused."),
         139:  (.warning,      "NetBIOS Exposed",           "NetBIOS session service exposed.",                                                           "Disable NetBIOS over TCP/IP if unused."),
         22:   (.warning,      "SSH Exposed",               "SSH provides remote shell access. Ensure password auth is disabled.",                        "Use key-based SSH auth. Disable root login."),
         554:  (.warning,      "RTSP Stream Exposed",       "RTSP may allow unauthorized access to camera or media streams.",                             "Restrict RTSP to trusted IPs."),
@@ -66,15 +69,16 @@ final class SecurityViewModel: ObservableObject {
         8443: (.informational,"HTTPS Alternate Port",      "HTTPS service on port 8443.",                                                                 "Confirm this is an intended service.")
     ]
 
+    // All informational: an advertisement says a service may be running, not that its port is open.
     private let bonjourRules: [String: (Severity, String, String, String)] = [
-        "_telnet._tcp":           (.critical,     "Telnet Advertised via Bonjour",  "A Telnet service is broadcasting. Telnet is insecure.",                             "Disable Telnet immediately."),
-        "_rfb._tcp":              (.critical,     "VNC Advertised via Bonjour",     "A VNC remote desktop service is broadcasting.",                                      "Disable VNC or restrict to trusted hosts."),
-        "_vnc._tcp":              (.critical,     "VNC Advertised via Bonjour",     "A VNC remote desktop service is broadcasting.",                                      "Disable VNC or restrict to trusted hosts."),
-        "_ftp._tcp":              (.critical,     "FTP Advertised via Bonjour",     "An FTP service is broadcasting. FTP is insecure.",                                   "Disable FTP. Use SFTP instead."),
-        "_remotemanagement._tcp": (.warning,      "Remote Management Enabled",      "Apple Remote Desktop management is discoverable on the network.",                    "Restrict Remote Management to authorized users."),
-        "_ssh._tcp":              (.warning,      "SSH Advertised via Bonjour",     "SSH remote access is enabled.",                                                      "Use key-based auth. Disable root login."),
-        "_smb._tcp":              (.warning,      "SMB File Sharing Advertised",    "Windows-compatible file sharing is enabled.",                                        "Keep SMB patched. Restrict shares."),
-        "_workstation._tcp":      (.warning,      "SMB Workstation Advertised",     "A workstation SMB service is discoverable.",                                         "Ensure SMB shares require authentication."),
+        "_telnet._tcp":           (.informational,"Telnet Advertised via Bonjour",  "A Telnet service is advertised. Telnet sends logins and passwords in cleartext.",   "Disable Telnet if unused. Use SSH instead."),
+        "_rfb._tcp":              (.informational,"VNC Advertised via Bonjour",     "A VNC remote desktop service is advertised.",                                        "Disable VNC or restrict to trusted hosts."),
+        "_vnc._tcp":              (.informational,"VNC Advertised via Bonjour",     "A VNC remote desktop service is advertised.",                                        "Disable VNC or restrict to trusted hosts."),
+        "_ftp._tcp":              (.informational,"FTP Advertised via Bonjour",     "An FTP service is advertised. FTP sends logins and passwords in cleartext.",         "Disable FTP if unused. Use SFTP instead."),
+        "_remotemanagement._tcp": (.informational,"Remote Management Advertised",   "Apple Remote Desktop management is advertised on the network.",                      "Restrict Remote Management to authorized users."),
+        "_ssh._tcp":              (.informational,"SSH Advertised via Bonjour",     "An SSH remote access service is advertised.",                                        "Use key-based auth. Disable root login."),
+        "_smb._tcp":              (.informational,"SMB File Sharing Advertised",    "A Windows-compatible file sharing service is advertised.",                           "Keep SMB patched. Restrict shares."),
+        "_workstation._tcp":      (.informational,"SMB Workstation Advertised",     "A workstation SMB service is advertised.",                                           "Ensure SMB shares require authentication."),
         "_http._tcp":             (.informational,"HTTP Service Advertised",        "Unencrypted web service detected.",                                                  "Prefer HTTPS."),
         "_airplay._tcp":          (.informational,"AirPlay Receiver Advertised",    "This device accepts AirPlay streams from other devices on the network.",             "Limit AirPlay to the current user or turn it off when unused."),
         "_raop._tcp":             (.informational,"AirPlay Receiver Advertised",    "This device accepts AirPlay streams from other devices on the network.",             "Limit AirPlay to the current user or turn it off when unused."),
@@ -161,8 +165,12 @@ final class SecurityViewModel: ObservableObject {
             return
         }
 
+        // Stamped only when both phases finish, not on .alreadyRefreshing or a logged NVD failure.
+        var kevCompleted = false
+        var nvdCompleted = false
         do {
             let status = try await threatDatabase.refresh()
+            kevCompleted = true
             threatDataStatus = status
             if !lastAssessedDevices.isEmpty {
                 await assess(devices: lastAssessedDevices)
@@ -187,6 +195,7 @@ final class SecurityViewModel: ObservableObject {
         do {
             let priorityManufacturers = lastAssessedDevices.compactMap(\.manufacturer)
             try await threatDatabase.refreshNVDVendorData(priorityManufacturers: priorityManufacturers)
+            nvdCompleted = true
             threatDataStatus = await threatDatabase.status()
             if !lastAssessedDevices.isEmpty {
                 await assess(devices: lastAssessedDevices)
@@ -198,6 +207,7 @@ final class SecurityViewModel: ObservableObject {
         } catch {
             logger.error("NVD vendor refresh failed: \(String(describing: error), privacy: .public)")
         }
+        if kevCompleted && nvdCompleted { lastRefreshCompletedAt = Date() }
     }
 
     // MARK: - Computed views of findings
@@ -357,10 +367,11 @@ final class SecurityViewModel: ObservableObject {
         }
 
         let plural = matches.count == 1 ? "vulnerability" : "vulnerabilities"
-        let encodedVendorName = vendorName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? vendorName
+        let queryValueAllowed = CharacterSet.urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&+=?#"))
+        let encodedVendorName = vendorName.addingPercentEncoding(withAllowedCharacters: queryValueAllowed) ?? vendorName
         let referenceURL = kevMatches.isEmpty
             ? URL(string: "https://nvd.nist.gov/vuln/search/results?query=\(encodedVendorName)")
-            : URL(string: "https://www.cisa.gov/known-exploited-vulnerabilities-catalog")
+            : URL(string: "https://www.cisa.gov/known-exploited-vulnerabilities-catalog?search_api_fulltext=\(encodedVendorName)")
 
         return SecurityFinding(
             deviceID: device.id, deviceName: name, deviceIcon: icon,

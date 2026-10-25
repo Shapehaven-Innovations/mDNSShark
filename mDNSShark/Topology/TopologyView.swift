@@ -42,7 +42,9 @@ struct TopologyView: View {
             case .some(.informational): secStatus = .informational
             default:                    secStatus = .secure
             }
+            // Secure also covers informational-only devices, matching the header's "no warning or critical" definition.
             let secOK  = securityFilters.isEmpty || securityFilters.contains(secStatus)
+                || (secStatus == .informational && securityFilters.contains(.secure))
             let typeOK = typeFilters.isEmpty     || typeFilters.contains(device.deviceType)
             return secOK && typeOK
         }
@@ -80,11 +82,12 @@ struct TopologyView: View {
                                         .font(.headline)
                                     Spacer()
                                     Button { showingPicker = true } label: {
-                                        Image(systemName: "plus.circle")
+                                        Image(systemName: "pin.circle")
                                             .font(.title3)
                                             .foregroundColor(AppColors.info)
                                     }
                                     .buttonStyle(.plain)
+                                    .accessibilityLabel("Pin Devices")
                                 }
                                 .padding(.bottom, 10)
 
@@ -194,7 +197,7 @@ struct TopologyView: View {
                 HStack(spacing: 8) {
                     typeChip(nil,       "All")
                     typeChip(.router,   "Router")
-                    typeChip(.apple,    "Apple")
+                    typeChip(.apple,    "Apple (other)")
                     typeChip(.computer, "Computer")
                     typeChip(.printer,  "Printer")
                     typeChip(.tv,       "TV")

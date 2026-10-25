@@ -137,6 +137,26 @@ enum SharedSettings {
         return !reason.contains("127.0.0.1")
     }
 
+    /// Plain-language banner text for a raw drop reason, or nil when nothing should be shown.
+    /// The raw string stays in `tlsInterceptorLastError` for Settings.
+    static func userFacingTLSDropMessage(_ reason: String) -> String? {
+        if isBenignTLSDropReason(reason) { return nil }
+        // A session that ended cleanly with no response is not a failure.
+        if reason.contains("error=none") && reason.contains("respondedWithData=false") { return nil }
+        if reason.contains("-9825") || reason.localizedCaseInsensitiveContains("bad certificate") {
+            let host = tlsDropHost(reason) ?? "This server"
+            return "\(host) rejects inspection (certificate pinned)."
+        }
+        return reason
+    }
+
+    /// Host after "TLS for " or "TLS to " in a drop reason, with any port stripped.
+    private static func tlsDropHost(_ reason: String) -> String? {
+        guard let range = reason.range(of: "TLS for ") ?? reason.range(of: "TLS to ") else { return nil }
+        let host = reason[range.upperBound...].prefix { !$0.isWhitespace && $0 != ":" }
+        return host.isEmpty ? nil : String(host)
+    }
+
     static var tlsInterceptorDropCount: Int {
         get { suite.integer(forKey: "tlsInterceptorDropCount") }
         set { suite.set(newValue, forKey: "tlsInterceptorDropCount") }

@@ -18,7 +18,9 @@ struct CertDetailCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            LabeledContent("Subject", value: subject)
+            LabeledContent("Subject") {
+                Text(subject).lineLimit(1).truncationMode(.middle)
+            }
             if let d = expiry {
                 LabeledContent("Expires") {
                     Text(d, style: .date)
@@ -26,7 +28,10 @@ struct CertDetailCard: View {
                 }
             }
             HStack {
-                LabeledContent("Fingerprint", value: String(fingerprint.prefix(32)) + "…")
+                // Middle truncation keeps both ends of the hash visible without overflowing the card.
+                LabeledContent("Fingerprint") {
+                    Text(fingerprint).lineLimit(1).truncationMode(.middle)
+                }
                 Spacer()
                 Button(copied ? "Copied" : "Copy") {
                     UIPasteboard.general.string = fingerprint

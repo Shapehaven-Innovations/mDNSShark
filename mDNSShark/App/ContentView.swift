@@ -34,7 +34,7 @@ struct ContentView: View {
             if phase == .active {
                 Task { await PurchaseManager.shared.refreshEntitlements() }
                 let reason = SharedSettings.tlsInterceptorLastError
-                tlsError = SharedSettings.isBenignTLSDropReason(reason) ? "" : reason
+                tlsError = SharedSettings.userFacingTLSDropMessage(reason) ?? ""
             }
         }
         .onAppear {
@@ -43,7 +43,7 @@ struct ContentView: View {
                 hasShownOnboarding = true
             }
             let reason = SharedSettings.tlsInterceptorLastError
-            tlsError = SharedSettings.isBenignTLSDropReason(reason) ? "" : reason
+            tlsError = SharedSettings.userFacingTLSDropMessage(reason) ?? ""
         }
     }
 

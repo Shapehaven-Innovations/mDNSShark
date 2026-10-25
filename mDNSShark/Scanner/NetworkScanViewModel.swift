@@ -125,14 +125,15 @@ final class NetworkScanViewModel: ObservableObject {
         for device in raw {
             var ip = device.resolvedIPAddress ?? device.serviceName
             if ip.contains(":"), let host = device.hostName, let v4 = ipv4ByHost[host] { ip = v4 }
+            // Port-sweep and SSDP rows carry a non-Bonjour placeholder type; only real "_x._tcp" types are services.
+            let svc: BonjourService? = device.serviceType.hasPrefix("_") ? BonjourService(
+                serviceType: device.serviceType,
+                serviceName: device.serviceName,
+                port: device.port ?? 0,
+                txtRecords: device.txtRecords ?? [:]
+            ) : nil
             if var existing = byIP[ip] {
-                let svc = BonjourService(
-                    serviceType: device.serviceType,
-                    serviceName: device.serviceName,
-                    port: device.port ?? 0,
-                    txtRecords: device.txtRecords ?? [:]
-                )
-                if !existing.bonjourServices.contains(where: { $0.serviceType == svc.serviceType }) {
+                if let svc, !existing.bonjourServices.contains(where: { $0.serviceType == svc.serviceType }) {
                     existing.bonjourServices.append(svc)
                 }
                 if let p = device.port, !existing.openPorts.contains(p) {
@@ -156,12 +157,6 @@ final class NetworkScanViewModel: ObservableObject {
                     mfr = "eero"
                 }
                 if mfr == nil { mfr = appleManufacturer(serviceType: device.serviceType, txtRecords: device.txtRecords) }
-                let svc = BonjourService(
-                    serviceType: device.serviceType,
-                    serviceName: device.serviceName,
-                    port: device.port ?? 0,
-                    txtRecords: device.txtRecords ?? [:]
-                )
                 let os = inferOS(serviceType: device.serviceType, manufacturer: mfr, txtRecords: device.txtRecords)
                 let stableID = knownIDs[ip] ?? UUID()
                 knownIDs[ip] = stableID
@@ -173,7 +168,7 @@ final class NetworkScanViewModel: ObservableObject {
                     manufacturer:    mfr,
                     inferredOS:      os,
                     openPorts:       device.port.map { [$0] } ?? [],
-                    bonjourServices: [svc]
+                    bonjourServices: svc.map { [$0] } ?? []
                 )
                 // Re-merge stored raw enrichments against the FRESH baseline
                 // just built above, never against a stale pre-merged

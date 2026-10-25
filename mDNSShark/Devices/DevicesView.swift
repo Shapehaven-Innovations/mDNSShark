@@ -17,11 +17,14 @@ struct DevicesView: View {
                         ForEach(coordinator.networkScanViewModel.devices) { device in
                             let findings = coordinator.securityViewModel.findings.filter { $0.deviceID == device.id }
                             let issueCount = findings.count
+                            // Same semantics as Topology: vendor advisories never raise the colour above informational.
                             let badgeColor: Color = {
-                                if findings.contains(where: { $0.severity == .critical }) { return AppColors.critical }
-                                if findings.contains(where: { $0.severity == .warning })  { return AppColors.warning }
-                                if !findings.isEmpty { return AppColors.info }
-                                return AppColors.secure
+                                switch findings.worstDeviceSeverity {
+                                case .some(.critical):      return AppColors.critical
+                                case .some(.warning):       return AppColors.warning
+                                case .some(.informational): return AppColors.info
+                                case .none:                 return findings.hasVendorAdvisory ? AppColors.info : AppColors.secure
+                                }
                             }()
                             NavigationLink(destination: DeviceDetailView(device: device)) {
                                 DeviceCardView(device: device, issueCount: issueCount, badgeColor: badgeColor)

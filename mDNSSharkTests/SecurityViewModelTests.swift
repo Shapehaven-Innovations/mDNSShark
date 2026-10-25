@@ -148,6 +148,55 @@ struct SecurityViewModelTests {
         #expect(vendorFindings.allSatisfy { $0.severity == .warning })
         #expect(!vm.findings.contains { $0.source == .vendorAdvisory && $0.severity == .critical })
     }
+
+    // Issue #4: only cleartext-credential open ports are critical.
+    @Test("an open VNC port is a warning, not critical")
+    func vncOpenPortIsWarning() async {
+        let vm = makeViewModel()
+        let device = DiscoveredDevice(hostname: "mac-mini", ipAddress: "192.168.1.60", openPorts: [5900])
+        await vm.assess(devices: [device])
+        let vnc = vm.findings.first { $0.source == .portRule && $0.title == "VNC Exposed" }
+        #expect(vnc?.severity == .warning)
+        #expect(vm.criticalFindings.isEmpty)
+    }
+
+    @Test("an open Telnet port is critical")
+    func telnetOpenPortIsCritical() async {
+        let vm = makeViewModel()
+        let device = DiscoveredDevice(hostname: "old-switch", ipAddress: "192.168.1.61", openPorts: [23])
+        await vm.assess(devices: [device])
+        let telnet = vm.findings.first { $0.source == .portRule && $0.title == "Telnet Exposed" }
+        #expect(telnet?.severity == .critical)
+    }
+
+    @Test("a _rfb._tcp advertisement is informational")
+    func rfbAdvertIsInformational() async {
+        let vm = makeViewModel()
+        let device = DiscoveredDevice(
+            hostname: "mac-mini", ipAddress: "192.168.1.62",
+            bonjourServices: [BonjourService(serviceType: "_rfb._tcp", serviceName: "mac-mini", port: 5900)]
+        )
+        await vm.assess(devices: [device])
+        let rfb = vm.findings.first { $0.source == .bonjourRule }
+        #expect(rfb?.severity == .informational)
+    }
+
+    @Test("a device with only Bonjour advertisements is not counted vulnerable")
+    func bonjourOnlyDeviceNotVulnerable() async {
+        let vm = makeViewModel()
+        let device = DiscoveredDevice(
+            hostname: "nas", ipAddress: "192.168.1.63",
+            bonjourServices: [
+                BonjourService(serviceType: "_telnet._tcp", serviceName: "nas", port: 23),
+                BonjourService(serviceType: "_ftp._tcp", serviceName: "nas", port: 21),
+                BonjourService(serviceType: "_ssh._tcp", serviceName: "nas", port: 22),
+                BonjourService(serviceType: "_smb._tcp", serviceName: "nas", port: 445)
+            ]
+        )
+        await vm.assess(devices: [device])
+        #expect(!vm.findings.isEmpty)
+        #expect(vm.vulnerableDeviceCount == 0)
+    }
 }
 
 /// Polls a MainActor condition until it's true or a short timeout elapses,

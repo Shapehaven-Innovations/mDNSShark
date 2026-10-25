@@ -6,6 +6,7 @@ struct PacketCaptureView: View {
     @State private var selectedProtocol = "All"
     @State private var showWarning = false
     @State private var showExportError = false
+    @State private var showDeleteConfirm = false
     private let protocols = ["All", "TCP", "UDP", "DNS", "mDNS", "Other"]
 
     private var filtered: [PacketModel] {
@@ -44,6 +45,13 @@ struct PacketCaptureView: View {
                              ? "Waiting for packets…"
                              : "Tap Start to begin capturing.")
                         .foregroundColor(.secondary)
+                        if selectedProtocol == "mDNS" {
+                            Text("mDNS (Bonjour) is multicast traffic that iOS keeps on Wi-Fi, so it never enters the capture tunnel and will not appear here. Bonjour services found on your network are listed in the Devices tab.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 32)
+                        }
                     }
                     Spacer()
                 } else {
@@ -65,8 +73,16 @@ struct PacketCaptureView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     if coordinator.packetCaptureManager.hasCapture &&
                        !coordinator.packetCaptureManager.isCapturing {
-                        Button { exportPCAP() } label: {
-                            Label("Export", systemImage: "square.and.arrow.up")
+                        HStack(spacing: 12) {
+                            Button { exportPCAP() } label: {
+                                Label("Export", systemImage: "square.and.arrow.up")
+                            }
+                            Button(role: .destructive) { showDeleteConfirm = true } label: {
+                                Label("Delete Capture", systemImage: "trash")
+                            }
+                            .foregroundColor(AppColors.critical)
+                            // Wait for .disconnected so the extension can't rewrite capture-meta.json after deletion.
+                            .disabled(!coordinator.packetCaptureManager.isTunnelDisconnected)
                         }
                     }
                 }
@@ -98,6 +114,14 @@ struct PacketCaptureView: View {
             } message: {
                 Text("No capture file found. Run a capture session first.")
             }
+            .confirmationDialog("Delete Capture?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+                Button("Delete Capture", role: .destructive) {
+                    coordinator.packetCaptureManager.deleteCapture()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This permanently removes the captured packets, pcap file, and capture metadata from this device.")
+            }
         }
     }
 
@@ -108,15 +132,20 @@ struct PacketCaptureView: View {
         }
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd-HHmmss"
-        let name = "mDNSShark-\(formatter.string(from: Date())).pcap"
+        let stem = "mDNSShark-\(formatter.string(from: captureStartDate(metaURL: urls.meta)))"
+        let fm = FileManager.default
 
-        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(name)
-        try? FileManager.default.removeItem(at: tmp)
-        try? FileManager.default.copyItem(at: urls.pcap, to: tmp)
+        let tmp = fm.temporaryDirectory.appendingPathComponent("\(stem).pcap")
+        try? fm.removeItem(at: tmp)
+        try? fm.copyItem(at: urls.pcap, to: tmp)
 
         var items: [Any] = [tmp]
-        if FileManager.default.fileExists(atPath: urls.meta.path) {
-            items.append(urls.meta)
+        if fm.fileExists(atPath: urls.meta.path) {
+            let metaTmp = fm.temporaryDirectory.appendingPathComponent("\(stem)-meta.json")
+            try? fm.removeItem(at: metaTmp)
+            if (try? fm.copyItem(at: urls.meta, to: metaTmp)) != nil {
+                items.append(metaTmp)
+            }
         }
 
         let ac = UIActivityViewController(activityItems: items, applicationActivities: nil)
@@ -124,5 +153,17 @@ struct PacketCaptureView: View {
            let root = scene.windows.first?.rootViewController {
             root.present(ac, animated: true)
         }
+    }
+
+    // Names exports by capture start (meta captureStart, else first packet) so pcap and meta pair up.
+    private func captureStartDate(metaURL: URL) -> Date {
+        if let data = try? Data(contentsOf: metaURL),
+           let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let str = obj["captureStart"] as? String {
+            let frac = ISO8601DateFormatter()
+            frac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let d = ISO8601DateFormatter().date(from: str) ?? frac.date(from: str) { return d }
+        }
+        return coordinator.packetCaptureManager.packets.first?.timestamp ?? Date()
     }
 }

@@ -43,11 +43,11 @@ struct PacketDetailView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("Payload (Plaintext)").font(.headline)
                             Divider()
-                            ScrollView(.horizontal, showsIndicators: true) {
-                                Text(text)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .padding(.vertical, 4)
-                            }
+                            Text(text)
+                                .font(.system(.caption, design: .monospaced))
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 4)
                         }
                     }
                 }
@@ -96,16 +96,17 @@ struct PacketDetailView: View {
         var lines: [String] = []
         var i = 0
         while i < tokens.count {
-            let chunk = Array(tokens[i..<min(i + 16, tokens.count)])
+            // 8 bytes per row so offset, hex and ASCII fit a phone-width card without scrolling.
+            let chunk = Array(tokens[i..<min(i + 8, tokens.count)])
             let offset = String(format: "%04x", i)
             let hex = chunk.joined(separator: " ")
-            let padded = hex.padding(toLength: 16 * 3 - 1, withPad: " ", startingAt: 0)
+            let padded = hex.padding(toLength: 8 * 3 - 1, withPad: " ", startingAt: 0)
             let ascii = chunk
                 .compactMap { UInt8($0, radix: 16) }
                 .map { ($0 >= 32 && $0 < 127) ? String(UnicodeScalar($0)) : "." }
                 .joined()
             lines.append("\(offset)  \(padded)  \(ascii)")
-            i += 16
+            i += 8
         }
         return lines.joined(separator: "\n")
     }

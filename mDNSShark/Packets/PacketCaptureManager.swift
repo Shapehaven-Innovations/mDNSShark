@@ -8,11 +8,21 @@ final class PacketCaptureManager: ObservableObject {
     @Published var packets: [PacketModel] = []
     @Published var isCapturing: Bool = false
     @Published var hasCapture: Bool = false
+    // True only once the tunnel reports .disconnected, so deletion can't race the extension's final meta write.
+    @Published private(set) var isTunnelDisconnected: Bool = true
 
     private var tunnelManager: NETunnelProviderManager?
     private var fileReadTimer: Timer?
     private var statusObserver: NSObjectProtocol?
     private var logOffset: UInt64 = 0
+
+    // Shared formatters so polling doesn't allocate two per decoded packet.
+    private nonisolated static let fractionalISO8601: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    private nonisolated static let wholeSecondISO8601 = ISO8601DateFormatter()
 
     private let sharedFileURL: URL = {
         let base = FileManager.default
@@ -42,21 +52,36 @@ final class PacketCaptureManager: ObservableObject {
             self.observeVPNStatus()
             do {
                 try self.tunnelManager?.connection.startVPNTunnel()
+                self.isTunnelDisconnected = false
             } catch { print("VPN start error: \(error)") }
         }
     }
 
+    // The status observer stays installed so it can flip isTunnelDisconnected once the stop completes.
     func stopCapture() {
+        if let status = tunnelManager?.connection.status, status != .disconnected, status != .invalid {
+            isTunnelDisconnected = false
+        }
         tunnelManager?.connection.stopVPNTunnel()
         isCapturing = false
         hasCapture = !packets.isEmpty
         stopPolling()
-        removeStatusObserver()
     }
 
     func exportURLs() -> (pcap: URL, meta: URL)? {
         guard FileManager.default.fileExists(atPath: pcapFileURL.path) else { return nil }
         return (pcapFileURL, metaFileURL)
+    }
+
+    /// Removes the on-device capture files and clears the in-memory packet list.
+    func deleteCapture() {
+        guard isTunnelDisconnected else { return }
+        for url in [sharedFileURL, pcapFileURL, metaFileURL] {
+            try? FileManager.default.removeItem(at: url)
+        }
+        packets.removeAll()
+        logOffset = 0
+        hasCapture = false
     }
 
     /// Authoritative check for whether the capture tunnel is (or is about
@@ -98,11 +123,13 @@ final class PacketCaptureManager: ObservableObject {
                 guard let self else { return }
                 switch self.tunnelManager?.connection.status {
                 case .connected:
+                    self.isTunnelDisconnected = false
                     self.isCapturing = true
                     self.logOffset = 0
                     self.packets.removeAll()
                     self.startPolling()
                 case .disconnected, .invalid:
+                    self.isTunnelDisconnected = true
                     self.isCapturing = false
                     self.hasCapture = !self.packets.isEmpty
                     self.stopPolling()
@@ -230,7 +257,13 @@ final class PacketCaptureManager: ObservableObject {
         logOffset += UInt64(completeBytes.count)
 
         let dec = JSONDecoder()
-        dec.dateDecodingStrategy = .iso8601
+        // The tunnel writes fractional-second ISO8601; whole-second strings are still accepted.
+        dec.dateDecodingStrategy = .custom { decoder in
+            let c = try decoder.singleValueContainer()
+            let str = try c.decode(String.self)
+            if let d = Self.fractionalISO8601.date(from: str) ?? Self.wholeSecondISO8601.date(from: str) { return d }
+            throw DecodingError.dataCorruptedError(in: c, debugDescription: "Invalid ISO8601 date: \(str)")
+        }
         let newPackets = completeBytes
             .split(separator: newline)
             .compactMap { slice -> PacketModel? in

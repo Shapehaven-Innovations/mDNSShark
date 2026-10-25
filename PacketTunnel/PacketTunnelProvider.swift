@@ -106,6 +106,8 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             guard let self else { return }
             let packet = self.parse(rawIP, direction: direction, isReconstructed: isReconstructed)
             guard SharedSettings.captureFilterProtocols.contains(packet.protocolName) else { return }
+            // Only written packets consume a frame number; without TLS inspection the meta count matches the pcap.
+            self.counter += 1
             self.writeJSON(packet)
             self.pcapWriter.appendPacket(rawIP, at: packet.timestamp, isReconstructed: isReconstructed)
         }
@@ -133,6 +135,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
                 isReconstructed: true
             )
             self.writeJSON(packet)
+            // Decrypted entries take a frame number but have no pcap record, so TLS captures overcount the pcap.
             self.counter += 1
         }
     }
@@ -291,7 +294,6 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             hexDump: hex, payloadText: payloadText,
             direction: direction, isReconstructed: isReconstructed
         )
-        counter += 1
         return m
     }
 
@@ -304,14 +306,24 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             protocolName: proto, length: len, info: info, hexDump: hex,
             direction: direction, isReconstructed: isReconstructed
         )
-        counter += 1
         return m
     }
+
+    // Fractional seconds keep sub-second packet timing (plain .iso8601 drops it); shared to avoid per-packet allocation.
+    private static let packetDateFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
 
     // Called on logQueue - uses the persistent logHandle for atomic append.
     private func writeJSON(_ packet: PacketModel) {
         guard let fh = logHandle else { return }
-        let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601
+        let enc = JSONEncoder()
+        enc.dateEncodingStrategy = .custom { date, encoder in
+            var c = encoder.singleValueContainer()
+            try c.encode(Self.packetDateFormatter.string(from: date))
+        }
         guard let jsonData = try? enc.encode(packet),
               let newline = "\n".data(using: .utf8) else { return }
         fh.write(jsonData + newline)
@@ -340,8 +352,11 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         }
     }
 
+    // Question name starts after the 12-byte DNS header; the QR bit marks responses.
     private func parseDNS(_ bytes: [UInt8]) -> String {
-        var labels: [String] = []; var i = 4
+        guard bytes.count >= 12 else { return "DNS packet" }
+        let isResponse = bytes[2] & 0x80 != 0
+        var labels: [String] = []; var i = 12
         while i < bytes.count {
             let len = Int(bytes[i]); i += 1
             if len == 0 { break }
@@ -349,6 +364,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             if let s = String(bytes: Array(bytes[i..<i+len]), encoding: .utf8) { labels.append(s) }
             i += len
         }
-        return labels.isEmpty ? "DNS query" : "Query: \(labels.joined(separator: "."))"
+        let kind = isResponse ? "Response" : "Query"
+        return labels.isEmpty ? "DNS \(kind.lowercased())" : "\(kind): \(labels.joined(separator: "."))"
     }
 }

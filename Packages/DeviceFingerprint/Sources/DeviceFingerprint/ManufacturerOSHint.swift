@@ -6,7 +6,7 @@ import Foundation
 /// resolve to any of thousands of unrelated companies: laptops, phones,
 /// printers, etc).
 ///
-/// Deliberately scoped to router/AP/NAS-class vendors only, and safe to
+/// Deliberately scoped to router/AP/NAS/IoT/TV-class vendors only, and safe to
 /// call with ANY manufacturer string for exactly that reason: it returns
 /// nil for anything not in this curated list rather than guessing at
 /// vendors where "embedded Linux" would be a wrong assumption (e.g.
@@ -23,9 +23,16 @@ public func inferredOSFamily(forManufacturer manufacturer: String) -> String? {
     if lower.contains("mikrotik") {
         return "RouterOS (MikroTik, Linux-based, likely)"
     }
+    if lower.contains("espressif") {
+        return "ESP-IDF (Espressif, FreeRTOS-based, likely)"
+    }
+    // Full "lg electronics" match, since a bare "lg" substring hits unrelated vendor names.
+    if lower.contains("lg electronics") {
+        return "webOS (LG, Linux-based, likely)"
+    }
 
     let genericEmbeddedLinuxVendors = [
-        "ubiquiti", "linksys", "tp-link", "tplink", "gl.inet", "gl-inet", "netgear", "asus"
+        "ubiquiti", "linksys", "tp-link", "tplink", "gl.inet", "gl-inet", "netgear", "asus", "amcrest"
     ]
     if genericEmbeddedLinuxVendors.contains(where: lower.contains) {
         return "Linux (embedded, likely)"

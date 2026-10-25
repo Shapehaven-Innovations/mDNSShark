@@ -22,6 +22,8 @@ struct TabBarView: View {
             Image(systemName: tab.icon).font(.subheadline)
             Text(tab.rawValue)
                 .font(.subheadline.weight(selectedTab == tab ? .semibold : .regular))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
         .foregroundColor(selectedTab == tab ? AppColors.info : .secondary)
         .padding(.horizontal, 14).padding(.vertical, 8)
