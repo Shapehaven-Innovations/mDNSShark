@@ -99,7 +99,7 @@ struct ThreatDataStatus: Equatable, Sendable {
             nvdText = "NVD: refreshed \(refreshed.formatted(date: .abbreviated, time: .shortened))."
             if nvdStale { nvdText += " Over 30 days old." }
         } else if let checked = nvdLastCheckedAt {
-            nvdText = "NVD: checked \(checked.formatted(date: .abbreviated, time: .omitted)), no covered vendors on this network."
+            nvdText = "NVD: checked \(checked.formatted(date: .abbreviated, time: .shortened)), no covered vendors on this network."
         } else {
             nvdText = "NVD: not yet refreshed."
         }

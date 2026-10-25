@@ -56,7 +56,7 @@ struct SecurityView: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 HStack {
-                    stat(vm.findings.count,        "Findings",              AppColors.critical)
+                    stat(vm.findings.count,        "Findings",              AppColors.info)
                     Divider().frame(height: 40)
                     stat(vm.vulnerableDeviceCount, "Vulnerable Devices",    AppColors.warning)
                 }

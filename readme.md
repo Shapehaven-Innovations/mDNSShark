@@ -157,10 +157,10 @@ The iOS trust profile survives rebuilds and reinstalls. If Settings shows "Insta
 Apps that use certificate pinning (banking, health, government) fail if intercepted. Add their domains to the **TLS Bypass List** in Settings:
 
 - Enter a domain suffix (e.g. `bank.com`) and tap **+**.
-- Any connection whose SNI ends with a listed suffix is passed through uninspected.
+- Any connection whose SNI ends with a listed suffix is not inspected. In 1.9 the connection is closed instead of relayed, so the app or site will fail to load while inspection is on (see issue #6). Turn off TLS Inspection to use pinned apps.
 - Swipe left to delete an entry.
 
-**Apple's own services are bypassed by default.** The list ships with `mask.icloud.com` and `mask-h2.icloud.com` (Private Relay egress, which rejects inspecting proxies with `-9830`) and `gateway.icloud.com` (certificate-pinned, fails with `-9825`). This is not a bug in `TLSInterceptor.swift`; these services resist MITM by design. These defaults are pre-filled in the list and stay in effect unless you swipe to remove them. Other pinned Apple hosts, such as `push.apple.com` (APNs) or a host named in the error banner, can be added the same way. The bypass list **can be cleared by a rebuild or reinstall**, which restores the three defaults.
+**Apple's own services are bypassed by default.** The list ships with `mask.icloud.com` and `mask-h2.icloud.com` (Private Relay egress, which rejects inspecting proxies with `-9830`) and `gateway.icloud.com` (certificate-pinned, fails with `-9825`). This is not a bug in `TLSInterceptor.swift`; these services resist MITM by design. These defaults are pre-filled. Until #6 is fixed a listed host is closed, not relayed, so Private Relay and iCloud traffic will fail during an inspected capture. Other pinned Apple hosts, such as `push.apple.com` (APNs) or a host named in the error banner, can be added the same way. The bypass list **can be cleared by a rebuild or reinstall**, which restores the three defaults.
 
 ### DNS Server
 
@@ -168,7 +168,9 @@ The extension uses configurable upstream DNS resolvers, a primary and a secondar
 
 ### Capture Filters
 
-The **Capture** section in Settings has a chip for each protocol the capture view can show: `DNS`, `mDNS`, `HTTPS`, `HTTP`, `TCP`, `UDP`, `ICMP`. Tap a chip to turn it on or off. All are on by default.
+The **Capture** section in Settings has a chip for each protocol the capture view can show: `DNS`, `mDNS`, `HTTPS`, `HTTP`, `TCP`, `UDP`, `ICMP`. Tap a chip to turn it on or off. All are on by default. mDNS is multicast that iOS keeps on Wi-Fi; it never enters the capture tunnel, so that chip has no effect on captures. ARP is not captured either.
+
+**Delete Capture** removes the last capture's log, pcap and meta file from the app. Temporary export copies are not removed.
 
 <details>
 <summary>Shared settings and certificate storage (for contributors)</summary>
@@ -201,7 +203,7 @@ CA and leaf material is stored in the iOS Keychain under the shared access group
 | Per-domain leaf private keys      | `kSecClassKey` (tag `mdns.leaf.<domain>`) |
 | Per-domain leaf certificates      | `kSecClassCertificate`                    |
 
-**Remove Certificate** in Settings purges all CA items and disables inspection. Stopping the tunnel calls `LeafCertCache.purge()`, which deletes leaf items.
+**Remove Certificate** in Settings asks for confirmation, then purges all CA items and disables inspection. It cannot remove the iOS profile; delete "mDNSShark CA" under Settings > General > VPN & Device Management yourself. Stopping the tunnel calls `LeafCertCache.purge()`, which deletes leaf items.
 
 </details>
 
