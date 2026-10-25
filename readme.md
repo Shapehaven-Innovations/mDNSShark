@@ -6,7 +6,7 @@ mDNSShark is an **open-source** iPhone app that shows what is on your local netw
 
 ## Simplicity and Privacy
 
-Every scan runs on your phone, with **no external servers**. The one exception is a button you tap yourself: **Refresh CISA Data** on the Security tab downloads CISA's public vulnerability catalog and asks NIST's National Vulnerability Database (NVD) about specific device vendors. Your device list and scan results are never uploaded, but those NVD queries do name vendors seen on your network (see [Security Assessment](#security-assessment)). There is no telemetry, no analytics, and no trackers. The only permission the app needs is local network access.
+Every scan runs on your phone, with **no external servers**. The one exception is a button you tap yourself: **Refresh CISA Data** on the Security tab downloads CISA's public vulnerability catalog and asks NIST's National Vulnerability Database (NVD) about specific device vendors. Your device list and scan results are never uploaded, but those NVD queries do name vendors seen on your network (see [Security Assessment](#security-assessment)). There is no telemetry, no analytics, and no trackers. Discovery needs only local network access; Packet Capture also asks you to allow a VPN configuration.
 
 <details>
 <summary><strong>Terms in a Hurry</strong></summary>
@@ -81,7 +81,7 @@ Two Settings toggles combine: **Include LAN traffic** and **Enable TLS Inspectio
 
 | Mode | What is captured | What is not | Use it for |
 | ---- | ---------------- | ----------- | ---------- |
-| LAN off, TLS off | This phone's internet traffic, encrypted | Decrypted HTTPS, LAN traffic | Seeing who the phone talks to (DNS, SNI, ports) |
+| LAN off, TLS off | This phone's internet traffic, encrypted | Decrypted HTTPS, LAN traffic | Seeing who the phone talks to (DNS names, IP addresses, ports; SNI is visible when the pcap is opened in Wireshark) |
 | LAN off, TLS on | Same, plus decrypted HTTPS requests. UDP/QUIC on 443 is dropped so apps fall back to TCP | LAN traffic | Reading what apps send over HTTPS |
 | LAN on, TLS off | Adds this phone's traffic to other devices on the Wi-Fi subnet (scan probes appear) | Decrypted HTTPS | Seeing what a LAN scan sends |
 | LAN on, TLS on | Everything above, plus decrypted HTTPS to a LAN host by IP on port 443, with no certificate warning (tested with one self-signed host) | Nothing extra | Inspecting a device's web interface |
