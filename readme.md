@@ -203,7 +203,7 @@ CA and leaf material is stored in the iOS Keychain under the shared access group
 | Per-domain leaf private keys      | `kSecClassKey` (tag `mdns.leaf.<domain>`) |
 | Per-domain leaf certificates      | `kSecClassCertificate`                    |
 
-**Remove Certificate** in Settings asks for confirmation, then purges all CA items and disables inspection. It cannot remove the iOS profile; delete "mDNSShark CA" under Settings > General > VPN & Device Management yourself. Stopping the tunnel calls `LeafCertCache.purge()`, which deletes leaf items.
+**Remove Certificate** in Settings asks for confirmation, then purges all CA items and disables inspection. It cannot remove the iOS profile, so an alert offers an Open Settings button (iOS opens the app's own Settings page); delete "mDNSShark CA" under Settings > General > VPN & Device Management yourself. Stopping the tunnel calls `LeafCertCache.purge()`, which deletes leaf items.
 
 </details>
 

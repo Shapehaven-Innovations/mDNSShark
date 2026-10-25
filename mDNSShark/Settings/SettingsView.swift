@@ -93,9 +93,15 @@ struct SettingsView: View {
             } message: {
                 Text("This deletes the CA and its private key from mDNSShark and turns off TLS Inspection.")
             }
-            .alert("Remove the iOS Profile Too", isPresented: $showRemoveProfileReminder,
-                   actions: { Button("OK") {} },
-                   message: { Text("iOS still trusts the \"mDNSShark CA\" profile. Remove it in Settings > General > VPN & Device Management.") })
+            .alert("Remove the Profile in Settings", isPresented: $showRemoveProfileReminder,
+                   actions: {
+                       // iOS has no public deep link to VPN & Device Management; this opens the app's own Settings page.
+                       Button("Open Settings") {
+                           if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                       }
+                       Button("Cancel", role: .cancel) {}
+                   },
+                   message: { Text("mDNSShark deleted its copy of the certificate. To finish, open Settings, go to General › VPN & Device Management, choose the mDNSShark profile, and remove it.") })
         }
     }
 
