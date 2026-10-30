@@ -65,7 +65,7 @@ struct DeviceDetailView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(svc.serviceType).font(.subheadline.weight(.semibold))
                                     Text(svc.serviceName).font(.caption).foregroundColor(.secondary)
-                                    if svc.port > 0 { Text("Port \(String(svc.port))").font(.caption2).foregroundColor(.secondary) }
+                                    if svc.port > 0 { Text("Advertised port \(String(svc.port))").font(.caption2).foregroundColor(.secondary) }
                                 }
                                 if svc.id != device.bonjourServices.last?.id { Divider() }
                             }

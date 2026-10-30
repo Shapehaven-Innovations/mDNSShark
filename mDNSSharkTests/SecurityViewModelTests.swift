@@ -170,6 +170,28 @@ struct SecurityViewModelTests {
         #expect(telnet?.severity == .critical)
     }
 
+    // Issue #13: a port a device only advertises is not an open port.
+    @Test("a Bonjour-advertised port produces no port finding")
+    func advertisedPortProducesNoPortFinding() async {
+        let vm = makeViewModel()
+        let camera = DiscoveredDevice(
+            hostname: "amcrest-camera", ipAddress: "10.10.10.87",
+            bonjourServices: [BonjourService(serviceType: "_http._tcp", serviceName: "AMC060E7AF0A5BCE81", port: 80)]
+        )
+        await vm.assess(devices: [camera])
+        #expect(!vm.findings.contains { $0.source == .portRule })
+        #expect(vm.findings.contains { $0.source == .bonjourRule && $0.title == "HTTP Service Advertised" })
+    }
+
+    @Test("a confirmed open port 80 produces the HTTP Service finding")
+    func confirmedPortProducesPortFinding() async {
+        let vm = makeViewModel()
+        let device = DiscoveredDevice(hostname: "web-host", ipAddress: "192.168.1.64", openPorts: [80])
+        await vm.assess(devices: [device])
+        let http = vm.findings.first { $0.source == .portRule && $0.title == "HTTP Service" }
+        #expect(http?.severity == .informational)
+    }
+
     @Test("a _rfb._tcp advertisement is informational")
     func rfbAdvertIsInformational() async {
         let vm = makeViewModel()

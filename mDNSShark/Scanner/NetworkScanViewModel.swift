@@ -101,7 +101,9 @@ final class NetworkScanViewModel: ObservableObject {
         return "\(prefix)0/24"
     }
 
-    private func merge(raw: [NetworkScanner.Device]) -> [DiscoveredDevice] {
+    /// Builds the device rows from the scanner's raw results. `openPorts` is never seeded from `Device.port`: that port is only
+    /// advertised (Bonjour resolve or SSDP LOCATION) and stays on the service; open ports arrive solely via the enrichment sink.
+    func merge(raw: [NetworkScanner.Device]) -> [DiscoveredDevice] {
         var byIP: [String: DiscoveredDevice] = [:]
         // One host can resolve to different address families per service (AirPlay IPv6-only, RAOP IPv4-only), so rows that share a host name collapse onto its IPv4.
         var ipv4ByHost: [String: String] = [:]
@@ -121,9 +123,6 @@ final class NetworkScanViewModel: ObservableObject {
             if var existing = byIP[ip] {
                 if let svc, !existing.bonjourServices.contains(where: { $0.serviceType == svc.serviceType }) {
                     existing.bonjourServices.append(svc)
-                }
-                if let p = device.port, !existing.openPorts.contains(p) {
-                    existing.openPorts.append(p)
                 }
                 if existing.manufacturer == nil {
                     existing.manufacturer = appleManufacturer(serviceType: device.serviceType, txtRecords: device.txtRecords)
@@ -153,7 +152,6 @@ final class NetworkScanViewModel: ObservableObject {
                     macAddress:      mac,
                     manufacturer:    mfr,
                     inferredOS:      os,
-                    openPorts:       device.port.map { [$0] } ?? [],
                     bonjourServices: svc.map { [$0] } ?? []
                 )
                 // Re-merge stored raw enrichments against the fresh baseline, not a stale merged snapshot.

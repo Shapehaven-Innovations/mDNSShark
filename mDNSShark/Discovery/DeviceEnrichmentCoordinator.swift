@@ -158,7 +158,7 @@ final class DeviceEnrichmentCoordinator {
             }
             if let r = await ssdp {
                 enrichments.append(DeviceEnrichment(mac: nil, manufacturer: r.manufacturer, inferredOS: nil,
-                                                     openPorts: [], source: .ssdpDescription))
+                                                     openPorts: Self.confirmedPorts(descriptionURL: locationURL), source: .ssdpDescription))
             }
             let scannedPorts = await ports
             if !scannedPorts.isEmpty {
@@ -201,7 +201,7 @@ final class DeviceEnrichmentCoordinator {
             defer { activeTasks.removeValue(forKey: taskID) }
             guard let info = await limitedSSDPFetch(locationURL: locationURL) else { return }
             let enrichment = DeviceEnrichment(mac: nil, manufacturer: info.manufacturer, inferredOS: nil,
-                                               openPorts: [], source: .ssdpDescription)
+                                               openPorts: Self.confirmedPorts(descriptionURL: locationURL), source: .ssdpDescription)
             results.send((ip: ip, enrichments: [enrichment]))
         }
         activeTasks[taskID] = task
@@ -238,6 +238,12 @@ final class DeviceEnrichmentCoordinator {
             results.send((ip: ip, enrichments: [enrichment]))
         }
         activeTasks[taskID] = task
+    }
+
+    /// A 2xx description fetch is a real TCP connection to the LOCATION port, so it is the one port an SSDP reply confirms.
+    static func confirmedPorts(descriptionURL: URL?) -> [Int] {
+        guard let descriptionURL else { return [] }
+        return [descriptionURL.port ?? 80]
     }
 
     /// Cancels every in-flight `enrich`/`enrichDescription`/`enrichGoogleWifi` task and clears

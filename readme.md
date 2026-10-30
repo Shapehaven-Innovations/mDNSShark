@@ -42,7 +42,7 @@ The Security tab turns scan results into findings, grouped by severity, by devic
 
 Each device is assessed in three layers (code: `mDNSShark/Security/SecurityViewModel.swift`):
 
-- **Exposed ports.** Telnet and FTP (cleartext logins) are Critical. VNC, RDP, SMB, NetBIOS, SSH, and RTSP are Warnings. UPnP and plain or admin HTTP/HTTPS are Informational.
+- **Exposed ports.** Telnet and FTP (cleartext logins) are Critical. VNC, RDP, SMB, NetBIOS, SSH, and RTSP are Warnings. UPnP and plain or admin HTTP/HTTPS are Informational. Only ports confirmed by a successful TCP connection count as open; a port a device merely advertises over Bonjour or SSDP does not.
 - **Bonjour services.** Services a device announces over mDNS (`_telnet._tcp`, `_ssh._tcp`, `_smb._tcp`, and so on) are Informational, since an advertisement does not confirm an open port.
 - **Manufacturer advisories.** The device's manufacturer, as identified by the scan, is matched by whole word against 28 vendors in `mDNSShark/Resources/nist_cpe_map.json` (`vendorAdvisories`). A matched vendor is then checked against:
   - **CISA KEV** for 19 vendors (ASUS, NETGEAR, D-Link, TP-Link, Zyxel, QNAP, MikroTik, Ubiquiti, Hikvision, Dahua, DrayTek, Tenda, Reolink, TerraMaster, Netis, Edimax, Arcadyan, DZS, Apple).
