@@ -4,22 +4,14 @@ import SwiftUI
 struct PacketCaptureView: View {
     @EnvironmentObject var coordinator: AppCoordinator
     @State private var selectedProtocol = "All"
+    @State private var decryptedOnly = false
     @State private var showWarning = false
     @State private var showExportError = false
     @State private var showDeleteConfirm = false
-    private let protocols = ["All", "TCP", "UDP", "DNS", "mDNS", "Other"]
+    private let protocols = PacketCaptureChip.all
 
     private var filtered: [PacketModel] {
-        let all = coordinator.packetCaptureManager.packets
-        switch selectedProtocol {
-        case "All":   return all
-        case "TCP":   return all.filter { ["TCP","HTTP","HTTPS"].contains($0.protocolName) }
-        case "UDP":   return all.filter { $0.protocolName == "UDP" }
-        case "Other":
-            let known: Set<String> = ["TCP","UDP","DNS","mDNS","HTTPS","HTTP","ICMP"]
-            return all.filter { !known.contains($0.protocolName) }
-        default:      return all.filter { $0.protocolName == selectedProtocol }
-        }
+        coordinator.packetCaptureManager.packets.filtered(byChip: selectedProtocol, decryptedOnly: decryptedOnly)
     }
 
     var body: some View {
@@ -28,13 +20,25 @@ struct PacketCaptureView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(protocols, id: \.self) { p in
-                            Button(p) { selectedProtocol = p }
+                            Button(p) {
+                                selectedProtocol = p
+                                if p != "TCP" { decryptedOnly = false }
+                            }
                                 .buttonStyle(.bordered)
                                 .tint(selectedProtocol == p ? AppColors.info : .secondary)
                                 .font(.caption.weight(selectedProtocol == p ? .semibold : .regular))
                         }
                     }
                     .padding(.horizontal, 16).padding(.vertical, 8)
+                }
+                if selectedProtocol == "TCP" {
+                    Picker("TCP entries", selection: $decryptedOnly) {
+                        Text("All TCP").tag(false)
+                        Text("Decrypted").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .font(.caption)
+                    .padding(.horizontal, 16).padding(.bottom, 8)
                 }
                 Divider()
                 if filtered.isEmpty {
@@ -47,6 +51,12 @@ struct PacketCaptureView: View {
                         .foregroundColor(.secondary)
                         if selectedProtocol == "mDNS" {
                             Text("mDNS (Bonjour) is multicast traffic that iOS keeps on Wi-Fi, so it never enters the capture tunnel and will not appear here. Bonjour services found on your network are listed in the Devices tab.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 32)
+                        } else if decryptedOnly {
+                            Text("Decrypted HTTPS requests appear here only while TLS Inspection is enabled in Settings and the mDNSShark CA certificate is installed and trusted on this device. Domains on the Bypass List are relayed without decryption.")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.center)
@@ -165,5 +175,27 @@ struct PacketCaptureView: View {
             if let d = ISO8601DateFormatter().date(from: str) ?? frac.date(from: str) { return d }
         }
         return coordinator.packetCaptureManager.packets.first?.timestamp ?? Date()
+    }
+}
+
+/// Quick-filter chips on the Packet Capture tab, in display order.
+enum PacketCaptureChip {
+    static let all = ["All", "TCP", "UDP", "DNS", "mDNS", "Other"]
+    static let tcpProtocols: Set<String> = ["TCP", "HTTP", "HTTPS"]
+    static let knownProtocols: Set<String> = ["TCP", "UDP", "DNS", "mDNS", "HTTPS", "HTTP", "ICMP"]
+}
+
+extension Array where Element == PacketModel {
+    /// Applies a chip from `PacketCaptureChip.all`; `decryptedOnly` then narrows the result to decrypted HTTPS requests, which only the TCP chip offers.
+    func filtered(byChip chip: String, decryptedOnly: Bool = false) -> [PacketModel] {
+        let byChip: [PacketModel]
+        switch chip {
+        case "All":   byChip = self
+        case "TCP":   byChip = filter { PacketCaptureChip.tcpProtocols.contains($0.protocolName) }
+        case "UDP":   byChip = filter { $0.protocolName == "UDP" }
+        case "Other": byChip = filter { !PacketCaptureChip.knownProtocols.contains($0.protocolName) }
+        default:      byChip = filter { $0.protocolName == chip }
+        }
+        return decryptedOnly ? byChip.filter { $0.isDecryptedRequest } : byChip
     }
 }
