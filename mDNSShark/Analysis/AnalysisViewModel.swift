@@ -22,10 +22,12 @@ final class AnalysisViewModel: ObservableObject {
 
     init() {}
 
+    // Decrypted requests duplicate bytes already counted as encrypted frames and have no pcap record, so only real frames count.
     func ingest(packets: [PacketModel]) {
-        totalPackets = packets.count
-        updateTraffic(packets: packets)
-        updateDistribution(packets: packets)
+        let frames = packets.filter { !$0.isDecryptedRequest }
+        totalPackets = frames.count
+        updateTraffic(packets: frames)
+        updateDistribution(packets: frames)
     }
 
     func update(findings: [SecurityFinding]) {

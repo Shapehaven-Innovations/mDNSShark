@@ -120,7 +120,7 @@ Console access to a network extension on a real iPhone is unreliable, so the ext
 
 - **Error banner** (`tlsInterceptorLastError`): the app shows the extension's last non-benign drop reason in a dismissible banner. `tlsInterceptorDropCount` still counts drops, but its Settings line is disabled.
 - **Unified log:** `log stream --level debug --predicate 'subsystem == "com.mDNSShark.PacketTunnel"'`. Key lines: `sendSYNACK to ...`, `device-facing TLS READY` (the device trusted the leaf), and `first write to device`.
-- **Packet capture:** the `.pcap` export includes the extension's own synthetic packets, tagged `[reconstructed]` in the capture view.
+- **Packet capture:** the `.pcap` export includes the extension's own synthetic packets, tagged `[reconstructed]` in the capture view. Decrypted HTTPS requests are numbered `D-1`, `D-2`, ... on their own sequence and are neither written to the pcap nor counted in `totalPackets` (they appear as `decryptedRequests` in `capture-meta.json`), so frame N in the app is frame N in Wireshark.
 - **Signposts:** each plain relay flow is an `OSSignposter` interval (`relayFlow`) in Instruments.
 
 </details>

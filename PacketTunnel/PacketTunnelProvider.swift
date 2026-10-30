@@ -5,7 +5,7 @@ import Darwin
 import os
 
 class PacketTunnelProvider: NEPacketTunnelProvider {
-    private var counter: UInt = 1          // mutated only on logQueue
+    private var sequence = CaptureSequence()   // mutated only on logQueue
     private var forwarder: PacketForwarder?
     private lazy var pcapWriter = PCAPWriter(fileURL: pcapFileURL)
     private let logQueue = DispatchQueue(label: "com.mDNSShark.provider.log")
@@ -100,27 +100,29 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         }
     }
 
-    // Dispatched to logQueue so counter, logHandle, and pcapWriter are accessed serially.
+    // Dispatched to logQueue so sequence, logHandle, and pcapWriter are accessed serially.
     private func handle(rawIP: Data, direction: PacketDirection, isReconstructed: Bool) {
         logQueue.async { [weak self] in
             guard let self else { return }
             let packet = self.parse(rawIP, direction: direction, isReconstructed: isReconstructed)
             guard SharedSettings.captureFilterProtocols.contains(packet.protocolName) else { return }
-            // Only written packets consume a frame number; without TLS inspection the meta count matches the pcap.
-            self.counter += 1
+            // Only packets written to the pcap consume a frame number, so app frame N is Wireshark frame N.
+            self.sequence.recordFrame()
             self.writeJSON(packet)
             self.pcapWriter.appendPacket(rawIP, at: packet.timestamp, isReconstructed: isReconstructed)
         }
     }
 
+    // Decrypted requests are never written to the pcap, so they get their own D-n sequence and leave the frame counter alone.
     private func handleDecryptedHTTPS(payload: Data, domain: String) {
         logQueue.async { [weak self] in
             guard let self else { return }
             let text = String(data: payload, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             guard let text, !text.isEmpty else { return }
+            let entry = self.sequence.recordDecryptedRequest()
             let packet = PacketModel(
-                frameNumber: Int(self.counter),
+                frameNumber: entry.afterFrame,
                 timestamp: Date(),
                 sourceIP: "device",
                 destinationIP: domain,
@@ -132,11 +134,10 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
                 hexDump: payload.map { String(format: "%02x", $0) }.joined(separator: " "),
                 payloadText: text,
                 direction: .outbound,
-                isReconstructed: true
+                isReconstructed: false,
+                decryptedSequence: entry.sequence
             )
             self.writeJSON(packet)
-            // Decrypted entries take a frame number but have no pcap record, so TLS captures overcount the pcap.
-            self.counter += 1
         }
     }
 
@@ -145,18 +146,18 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         running = false
         forwarder?.stop()
 
-        // Drain in-flight log writes; capture counter after all packets are processed.
-        var totalPackets = 0
+        // Drain in-flight log writes so every appendPacket is queued before the pcap is closed and counted.
+        var decryptedRequests = 0
         logQueue.sync {
             logHandle?.closeFile()
             logHandle = nil
-            totalPackets = Int(self.counter) - 1
+            decryptedRequests = self.sequence.decryptedRequests
         }
 
         let meta = pcapWriter.stopCapture(
             deviceWiFiIP: detectedWiFiIP,
             tunnelIP: "100.64.0.1",
-            totalPackets: totalPackets,
+            decryptedRequests: decryptedRequests,
             lanRouteStatus: lanRouteStatus
         )
         if let data = try? JSONSerialization.data(withJSONObject: meta, options: .prettyPrinted) {
@@ -286,7 +287,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         }
 
         let m = PacketModel(
-            frameNumber: Int(counter), timestamp: Date(),
+            frameNumber: sequence.nextFrameNumber, timestamp: Date(),
             sourceIP: src, destinationIP: dst,
             sourcePort: sPort, destinationPort: dPort,
             protocolName: proto, length: data.count,
@@ -301,7 +302,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
                       info: String, hex: String,
                       direction: PacketDirection, isReconstructed: Bool) -> PacketModel {
         let m = PacketModel(
-            frameNumber: Int(counter), timestamp: Date(),
+            frameNumber: sequence.nextFrameNumber, timestamp: Date(),
             sourceIP: src, destinationIP: dst,
             protocolName: proto, length: len, info: info, hexDump: hex,
             direction: direction, isReconstructed: isReconstructed

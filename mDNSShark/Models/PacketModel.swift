@@ -19,6 +19,8 @@ struct PacketModel: Identifiable, Codable {
     let payloadText: String?
     let direction: PacketDirection
     let isReconstructed: Bool
+    /// Set only on decrypted HTTPS requests, which are logged but never written to the pcap; `frameNumber` then holds the last pcap frame written before the request.
+    let decryptedSequence: Int?
 
     init(
         id: UUID = UUID(),
@@ -34,7 +36,8 @@ struct PacketModel: Identifiable, Codable {
         hexDump: String,
         payloadText: String? = nil,
         direction: PacketDirection = .outbound,
-        isReconstructed: Bool = false
+        isReconstructed: Bool = false,
+        decryptedSequence: Int? = nil
     ) {
         self.id = id; self.frameNumber = frameNumber; self.timestamp = timestamp
         self.sourceIP = sourceIP; self.destinationIP = destinationIP
@@ -42,6 +45,16 @@ struct PacketModel: Identifiable, Codable {
         self.protocolName = protocolName; self.length = length
         self.info = info; self.hexDump = hexDump; self.payloadText = payloadText
         self.direction = direction; self.isReconstructed = isReconstructed
+        self.decryptedSequence = decryptedSequence
+    }
+
+    /// True for decrypted HTTPS requests; the info fallback covers logs written before `decryptedSequence` existed.
+    var isDecryptedRequest: Bool { decryptedSequence != nil || info == Self.tlsDecryptedInfo }
+
+    /// "D-12" for a decrypted request, otherwise "#640" matching the pcap frame number.
+    var frameLabel: String {
+        if let seq = decryptedSequence { return "D-\(seq)" }
+        return "#\(frameNumber)"
     }
 
     // Decode with defaults for new fields so old JSON in packets.log still parses
@@ -61,11 +74,33 @@ struct PacketModel: Identifiable, Codable {
         payloadText     = try c.decodeIfPresent(String.self, forKey: .payloadText)
         direction       = try c.decodeIfPresent(PacketDirection.self, forKey: .direction) ?? .outbound
         isReconstructed = try c.decodeIfPresent(Bool.self, forKey: .isReconstructed) ?? false
+        decryptedSequence = try c.decodeIfPresent(Int.self, forKey: .decryptedSequence)
     }
 
     var formattedTimestamp: String {
         let f = DateFormatter()
         f.dateFormat = "HH:mm:ss.SSS"
         return f.string(from: timestamp)
+    }
+}
+
+/// Numbers pcap frames and decrypted requests on separate sequences so app frame N is pcap record N.
+struct CaptureSequence {
+    private(set) var framesWritten = 0
+    private(set) var decryptedRequests = 0
+
+    /// Frame number the next pcap record will get (1-based, as Wireshark shows it).
+    var nextFrameNumber: Int { framesWritten + 1 }
+
+    @discardableResult
+    mutating func recordFrame() -> Int {
+        framesWritten += 1
+        return framesWritten
+    }
+
+    /// Returns the request's own sequence and the last frame written before it (0 if none yet).
+    mutating func recordDecryptedRequest() -> (sequence: Int, afterFrame: Int) {
+        decryptedRequests += 1
+        return (decryptedRequests, framesWritten)
     }
 }

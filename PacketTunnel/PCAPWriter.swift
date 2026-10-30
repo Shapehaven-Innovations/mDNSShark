@@ -40,6 +40,8 @@ final class PCAPWriter {
     }
 
     // Flush and close. Returns metadata dict for capture-meta.json.
+    // totalPackets is the number of records actually written, so it always equals the pcap's
+    // frame count; decrypted HTTPS requests are reported separately because they have no record.
     // `lanRouteStatus` records whether PacketTunnelProvider's LAN-route
     // attempt (todo.md item 1's includeAllNetworksInCapture A/B test) found
     // a Wi-Fi subnet to add and what it added, or why it couldn't — without
@@ -47,15 +49,17 @@ final class PCAPWriter {
     // route was never added" vs. "the route was added but the on-link route
     // still won it", both of which look identical in the packet capture
     // itself.
-    func stopCapture(deviceWiFiIP: String, tunnelIP: String, totalPackets: Int,
+    func stopCapture(deviceWiFiIP: String, tunnelIP: String, decryptedRequests: Int = 0,
                       lanRouteStatus: String = "n/a") -> [String: Any] {
         dispatchPrecondition(condition: .notOnQueue(queue))
         var startTime = Date()
+        var totalPackets = 0
         var reconCount = 0
         queue.sync {
             fileHandle?.closeFile()
             fileHandle = nil
             startTime = captureStartTime
+            totalPackets = packetCount
             reconCount = reconstructedCount
         }
         return [
@@ -66,6 +70,7 @@ final class PCAPWriter {
             "totalPackets": totalPackets,
             "rawPackets": totalPackets - reconCount,
             "reconstructedPackets": reconCount,
+            "decryptedRequests": decryptedRequests,
             "disclaimer": "Inbound TCP packets are stream-proxied. Payload bytes are accurate. TCP sequence numbers and window sizes are approximate."
         ]
     }

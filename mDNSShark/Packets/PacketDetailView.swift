@@ -16,14 +16,19 @@ struct PacketDetailView: View {
                                      color: AppColors.PacketProtocol.color(for: packet.protocolName))
                         }
                         Divider()
-                        row("Frame",       "#\(packet.frameNumber)")
+                        if packet.isDecryptedRequest {
+                            row("Decrypted request", packet.frameLabel)
+                            row("After frame", "#\(packet.frameNumber)")
+                        } else {
+                            row("Frame", packet.frameLabel)
+                        }
                         row("Timestamp",   packet.formattedTimestamp)
                         row("Source",      packet.sourceIP + (packet.sourcePort.map { ":\($0)" } ?? ""))
                         row("Destination", packet.destinationIP + (packet.destinationPort.map { ":\($0)" } ?? ""))
                         row("Protocol",    packet.protocolName)
                         row("Length",      "\(packet.length) bytes")
                         if !packet.info.isEmpty { row("Info", packet.info) }
-                        if packet.isReconstructed {
+                        if packet.isReconstructed && !packet.isDecryptedRequest {
                             VStack(alignment: .leading, spacing: 4) {
                                 Label("Reconstructed Inbound", systemImage: "info.circle")
                                     .font(.caption.weight(.semibold))
@@ -58,7 +63,7 @@ struct PacketDetailView: View {
                         Divider()
                         if packet.protocolName == "HTTPS" {
                             VStack(alignment: .leading, spacing: 4) {
-                                if packet.info == PacketModel.tlsDecryptedInfo {
+                                if packet.isDecryptedRequest {
                                     Label("Decrypted by TLS Inspection - hex shows plaintext.", systemImage: "lock.open.fill")
                                         .font(.caption.weight(.semibold))
                                         .foregroundColor(.green)
@@ -86,7 +91,7 @@ struct PacketDetailView: View {
             }
             .padding(.horizontal).padding(.top, 8)
         }
-        .navigationTitle("Frame \(packet.frameNumber)")
+        .navigationTitle(packet.isDecryptedRequest ? "Decrypted \(packet.frameLabel)" : "Frame \(packet.frameNumber)")
         .navigationBarTitleDisplayMode(.inline)
     }
 

@@ -7,7 +7,7 @@ struct PacketRowView: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             // Verbatim avoids locale grouping ("#17,202") that wrapped in the narrow column.
-            Text(verbatim: "#\(packet.frameNumber)")
+            Text(verbatim: packet.frameLabel)
                 .font(.caption.monospacedDigit()).foregroundColor(.secondary)
                 .lineLimit(1).minimumScaleFactor(0.8)
                 .frame(width: 52, alignment: .trailing)
@@ -19,7 +19,7 @@ struct PacketRowView: View {
                     HStack(spacing: 4) {
                         AppBadge(text: packet.protocolName,
                                  color: AppColors.PacketProtocol.color(for: packet.protocolName))
-                        if packet.info == PacketModel.tlsDecryptedInfo {
+                        if packet.isDecryptedRequest {
                             Text("decrypted")
                                 .font(.caption2)
                                 .padding(.horizontal, 4).padding(.vertical, 2)
@@ -27,7 +27,7 @@ struct PacketRowView: View {
                                 .foregroundColor(.green)
                                 .cornerRadius(4)
                         }
-                        if packet.isReconstructed {
+                        if packet.isReconstructed && !packet.isDecryptedRequest {
                             Text("reconstructed")
                                 .font(.caption2)
                                 .padding(.horizontal, 4).padding(.vertical, 2)
