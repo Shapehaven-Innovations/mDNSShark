@@ -751,10 +751,15 @@ final class TLSSession {
         stage = "clientHelloWait"
         logger.debug("[\(self.tag, privacy: .public)] +\(self.elapsedMs)ms ClientHello wait done: \(snapshot.count) bytes buffered, sni=\(parsedSNI ?? "<none, using dstIP>", privacy: .public), closedDuringWait=\(closedDuringWait)")
 
-        if SharedSettings.tlsBypassList.contains(where: { sni == $0 || sni.hasSuffix(".\($0)") }) {
+        let lowerHost = sni.lowercased()
+        if SharedSettings.tlsBypassList.contains(where: {
+            let d = $0.lowercased()
+            return lowerHost == d || lowerHost.hasSuffix(".\(d)")
+        }) {
             stage = "bypassed"
-            logger.debug("[\(self.tag, privacy: .public)] sni=\(sni, privacy: .public) is on the bypass list; closing (device gets a FIN, not a passthrough connection)")
-            close(); return
+            logger.debug("[\(self.tag, privacy: .public)] sni=\(sni, privacy: .public) is on the bypass list; relaying untouched")
+            runPassthrough(sni: sni)
+            return
         }
 
         stage = "identity"
@@ -1094,6 +1099,74 @@ final class TLSSession {
         receiveFromTLS(tlsConn: tlsConn, sni: sni, upstream: upstreamConn,
                        onDecryptedRequest: onDecryptedRequest)
         receiveFromUpstream(upstream: upstreamConn, tlsConn: tlsConn)
+    }
+
+    // MARK: - Bypass passthrough
+
+    // Bypass-listed SNI: relay the device's bytes (the buffered ClientHello
+    // first) to the real server over plain TCP and copy replies back, so the
+    // device negotiates TLS end to end and nothing is decrypted or reported.
+    private func runPassthrough(sni: String) {
+        stage = "passthroughConnect"
+        guard let port = NWEndpoint.Port(rawValue: dstPort) else { close(); return }
+        let conn = NWConnection(host: NWEndpoint.Host(dstIP), port: port,
+                                using: NWParameters(tls: nil, tcp: NWProtocolTCP.Options()))
+        upstream = conn
+        let readySem = DispatchSemaphore(value: 0)
+        conn.stateUpdateHandler = { [weak self] state in
+            switch state {
+            case .ready, .failed: readySem.signal()
+            case .waiting(let err):
+                self?.logger.debug("[\(self?.tag ?? "?", privacy: .public)] passthrough upstream waiting: \(String(describing: err), privacy: .public)")
+            default: break
+            }
+        }
+        conn.start(queue: .global())
+        // `.waiting` never signals, so bound the wait like the intercepted path.
+        _ = readySem.wait(timeout: .now() + 10)
+        guard case .ready = conn.state, !sessionClosed else {
+            if !sessionClosed {
+                dropSession("Bypass passthrough to \(dstIP):\(dstPort) (sni \(sni)) not ready (\(conn.state))")
+            }
+            close(); return
+        }
+        stage = "passthrough"
+        logger.debug("[\(self.tag, privacy: .public)] +\(self.elapsedMs)ms passthrough upstream READY")
+
+        Thread.detachNewThread { self.devicePassthroughLoop(to: conn) }
+        passthroughReceive(from: conn)
+    }
+
+    // Device bytes → upstream, unmodified.
+    private func devicePassthroughLoop(to conn: NWConnection) {
+        while !sessionClosed {
+            condition.lock()
+            let deadline = Date().addingTimeInterval(30)
+            while inboundBuffer.isEmpty && !sessionClosed {
+                if !condition.wait(until: deadline) { break }
+            }
+            let chunk = inboundBuffer
+            inboundBuffer.removeAll(keepingCapacity: true)
+            condition.unlock()
+
+            guard !chunk.isEmpty, !sessionClosed else { continue }
+            conn.send(content: chunk, completion: .contentProcessed { [weak self] err in
+                if err != nil { self?.close() }
+            })
+        }
+    }
+
+    // Upstream bytes → device; any end of stream closes the session.
+    private func passthroughReceive(from conn: NWConnection) {
+        conn.receive(minimumIncompleteLength: 1, maximumLength: 65535) { [weak self] data, _, isDone, error in
+            guard let self else { return }
+            if let data, !data.isEmpty { self.writeToDevice(data) }
+            if isDone || error != nil || self.sessionClosed {
+                self.close()
+            } else {
+                self.passthroughReceive(from: conn)
+            }
+        }
     }
 
     // MARK: - Data paths

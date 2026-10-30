@@ -157,10 +157,10 @@ The iOS trust profile survives rebuilds and reinstalls. If Settings shows "Insta
 Apps that use certificate pinning (banking, health, government) fail if intercepted. Add their domains to the **TLS Bypass List** in Settings:
 
 - Enter a domain suffix (e.g. `bank.com`) and tap **+**.
-- Any connection whose SNI ends with a listed suffix is not inspected. In 1.9 the connection is closed instead of relayed, so the app or site will fail to load while inspection is on (see issue #6). Turn off TLS Inspection to use pinned apps.
+- Any connection whose SNI matches a listed domain or one of its subdomains is passed through uninspected. In 1.9 the connection is closed instead, so the app or site fails to load while inspection is on. This is fixed in 1.10 (see issue #6).
 - Swipe left to delete an entry.
 
-**Apple's own services are bypassed by default.** The list ships with `mask.icloud.com` and `mask-h2.icloud.com` (Private Relay egress, which rejects inspecting proxies with `-9830`) and `gateway.icloud.com` (certificate-pinned, fails with `-9825`). This is not a bug in `TLSInterceptor.swift`; these services resist MITM by design. These defaults are pre-filled. Until #6 is fixed a listed host is closed, not relayed, so Private Relay and iCloud traffic will fail during an inspected capture. Other pinned Apple hosts, such as `push.apple.com` (APNs) or a host named in the error banner, can be added the same way. The bypass list **can be cleared by a rebuild or reinstall**, which restores the three defaults.
+**Apple's own services are bypassed by default.** The list ships with `mask.icloud.com` and `mask-h2.icloud.com` (Private Relay egress, which rejects inspecting proxies with `-9830`) and `gateway.icloud.com` (certificate-pinned, fails with `-9825`). This is not a bug in `TLSInterceptor.swift`; these services resist MITM by design. These defaults are pre-filled. In 1.9, Private Relay and iCloud traffic fails during an inspected capture (fixed in 1.10, see #6). Other pinned Apple hosts, such as `push.apple.com` (APNs) or a host named in the error banner, can be added the same way. The bypass list **can be cleared by a rebuild or reinstall**, which restores the three defaults.
 
 ### DNS Server
 
