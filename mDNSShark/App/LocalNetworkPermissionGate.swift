@@ -51,15 +51,42 @@ enum LocalNetworkPermissionGate {
     /// momentary blip.
     private static let deniedDebounceInterval: TimeInterval = 1.5
 
+    /// How the OS settled the Local Network Privacy decision.
+    enum Decision: Equatable {
+        case granted
+        case denied
+        /// Nothing settled (alert ignored, timeout, or the preflight itself broke), so callers fail open.
+        case undetermined
+
+        /// Whether the "Local Network is off" banner should show after this decision, keeping `current` when nothing settled.
+        func showsDeniedBanner(current: Bool) -> Bool {
+            switch self {
+            case .granted:      return false
+            case .denied:       return true
+            case .undetermined: return current
+            }
+        }
+    }
+
+    /// True when a browser is reporting DNS-SD's `kDNSServiceErr_PolicyDenied`, the documented signal for a denied decision.
+    static func isPolicyDenied(_ state: NWBrowser.State) -> Bool {
+        if case .waiting(let error) = state,
+           case .dns(let dnsError) = error,
+           dnsError == kDNSServiceErr_PolicyDenied {
+            return true
+        }
+        return false
+    }
+
     /// Resolves once the OS has settled its Local Network Privacy decision
     /// (granted or denied), or after `timeout` elapses so a user who
     /// ignores/dismisses the alert never blocks the scanner forever.
     ///
-    /// Call once, at launch, before the automatic first scan. Not meant to
-    /// gate the manual "Scan" button: by the time a user can tap that,
-    /// the app is already visible and this has already had its chance to
-    /// resolve.
-    static func waitForDecision(timeout: TimeInterval = 30) async {
+    /// Called at launch before the automatic first scan, and again by
+    /// `NetworkScanViewModel` alongside every scan so a manual Scan with
+    /// the permission turned off can surface the denial instead of
+    /// silently reporting only the router.
+    static func waitForDecision(timeout: TimeInterval = 30) async -> Decision {
         await withCheckedContinuation { continuation in
             var resumed = false
             var listener: NWListener?
@@ -72,12 +99,12 @@ enum LocalNetworkPermissionGate {
                 timeoutWorkItem?.cancel()
             }
 
-            let resumeOnce: (String) -> Void = { reason in
+            let resumeOnce: (Decision, String) -> Void = { decision, reason in
                 guard !resumed else { return }
                 resumed = true
                 logger.debug("LocalNetworkPermissionGate: resolved (\(reason, privacy: .public))")
                 cleanup()
-                continuation.resume()
+                continuation.resume(returning: decision)
             }
 
             let newListener: NWListener
@@ -87,7 +114,7 @@ enum LocalNetworkPermissionGate {
                 // Can't even set up the local check: fail open immediately
                 // rather than block a real scan on a broken preflight.
                 logger.error("LocalNetworkPermissionGate: NWListener setup failed: \(error.localizedDescription, privacy: .public)")
-                resumeOnce("listener-setup-failed")
+                resumeOnce(.undetermined, "listener-setup-failed")
                 return
             }
             newListener.service = NWListener.Service(name: UUID().uuidString, type: serviceType)
@@ -100,7 +127,7 @@ enum LocalNetworkPermissionGate {
                     // silently sit until the full timeout on every launch,
                     // even on an already-granted device. Fail open instead.
                     logger.error("LocalNetworkPermissionGate: NWListener failed post-start: \(error.localizedDescription, privacy: .public)")
-                    resumeOnce("listener-failed-poststart")
+                    resumeOnce(.undetermined, "listener-failed-poststart")
                 }
             }
             newListener.start(queue: .main)
@@ -110,18 +137,14 @@ enum LocalNetworkPermissionGate {
             newBrowser.browseResultsChangedHandler = { results, _ in
                 // Finding our own just-advertised listener is only possible
                 // if local-network browsing is actually permitted.
-                if !results.isEmpty { resumeOnce("granted") }
+                if !results.isEmpty { resumeOnce(.granted, "granted") }
             }
             newBrowser.stateUpdateHandler = { state in
-                if case .waiting(let error) = state,
-                   case .dns(let dnsError) = error,
-                   dnsError == kDNSServiceErr_PolicyDenied {
+                if isPolicyDenied(state) {
                     DispatchQueue.main.asyncAfter(deadline: .now() + deniedDebounceInterval) {
                         guard !resumed else { return }
-                        if case .waiting(let stillError) = newBrowser.state,
-                           case .dns(let stillDnsError) = stillError,
-                           stillDnsError == kDNSServiceErr_PolicyDenied {
-                            resumeOnce("denied")
+                        if isPolicyDenied(newBrowser.state) {
+                            resumeOnce(.denied, "denied")
                         }
                         // Otherwise the state moved on (granted, or still
                         // genuinely undetermined); let the normal handlers
@@ -135,7 +158,7 @@ enum LocalNetworkPermissionGate {
             newBrowser.start(queue: .main)
             browser = newBrowser
 
-            let work = DispatchWorkItem { resumeOnce("timeout") }
+            let work = DispatchWorkItem { resumeOnce(.undetermined, "timeout") }
             timeoutWorkItem = work
             DispatchQueue.main.asyncAfter(deadline: .now() + timeout, execute: work)
         }

@@ -8,40 +8,25 @@ import os
 final class NetworkScanViewModel: ObservableObject {
     @Published var devices: [DiscoveredDevice] = []
     @Published var isScanning: Bool = false
-    /// True once any scan has actually started (manual button tap or the
-    /// automatic launch scan); lets `AppCoordinator` skip its
-    /// gate-delayed automatic first scan if the user already ran one
-    /// manually while `LocalNetworkPermissionGate` was still resolving, so
-    /// it can't silently stomp on results the user is already looking at.
+    /// Lets `AppCoordinator` skip its automatic first scan if the user already started one manually.
     private(set) var hasScannedAtLeastOnce = false
+    /// True once the Local Network permission resolved as denied; drives the "Open Settings" banner in ContentView.
+    @Published private(set) var isLocalNetworkDenied = false
 
     private let scanner     = NetworkScanner()
     private let localUtil   = LocalDeviceScanner()
     private let ouiDB       = OUIDatabase.shared
     private let enrichmentCoordinator = DeviceEnrichmentCoordinator()
     private var cancellables = Set<AnyCancellable>()
-    // Stable UUID assignment only: persists across re-scans so rows keep
-    // identity, and is intentionally NOT used to gate enrichment dispatch
-    // (see `enrichedIPsThisScan` below).
+    // Stable row IDs across re-scans; not used to gate enrichment.
     private var knownIDs: [String: UUID] = [:]
-    // Raw probe results per IP (not pre-merged fields) so a later rebuild of
-    // a device's baseline (e.g. a stronger Bonjour identity resolving after
-    // a bare port-80-sweep placeholder) re-runs precedence against whatever
-    // is CURRENT, rather than blindly overlaying a merged snapshot that may
-    // have been captured against a weaker, now-stale baseline.
+    // Raw probe results, so a rebuilt baseline re-runs precedence instead of overlaying a stale merged snapshot.
     private var rawEnrichmentsByIP: [String: [DeviceEnrichment]] = [:]
-    // Which IPs have already had `enrichDescription` dispatched this scan,
-    // so a re-appearing `locationURL` across multiple raw Device rows for
-    // the same IP only triggers one SSDP description fetch.
+    // One SSDP description fetch per IP per scan.
     private var fetchedDescriptionIPs = Set<String>()
-    // Which IPs have already had `enrichGoogleWifi` dispatched this scan,
-    // same one-shot-per-IP reasoning as `fetchedDescriptionIPs`.
+    // One Google Wifi probe per IP per scan.
     private var fetchedGoogleWifiIPs = Set<String>()
-    // Which IPs have already had the main `enrich()` probe pass dispatched
-    // THIS scan. Deliberately separate from `knownIDs`: a re-scan should
-    // give every device a fresh enrichment pass (e.g. a host that was
-    // offline during scan 1 and answers during scan 2), even though its
-    // row keeps the same stable UUID.
+    // Separate from `knownIDs` so a re-scan gives every device a fresh enrichment pass.
     private var enrichedIPsThisScan = Set<String>()
     private let logger      = Logger(subsystem: "com.mDNSShark", category: "NetworkScanViewModel")
 
@@ -62,10 +47,7 @@ final class NetworkScanViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] result in
                 guard let self else { return }
-                // Always accumulate the raw results, independent of whether
-                // a matching device row currently exists: `merge(raw:)`
-                // re-derives fields from this against the live baseline the
-                // next time it rebuilds a row for this IP (Fix 2).
+                // Kept even without a matching row: `merge(raw:)` re-derives fields from these on the next rebuild.
                 self.rawEnrichmentsByIP[result.ip, default: []].append(contentsOf: result.enrichments)
 
                 guard let index = self.devices.firstIndex(where: { $0.ipAddress == result.ip }) else { return }
@@ -73,8 +55,7 @@ final class NetworkScanViewModel: ObservableObject {
                                                manufacturer: self.devices[index].manufacturer,
                                                inferredOS: self.devices[index].inferredOS,
                                                openPorts: self.devices[index].openPorts)
-                // Module-qualified: this type's own private `merge(raw:)` would
-                // otherwise win unqualified lookup over the package function.
+                // Module-qualified so this type's own `merge(raw:)` doesn't shadow the package function.
                 let merged = DeviceFingerprint.merge(existing: existing, incoming: result.enrichments)
                 self.devices[index].macAddress = merged.mac
                 self.devices[index].manufacturer = merged.manufacturer
@@ -96,11 +77,7 @@ final class NetworkScanViewModel: ObservableObject {
     }
 
     private func beginScan(duration: Double) {
-        // A fresh scan gets a genuinely fresh enrichment pass: cancel
-        // whatever the previous scan still had in flight and clear all
-        // per-scan enrichment state. `knownIDs` is deliberately untouched:
-        // it serves only stable row-ID assignment across the device's
-        // lifetime, unrelated to enrichment gating.
+        // Fresh enrichment pass per scan; `knownIDs` is kept so rows keep their identity.
         hasScannedAtLeastOnce = true
         enrichmentCoordinator.cancelAll()
         enrichedIPsThisScan.removeAll()
@@ -108,6 +85,15 @@ final class NetworkScanViewModel: ObservableObject {
         fetchedDescriptionIPs.removeAll()
         fetchedGoogleWifiIPs.removeAll()
         scanner.scanNetwork(duration: duration)
+        // Runs alongside the scan, never ahead of it, so a denied permission can explain the near-empty result.
+        Task {
+            let decision = await LocalNetworkPermissionGate.waitForDecision(timeout: 10)
+            apply(permissionDecision: decision)
+        }
+    }
+
+    func apply(permissionDecision decision: LocalNetworkPermissionGate.Decision) {
+        isLocalNetworkDenied = decision.showsDeniedBanner(current: isLocalNetworkDenied)
     }
 
     var networkCIDR: String {
@@ -170,12 +156,7 @@ final class NetworkScanViewModel: ObservableObject {
                     openPorts:       device.port.map { [$0] } ?? [],
                     bonjourServices: svc.map { [$0] } ?? []
                 )
-                // Re-merge stored raw enrichments against the FRESH baseline
-                // just built above, never against a stale pre-merged
-                // snapshot; otherwise a later rebuild against a NOW-BETTER
-                // baseline (e.g. a real Bonjour identity resolving after a
-                // bare port-80-sweep placeholder) would have its good data
-                // overwritten by an earlier weak snapshot (Fix 2).
+                // Re-merge stored raw enrichments against the fresh baseline, not a stale merged snapshot.
                 if let stored = rawEnrichmentsByIP[ip], !stored.isEmpty {
                     let baseline = EnrichedFields(mac: newDevice.macAddress, manufacturer: newDevice.manufacturer,
                                                    inferredOS: newDevice.inferredOS, openPorts: newDevice.openPorts)
@@ -197,24 +178,14 @@ final class NetworkScanViewModel: ObservableObject {
         return Array(byIP.values).sorted { $0.ipAddress < $1.ipAddress }
     }
 
-    /// Fires the SSDP description fetch the first time ANY raw `Device` row
-    /// for this IP reveals a non-nil `locationURL`, regardless of whether
-    /// it came from the new-device or existing-device branch above, and
-    /// regardless of whether the main `enrich()` pass already fired for
-    /// this IP (Fix 3).
+    /// Fires the SSDP description fetch the first time any row for this IP reveals a `locationURL`.
     private func dispatchDescriptionFetchIfNeeded(ip: String, locationURL: URL?) {
         guard let locationURL, !fetchedDescriptionIPs.contains(ip) else { return }
         fetchedDescriptionIPs.insert(ip)
         enrichmentCoordinator.enrichDescription(ip: ip, locationURL: locationURL)
     }
 
-    /// Fires the Google Wifi status probe the first time ANY raw `Device`
-    /// row for this IP reveals `_googlecast._tcp` - regardless of whether
-    /// it came from the new-device or existing-device branch of `merge()`,
-    /// same reasoning as `dispatchDescriptionFetchIfNeeded`. This is the
-    /// probe's only trigger; `enrich()` never fires it directly, so an
-    /// active HTTP probe never fires against a host with no Google Cast
-    /// mDNS hint at all.
+    /// Fires the Google Wifi probe only for hosts that advertise `_googlecast._tcp`, never blindly.
     private func dispatchGoogleWifiIfNeeded(ip: String, serviceType: String) {
         guard serviceType == "_googlecast._tcp", !fetchedGoogleWifiIPs.contains(ip) else { return }
         fetchedGoogleWifiIPs.insert(ip)
@@ -241,10 +212,7 @@ final class NetworkScanViewModel: ObservableObject {
            model.contains("Nest Wifi") || model.contains("Google Wifi") {
             return model
         }
-        // HomeKit alone is too generic a signal to imply "eero" (HomeKit
-        // covers thousands of unrelated smart-home products); only treat it
-        // as an eero hint when the HAP TXT record's "md" (model name, a
-        // required HAP TXT key) corroborates it.
+        // HomeKit alone is too generic; require the HAP "md" model name to mention eero.
         if serviceType == "_hap._tcp",
            let model = txtRecords?["md"], model.localizedCaseInsensitiveContains("eero") {
             return "eero"

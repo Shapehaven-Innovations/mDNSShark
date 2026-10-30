@@ -53,7 +53,8 @@ final class AppCoordinator: ObservableObject {
         // answered it, since the alert itself only renders in response to
         // this same traffic). See LocalNetworkPermissionGate.swift.
         Task {
-            await LocalNetworkPermissionGate.waitForDecision()
+            let decision = await LocalNetworkPermissionGate.waitForDecision()
+            networkScanViewModel.apply(permissionDecision: decision)
             // If the user already ran a manual scan (the header Scan
             // button isn't disabled during the gate wait) while this was
             // still resolving, don't silently replace it with a second,

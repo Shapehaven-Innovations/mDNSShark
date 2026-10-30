@@ -6,7 +6,7 @@ mDNSShark is an **open-source** iPhone app that shows what is on your local netw
 
 ## Simplicity and Privacy
 
-Every scan runs on your phone, with **no external servers**. The one exception is a button you tap yourself: **Refresh CISA Data** on the Security tab downloads CISA's public vulnerability catalog and asks NIST's National Vulnerability Database (NVD) about specific device vendors. Your device list and scan results are never uploaded, but those NVD queries do name vendors seen on your network (see [Security Assessment](#security-assessment)). There is no telemetry, no analytics, and no trackers. Discovery needs only local network access; Packet Capture also asks you to allow a VPN configuration.
+Every scan runs on your phone, with **no external servers**. The one exception is a button you tap yourself: **Refresh CISA Data** on the Security tab downloads CISA's public vulnerability catalog and asks NIST's National Vulnerability Database (NVD) about specific device vendors. Your device list and scan results are never uploaded, but those NVD queries do name vendors seen on your network (see [Security Assessment](#security-assessment)). There is no telemetry, no analytics, and no trackers. Discovery needs only local network access; Packet Capture also asks you to allow a VPN configuration. If you deny local network access, scans find little beyond your router and the app shows a banner with an Open Settings button.
 
 <details>
 <summary><strong>Terms in a Hurry</strong></summary>

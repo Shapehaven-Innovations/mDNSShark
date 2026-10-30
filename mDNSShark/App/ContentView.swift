@@ -15,6 +15,9 @@ struct ContentView: View {
             if showBanner {
                 OnboardingBannerView(isVisible: $showBanner).padding(.top, 4)
             }
+            if coordinator.networkScanViewModel.isLocalNetworkDenied {
+                LocalNetworkDeniedBanner().padding(.horizontal, 16).padding(.top, 4)
+            }
             if !tlsError.isEmpty {
                 TLSErrorBanner(message: tlsError, onDismiss: {
                     SharedSettings.tlsInterceptorLastError = ""
@@ -51,6 +54,24 @@ struct ContentView: View {
         case .analysis: AnalysisView()
         case .settings: SettingsView()
         }
+    }
+}
+
+private struct LocalNetworkDeniedBanner: View {
+    var body: some View {
+        HStack {
+            Image(systemName: "wifi.exclamationmark").foregroundColor(AppColors.warning)
+            Text("Local Network access is off, so scans can only find your router. Turn it on in Settings.")
+                .font(.caption).foregroundColor(.primary)
+            Spacer()
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+            }
+            .font(.caption)
+        }
+        .padding(10)
+        .background(AppColors.warning.opacity(0.15))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
