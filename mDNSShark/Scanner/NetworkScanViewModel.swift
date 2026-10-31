@@ -105,14 +105,17 @@ final class NetworkScanViewModel: ObservableObject {
     /// advertised (Bonjour resolve or SSDP LOCATION) and stays on the service; open ports arrive solely via the enrichment sink.
     func merge(raw: [NetworkScanner.Device]) -> [DiscoveredDevice] {
         var byIP: [String: DiscoveredDevice] = [:]
-        // One host can resolve to different address families per service (AirPlay IPv6-only, RAOP IPv4-only), so rows that share a host name collapse onto its IPv4.
-        var ipv4ByHost: [String: String] = [:]
+        // One host's services can each resolve to a different address (its LAN IPv4, a self-assigned 169.254 IPv4, or an IPv6),
+        // so every row that shares a Bonjour host name collapses onto that host's preferred address.
+        var addressesByHost: [String: [String]] = [:]
         for device in raw {
-            if let host = device.hostName, let ip = device.resolvedIPAddress, !ip.contains(":") { ipv4ByHost[host] = ip }
+            if let host = device.hostName, let ip = device.resolvedIPAddress { addressesByHost[host, default: []].append(ip) }
         }
+        let addressByHost = addressesByHost.compactMapValues { NetworkScanner.preferredAddress(from: $0) }
         for device in raw {
-            var ip = device.resolvedIPAddress ?? device.serviceName
-            if ip.contains(":"), let host = device.hostName, let v4 = ipv4ByHost[host] { ip = v4 }
+            // An advertisement that has not resolved names a service, not a host, so it never becomes a row of its own.
+            guard var ip = device.resolvedIPAddress else { continue }
+            if let host = device.hostName, let preferred = addressByHost[host] { ip = preferred }
             // Port-sweep and SSDP rows carry a non-Bonjour placeholder type; only real "_x._tcp" types are services.
             let svc: BonjourService? = device.serviceType.hasPrefix("_") ? BonjourService(
                 serviceType: device.serviceType,
@@ -165,7 +168,7 @@ final class NetworkScanViewModel: ObservableObject {
                     newDevice.openPorts = merged.openPorts
                 }
                 byIP[ip] = newDevice
-                if device.resolvedIPAddress != nil, !enrichedIPsThisScan.contains(ip) {
+                if !enrichedIPsThisScan.contains(ip) {
                     enrichedIPsThisScan.insert(ip)
                     enrichmentCoordinator.enrich(ip: ip, locationURL: device.locationURL)
                 }

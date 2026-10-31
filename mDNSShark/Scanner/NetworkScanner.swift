@@ -387,18 +387,8 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         var foundIP: String? = nil
         if let addresses = sender.addresses, !addresses.isEmpty {
             logger.info("\(sender.name) has \(addresses.count) addresses")
-            // Every enrichment probe and the port-80 sweep dedup are IPv4-only, so IPv6 only wins when no IPv4 sockaddr exists.
-            var firstIPv6: String? = nil
-            for addressData in addresses {
-                guard let ip = ipAddressFromData(addressData) else { continue }
-                if ip.contains(":") {
-                    if firstIPv6 == nil { firstIPv6 = ip }
-                    continue
-                }
-                foundIP = ip
-                break
-            }
-            if foundIP == nil { foundIP = firstIPv6 }
+            // A host that also has a self-assigned 169.254 address answers with both IPv4s in no fixed order, so pick by preference rather than arrival.
+            foundIP = Self.preferredAddress(from: addresses.compactMap { ipAddressFromData($0) })
             if let ip = foundIP {
                 logger.info("Found IP \(ip) for \(sender.name)")
             } else {
@@ -414,6 +404,8 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
                 if let host = host, let port = port {
                     DispatchQueue.main.async {
                         device.resolvedIPAddress = host
+                        // The fallback yields the host name, not an address; keep it so merge() can fold this row into the host's other rows.
+                        device.hostName = host
                         device.port = Int(port)
                         self.logger.info("Fallback resolved \(sender.name) to IP: \(host) on port: \(port)")
                         self.republishDevices()
@@ -475,6 +467,22 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         DispatchQueue.main.async {
             self.republishDevices()
         }
+    }
+
+    /// Picks the address a host is keyed by: a LAN IPv4 first, then a link-local IPv4, then the first IPv6, then a bare host
+    /// name from the fallback resolver, since every enrichment probe is IPv4-only and a self-assigned 169.254 address is never the host's main one.
+    static func preferredAddress(from addresses: [String]) -> String? {
+        func rank(_ ip: String) -> Int {
+            if ip.contains(":") { return 2 }
+            guard ip.allSatisfy({ $0.isNumber || $0 == "." }) else { return 3 }
+            return ip.hasPrefix("169.254.") ? 1 : 0
+        }
+        var best: (ip: String, rank: Int)?
+        for ip in addresses {
+            let r = rank(ip)
+            if best == nil || r < best!.rank { best = (ip, r) }
+        }
+        return best?.ip
     }
 
     // Device is a class, so in-place field updates never fire $devices; reassign so the view model re-merges.
