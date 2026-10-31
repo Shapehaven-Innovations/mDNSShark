@@ -542,6 +542,12 @@ struct SettingsView: View {
                 }
             }
             .padding(.vertical, 4)
+            if !SharedSettings.mdnsListenerStatus.isEmpty {
+                Text("Last mDNS listener status: \(SharedSettings.mdnsListenerStatus)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .textSelection(.enabled)
+            }
         }
     }
 

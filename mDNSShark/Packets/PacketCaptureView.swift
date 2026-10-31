@@ -50,7 +50,9 @@ struct PacketCaptureView: View {
                              : "Tap Start to begin capturing.")
                         .foregroundColor(.secondary)
                         if selectedProtocol == "mDNS" {
-                            Text("mDNS (Bonjour) is multicast traffic that iOS keeps on Wi-Fi, so it never enters the capture tunnel and will not appear here. Bonjour services found on your network are listed in the Devices tab.")
+                            Text(MDNSEmptyState.text(isCapturing: coordinator.packetCaptureManager.isCapturing,
+                                                     filterOn: SharedSettings.captureFilterProtocols.contains("mDNS"),
+                                                     listenerStatus: SharedSettings.mdnsListenerStatus))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.center)

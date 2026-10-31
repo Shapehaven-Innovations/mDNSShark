@@ -75,7 +75,12 @@
 		9A1D2E3F2FABF80F00D8F38C /* Exceptions for "PacketTunnel" folder in "mDNSShark" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				ChecksumHelpers.swift,
+				MDNSFrameBuilder.swift,
+				MDNSListener.swift,
 				PacketDirection.swift,
+				PacketParser.swift,
+				PCAPWriter.swift,
 			);
 			target = 9A1C9E882D443D5300643122 /* mDNSShark */;
 		};

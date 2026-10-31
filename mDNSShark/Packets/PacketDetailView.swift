@@ -30,12 +30,21 @@ struct PacketDetailView: View {
                         if !packet.info.isEmpty { row("Info", packet.info) }
                         if packet.isReconstructed && !packet.isDecryptedRequest {
                             VStack(alignment: .leading, spacing: 4) {
-                                Label("Reconstructed Inbound", systemImage: "info.circle")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundColor(.orange)
-                                Text("Inbound TCP payload is accurate. Sequence numbers and window size are approximate (stream-proxied, not wire-captured).")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                if packet.captureSource == .mdnsListener {
+                                    Label("Headers Reconstructed", systemImage: "info.circle")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundColor(.orange)
+                                    Text("Received by the mDNS listener in the capture extension. IP and UDP headers are rebuilt from socket metadata; the payload is verbatim.")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                } else {
+                                    Label("Reconstructed Inbound", systemImage: "info.circle")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundColor(.orange)
+                                    Text("Inbound TCP payload is accurate. Sequence numbers and window size are approximate (stream-proxied, not wire-captured).")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
                             }
                             .padding(10)
                             .background(Color.orange.opacity(0.08))

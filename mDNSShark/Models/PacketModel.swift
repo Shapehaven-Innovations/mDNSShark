@@ -5,6 +5,11 @@ struct PacketModel: Identifiable, Codable {
     /// The `info` value marking an HTTPS packet whose payload was decrypted by TLS inspection.
     static let tlsDecryptedInfo = "TLS-decrypted"
 
+    /// Where the frame came from: the tunnel's packet flow, or the extension's mDNS multicast listener (headers synthesized from socket metadata).
+    enum CaptureSource: String, Codable {
+        case tunnel, mdnsListener
+    }
+
     let id: UUID
     let frameNumber: Int
     let timestamp: Date
@@ -21,6 +26,7 @@ struct PacketModel: Identifiable, Codable {
     let isReconstructed: Bool
     /// Set only on decrypted HTTPS requests, which are logged but never written to the pcap; `frameNumber` then holds the last pcap frame written before the request.
     let decryptedSequence: Int?
+    let captureSource: CaptureSource
 
     init(
         id: UUID = UUID(),
@@ -37,7 +43,8 @@ struct PacketModel: Identifiable, Codable {
         payloadText: String? = nil,
         direction: PacketDirection = .outbound,
         isReconstructed: Bool = false,
-        decryptedSequence: Int? = nil
+        decryptedSequence: Int? = nil,
+        captureSource: CaptureSource = .tunnel
     ) {
         self.id = id; self.frameNumber = frameNumber; self.timestamp = timestamp
         self.sourceIP = sourceIP; self.destinationIP = destinationIP
@@ -46,6 +53,7 @@ struct PacketModel: Identifiable, Codable {
         self.info = info; self.hexDump = hexDump; self.payloadText = payloadText
         self.direction = direction; self.isReconstructed = isReconstructed
         self.decryptedSequence = decryptedSequence
+        self.captureSource = captureSource
     }
 
     /// True for decrypted HTTPS requests; the info fallback covers logs written before `decryptedSequence` existed.
@@ -75,6 +83,7 @@ struct PacketModel: Identifiable, Codable {
         direction       = try c.decodeIfPresent(PacketDirection.self, forKey: .direction) ?? .outbound
         isReconstructed = try c.decodeIfPresent(Bool.self, forKey: .isReconstructed) ?? false
         decryptedSequence = try c.decodeIfPresent(Int.self, forKey: .decryptedSequence)
+        captureSource   = try c.decodeIfPresent(CaptureSource.self, forKey: .captureSource) ?? .tunnel
     }
 
     var formattedTimestamp: String {

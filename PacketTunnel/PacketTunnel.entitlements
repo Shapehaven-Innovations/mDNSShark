@@ -2,6 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Multicast receive for the extension's mDNS listener (BSDMDNSListener); the PacketTunnel App ID needs the Multicast Networking capability or signing fails. -->
+	<key>com.apple.developer.networking.multicast</key>
+	<true/>
 	<key>com.apple.developer.networking.networkextension</key>
 	<array>
 		<string>packet-tunnel-provider</string>

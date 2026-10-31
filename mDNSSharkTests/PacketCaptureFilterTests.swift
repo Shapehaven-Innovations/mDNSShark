@@ -31,6 +31,16 @@ struct PacketCaptureFilterTests {
         all.filtered(byChip: chip, decryptedOnly: decryptedOnly).map(\.id)
     }
 
+    @Test func mdnsChipIncludesListenerSourceFrames() {
+        let listener = PacketModel(frameNumber: 10, sourceIP: "192.168.8.178", destinationIP: "224.0.0.251",
+                                   protocolName: "mDNS", length: 128, info: "Multicast DNS [reconstructed]", hexDump: "",
+                                   direction: .inbound, isReconstructed: true, captureSource: .mdnsListener)
+        let packets = all + [listener]
+        #expect(packets.filtered(byChip: "mDNS").map(\.id) == [mdns.id, listener.id])
+        #expect(!packets.filtered(byChip: "Other").map(\.id).contains(listener.id))
+        #expect(packets.filtered(byChip: "UDP").map(\.id) == [udp.id])
+    }
+
     @Test func chipOrderIsUnchanged() {
         #expect(PacketCaptureChip.all == ["All", "TCP", "UDP", "DNS", "mDNS", "Other"])
     }

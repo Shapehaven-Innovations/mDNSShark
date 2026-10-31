@@ -120,7 +120,7 @@ Console access to a network extension on a real iPhone is unreliable, so the ext
 
 - **Error banner** (`tlsInterceptorLastError`): the app shows the extension's last non-benign drop reason in a dismissible banner. `tlsInterceptorDropCount` still counts drops, but its Settings line is disabled.
 - **Unified log:** `log stream --level debug --predicate 'subsystem == "com.mDNSShark.PacketTunnel"'`. Key lines: `sendSYNACK to ...`, `device-facing TLS READY` (the device trusted the leaf), and `first write to device`.
-- **Packet capture:** the `.pcap` export includes the extension's own synthetic packets, tagged `[reconstructed]` in the capture view. Decrypted HTTPS requests are numbered `D-1`, `D-2`, ... on their own sequence and are neither written to the pcap nor counted in `totalPackets` (they appear as `decryptedRequests` in `capture-meta.json`), so frame N in the app is frame N in Wireshark.
+- **Packet capture:** the `.pcap` export includes the extension's own synthetic packets, tagged `[reconstructed]` in the capture view. Decrypted HTTPS requests are numbered `D-1`, `D-2`, ... on their own sequence and are neither written to the pcap nor counted in `totalPackets` (they appear as `decryptedRequests` in `capture-meta.json`), so frame N in the app is frame N in Wireshark. mDNS frames come from the extension's multicast listener and are counted in `totalPackets` and `reconstructedPackets`; `capture-meta.json` has an `mdnsListener` object with the listener status, interface, frame counts and whether TTLs and timestamps came from the kernel.
 - **Signposts:** each plain relay flow is an `OSSignposter` interval (`relayFlow`) in Instruments.
 
 </details>
@@ -168,7 +168,7 @@ The extension uses configurable upstream DNS resolvers, a primary and a secondar
 
 ### Capture Filters
 
-The **Capture** section in Settings has a chip for each protocol the capture view can show: `DNS`, `mDNS`, `HTTPS`, `HTTP`, `TCP`, `UDP`, `ICMP`. Tap a chip to turn it on or off. All are on by default. mDNS is multicast that iOS keeps on Wi-Fi; it never enters the capture tunnel, so that chip has no effect on captures. ARP is not captured either.
+The **Capture** section in Settings has a chip for each protocol the capture view can show: `DNS`, `mDNS`, `HTTPS`, `HTTP`, `TCP`, `UDP`, `ICMP`. Tap a chip to turn it on or off. All are on by default. mDNS is multicast that iOS keeps on Wi-Fi and never routes into the tunnel, so the extension runs its own multicast listener on 224.0.0.251:5353 while the `mDNS` chip is on; those frames get IP and UDP headers rebuilt from socket metadata (payloads verbatim), are tagged `[reconstructed]`, and land in the same pcap with ordinary frame numbers. Only traffic to the joined group is received (no unicast mDNS replies to other hosts). The listener's last status shows under the chips. ARP is not captured.
 
 **Delete Capture** removes the last capture's log, pcap and meta file from the app. Temporary export copies are not removed.
 

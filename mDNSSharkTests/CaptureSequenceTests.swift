@@ -85,6 +85,36 @@ struct CaptureSequenceTests {
         #expect(!plainJSON.contains("decryptedSequence"))
     }
 
+    // Logs written before captureSource existed are tunnel frames.
+    @Test func packetModelDecodesWithoutCaptureSourceAsTunnel() throws {
+        let json = """
+        {"id":"6C5A2E0B-5E9E-4D5D-9B1E-1F6A4E2B3C4D","frameNumber":12,"timestamp":"2026-10-12T23:03:10Z",
+         "sourceIP":"192.168.8.178","destinationIP":"224.0.0.251","protocolName":"mDNS",
+         "length":128,"info":"Multicast DNS","hexDump":"","direction":"inbound"}
+        """
+        let dec = JSONDecoder()
+        dec.dateDecodingStrategy = .iso8601
+        let packet = try dec.decode(PacketModel.self, from: Data(json.utf8))
+        #expect(packet.captureSource == .tunnel)
+        #expect(PacketModel(frameNumber: 1, sourceIP: "a", destinationIP: "b",
+                            protocolName: "DNS", length: 1, info: "", hexDump: "").captureSource == .tunnel)
+    }
+
+    @Test func captureSourceRoundTripsThroughJSON() throws {
+        let original = PacketModel(frameNumber: 7, sourceIP: "192.168.8.178", destinationIP: "224.0.0.251",
+                                   sourcePort: 5353, destinationPort: 5353, protocolName: "mDNS", length: 128,
+                                   info: "Multicast DNS [reconstructed]", hexDump: "", direction: .inbound,
+                                   isReconstructed: true, captureSource: .mdnsListener)
+        let enc = JSONEncoder()
+        enc.dateEncodingStrategy = .iso8601
+        let dec = JSONDecoder()
+        dec.dateDecodingStrategy = .iso8601
+        let decoded = try dec.decode(PacketModel.self, from: try enc.encode(original))
+        #expect(decoded.captureSource == .mdnsListener)
+        #expect(decoded.frameLabel == "#7")
+        #expect(decoded.isReconstructed)
+    }
+
     @MainActor
     @Test func analysisTotalExcludesDecryptedRequests() {
         var packets: [PacketModel] = []

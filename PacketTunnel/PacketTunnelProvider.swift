@@ -7,6 +7,7 @@ import os
 class PacketTunnelProvider: NEPacketTunnelProvider {
     private var sequence = CaptureSequence()   // mutated only on logQueue
     private var forwarder: PacketForwarder?
+    private var mdnsListener: BSDMDNSListener?
     private lazy var pcapWriter = PCAPWriter(fileURL: pcapFileURL)
     private let logQueue = DispatchQueue(label: "com.mDNSShark.provider.log")
     private var logHandle: FileHandle?
@@ -69,10 +70,12 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             try? "".write(to: self.sharedFileURL, atomically: true, encoding: .utf8)
             self.logHandle = try? FileHandle(forWritingTo: self.sharedFileURL)
 
+            var pcapReady = true
             do {
                 try self.pcapWriter.startCapture()
             } catch {
                 // PCAP unavailable (disk full, permissions) - tunnel still runs, export will fail
+                pcapReady = false
             }
 
             let fwd = PacketForwarder(
@@ -88,6 +91,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             self.forwarder = fwd
             self.running = true
             self.readLoop()
+            self.startMDNSListener(pcapReady: pcapReady)
             completionHandler(nil)
         }
     }
@@ -101,10 +105,12 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     }
 
     // Dispatched to logQueue so sequence, logHandle, and pcapWriter are accessed serially.
-    private func handle(rawIP: Data, direction: PacketDirection, isReconstructed: Bool) {
+    private func handle(rawIP: Data, direction: PacketDirection, isReconstructed: Bool,
+                        timestamp: Date = Date(), captureSource: PacketModel.CaptureSource = .tunnel) {
         logQueue.async { [weak self] in
             guard let self else { return }
-            let packet = self.parse(rawIP, direction: direction, isReconstructed: isReconstructed)
+            let packet = PacketParser.parse(rawIP, frameNumber: self.sequence.nextFrameNumber, timestamp: timestamp,
+                                            direction: direction, isReconstructed: isReconstructed, captureSource: captureSource)
             guard SharedSettings.captureFilterProtocols.contains(packet.protocolName) else { return }
             // Only packets written to the pcap consume a frame number, so app frame N is Wireshark frame N.
             self.sequence.recordFrame()
@@ -145,6 +151,9 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
                              completionHandler: @escaping () -> Void) {
         running = false
         forwarder?.stop()
+        // The listener stops first so no datagram can reach handle() after the drain below.
+        let listenerStatuses = (mdnsListener?.status, mdnsListener?.ipv6Status)
+        mdnsListener?.stop()
 
         // Drain in-flight log writes so every appendPacket is queued before the pcap is closed and counted.
         var decryptedRequests = 0
@@ -154,16 +163,54 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             decryptedRequests = self.sequence.decryptedRequests
         }
 
-        let meta = pcapWriter.stopCapture(
+        var meta = pcapWriter.stopCapture(
             deviceWiFiIP: detectedWiFiIP,
             tunnelIP: "100.64.0.1",
             decryptedRequests: decryptedRequests,
             lanRouteStatus: lanRouteStatus
         )
+        meta["mdnsListener"] = mdnsListenerMeta(statuses: listenerStatuses)
+        if let disclaimer = meta["disclaimer"] as? String {
+            meta["disclaimer"] = disclaimer + " mDNS frames have IP and UDP headers rebuilt from socket metadata; payloads are verbatim."
+        }
         if let data = try? JSONSerialization.data(withJSONObject: meta, options: .prettyPrinted) {
             try? data.write(to: metaFileURL)
         }
         completionHandler()
+    }
+
+    // MARK: - mDNS listener (docs/mdns-listener-scope.md section 2.3)
+
+    /// Starts the multicast listener when the mDNS filter is on and the pcap opened; each datagram becomes a reconstructed frame through handle().
+    private func startMDNSListener(pcapReady: Bool) {
+        guard SharedSettings.captureFilterProtocols.contains("mDNS") else {
+            SharedSettings.mdnsListenerStatus = "disabled (mDNS filter off)"
+            return
+        }
+        guard pcapReady else {
+            SharedSettings.mdnsListenerStatus = "not started (pcap unavailable)"
+            return
+        }
+        let listener = BSDMDNSListener()
+        listener.start { [weak self, weak listener] datagram, _ in
+            guard let self, let listener, let frame = MDNSFrameBuilder.frame(datagram) else { return }
+            let direction: PacketDirection = listener.ownAddresses.contains(datagram.source) ? .outbound : .inbound
+            self.handle(rawIP: frame, direction: direction, isReconstructed: true,
+                        timestamp: datagram.timestamp, captureSource: .mdnsListener)
+        }
+        mdnsListener = listener
+        SharedSettings.mdnsListenerStatus = listener.status.description
+        logger.info("mDNS listener: \(listener.status.description, privacy: .public)")
+    }
+
+    /// Reports the statuses sampled before stop() so the meta shows how the listener ran, not "stopped".
+    private func mdnsListenerMeta(statuses: (MDNSListenerStatus?, MDNSListenerStatus?)) -> [String: Any] {
+        guard let listener = mdnsListener else {
+            return ["status": SharedSettings.mdnsListenerStatus, "ipv6Status": SharedSettings.mdnsListenerStatus, "frames": 0]
+        }
+        return MDNSListenerMeta.dictionary(status: statuses.0 ?? listener.status, ipv6Status: statuses.1 ?? listener.ipv6Status,
+                                           interfaceName: listener.interfaceName, interfaceIndex: listener.interfaceIndex,
+                                           stats: listener.stats)
     }
 
     // MARK: - LAN route detection
@@ -223,93 +270,6 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         return (0..<4).map { String(a[$0] & m[$0]) }.joined(separator: ".")
     }
 
-    // MARK: - Parsing (called only on logQueue)
-
-    private func parse(_ data: Data, direction: PacketDirection, isReconstructed: Bool) -> PacketModel {
-        let hex   = data.map { String(format: "%02x", $0) }.joined(separator: " ")
-        let bytes = [UInt8](data)
-
-        guard data.count >= 20, bytes[0] >> 4 == 4 else {
-            return make(src: "0.0.0.0", dst: "0.0.0.0", proto: "Other",
-                        len: data.count, info: "Non-IPv4", hex: hex,
-                        direction: direction, isReconstructed: isReconstructed)
-        }
-
-        let ihl     = Int(bytes[0] & 0x0F) * 4
-        let ipProto = bytes[9]
-        let src     = "\(bytes[12]).\(bytes[13]).\(bytes[14]).\(bytes[15])"
-        let dst     = "\(bytes[16]).\(bytes[17]).\(bytes[18]).\(bytes[19])"
-        let payload = Array(bytes.dropFirst(ihl))
-
-        var proto = "Other"; var sPort: Int?; var dPort: Int?; var info = ""
-        var payloadText: String? = nil
-
-        switch ipProto {
-        case 6:
-            if payload.count >= 14 {
-                sPort = Int(payload[0]) << 8 | Int(payload[1])
-                dPort = Int(payload[2]) << 8 | Int(payload[3])
-                info  = decodeTCPFlags(payload[13])
-                proto = dPort == 443 || sPort == 443 ? "HTTPS"
-                      : dPort == 80  || sPort == 80  ? "HTTP" : "TCP"
-                if proto == "HTTP" {
-                    let tcpHeaderLen = Int((payload[12] >> 4)) * 4
-                    if payload.count > tcpHeaderLen {
-                        let httpBytes = Array(payload.dropFirst(tcpHeaderLen))
-                        let text = String(bytes: httpBytes, encoding: .utf8)
-                        if let t = text, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            payloadText = t
-                        }
-                    }
-                }
-            } else { proto = "TCP" }
-        case 17:
-            if payload.count >= 4 {
-                sPort = Int(payload[0]) << 8 | Int(payload[1])
-                dPort = Int(payload[2]) << 8 | Int(payload[3])
-                if dPort == 53 || sPort == 53 {
-                    proto = "DNS"; info = parseDNS(Array(payload.dropFirst(8)))
-                } else if dPort == 5353 || sPort == 5353 {
-                    proto = "mDNS"; info = "Multicast DNS"
-                } else {
-                    proto = "UDP"; info = "UDP \(sPort ?? 0) → \(dPort ?? 0)"
-                }
-            } else { proto = "UDP" }
-        case 1:
-            proto = "ICMP"
-            if !payload.isEmpty { info = decodeICMP(payload[0]) }
-        default:
-            proto = "IP(\(ipProto))"
-        }
-
-        if isReconstructed && !info.contains("[reconstructed]") {
-            info = info.isEmpty ? "[reconstructed]" : "\(info) [reconstructed]"
-        }
-
-        let m = PacketModel(
-            frameNumber: sequence.nextFrameNumber, timestamp: Date(),
-            sourceIP: src, destinationIP: dst,
-            sourcePort: sPort, destinationPort: dPort,
-            protocolName: proto, length: data.count,
-            info: info.isEmpty ? "\(proto) packet" : info,
-            hexDump: hex, payloadText: payloadText,
-            direction: direction, isReconstructed: isReconstructed
-        )
-        return m
-    }
-
-    private func make(src: String, dst: String, proto: String, len: Int,
-                      info: String, hex: String,
-                      direction: PacketDirection, isReconstructed: Bool) -> PacketModel {
-        let m = PacketModel(
-            frameNumber: sequence.nextFrameNumber, timestamp: Date(),
-            sourceIP: src, destinationIP: dst,
-            protocolName: proto, length: len, info: info, hexDump: hex,
-            direction: direction, isReconstructed: isReconstructed
-        )
-        return m
-    }
-
     // Fractional seconds keep sub-second packet timing (plain .iso8601 drops it); shared to avoid per-packet allocation.
     private static let packetDateFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
@@ -328,44 +288,5 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         guard let jsonData = try? enc.encode(packet),
               let newline = "\n".data(using: .utf8) else { return }
         fh.write(jsonData + newline)
-    }
-
-    // MARK: - Protocol helpers
-
-    private func decodeTCPFlags(_ f: UInt8) -> String {
-        var p: [String] = []
-        if f & 0x01 != 0 { p.append("FIN") }
-        if f & 0x02 != 0 { p.append("SYN") }
-        if f & 0x04 != 0 { p.append("RST") }
-        if f & 0x08 != 0 { p.append("PSH") }
-        if f & 0x10 != 0 { p.append("ACK") }
-        if f & 0x20 != 0 { p.append("URG") }
-        return p.isEmpty ? "TCP" : "[" + p.joined(separator: ", ") + "]"
-    }
-
-    private func decodeICMP(_ type: UInt8) -> String {
-        switch type {
-        case 0:  return "Echo Reply"
-        case 8:  return "Echo Request (ping)"
-        case 3:  return "Destination Unreachable"
-        case 11: return "Time Exceeded"
-        default: return "ICMP Type \(type)"
-        }
-    }
-
-    // Question name starts after the 12-byte DNS header; the QR bit marks responses.
-    private func parseDNS(_ bytes: [UInt8]) -> String {
-        guard bytes.count >= 12 else { return "DNS packet" }
-        let isResponse = bytes[2] & 0x80 != 0
-        var labels: [String] = []; var i = 12
-        while i < bytes.count {
-            let len = Int(bytes[i]); i += 1
-            if len == 0 { break }
-            guard i + len <= bytes.count else { break }
-            if let s = String(bytes: Array(bytes[i..<i+len]), encoding: .utf8) { labels.append(s) }
-            i += len
-        }
-        let kind = isResponse ? "Response" : "Query"
-        return labels.isEmpty ? "DNS \(kind.lowercased())" : "\(kind): \(labels.joined(separator: "."))"
     }
 }

@@ -100,6 +100,12 @@ enum SharedSettings {
 
     static let allProtocols: Set<String> = ["DNS", "mDNS", "HTTPS", "HTTP", "TCP", "UDP", "ICMP"]
 
+    /// Last status of the extension's mDNS multicast listener, written at tunnel start and on failure, read by the Packets empty state and Settings.
+    static var mdnsListenerStatus: String {
+        get { suite.string(forKey: "mdnsListenerStatus") ?? "" }
+        set { suite.set(newValue, forKey: "mdnsListenerStatus") }
+    }
+
     /// When on, the tunnel adds a Wi-Fi subnet included route and `excludeLocalNetworks` flips off, but router traffic stays on Wi-Fi uncaptured.
     static var includeAllNetworksInCapture: Bool {
         get { suite.bool(forKey: "includeAllNetworksInCapture") }
