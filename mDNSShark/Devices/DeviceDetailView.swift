@@ -60,6 +60,7 @@ struct DeviceDetailView: View {
                         row("MAC Address",  device.macAddress ?? "Unknown")
                         row("Manufacturer", device.manufacturer ?? "Unknown")
                         row("Inferred OS",  device.displayInferredOS  ?? "Unknown")
+                        if let server = device.ssdpServer { row("Server header", server, selectable: true) }
                         row("Open Ports",   device.openPorts.isEmpty ? "None" : device.openPorts.map { String($0) }.joined(separator: ", "))
                     }
                 }

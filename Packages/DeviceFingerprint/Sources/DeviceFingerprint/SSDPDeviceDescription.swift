@@ -4,6 +4,8 @@ public struct SSDPDescriptionInfo {
     public let manufacturer: String?
     public let modelName: String?
     public let serialNumber: String?
+    /// The device's own short description for end users (UPnP `friendlyName`), plain text, trimmed and capped.
+    public let friendlyName: String?
 }
 
 /// Parses the UPnP device-description XML document an SSDP `LOCATION`
@@ -15,15 +17,23 @@ public enum SSDPDeviceDescription {
         let parser = XMLParser(data: xml)
         parser.delegate = delegate
         guard parser.parse() else { return nil }
-        guard delegate.manufacturer != nil || delegate.modelName != nil || delegate.serialNumber != nil else {
+        guard delegate.manufacturer != nil || delegate.modelName != nil || delegate.serialNumber != nil || delegate.friendlyName != nil else {
             return nil
         }
-        return SSDPDescriptionInfo(manufacturer: delegate.manufacturer, modelName: delegate.modelName, serialNumber: delegate.serialNumber)
+        return SSDPDescriptionInfo(manufacturer: delegate.manufacturer, modelName: delegate.modelName, serialNumber: delegate.serialNumber,
+                                   friendlyName: delegate.friendlyName)
     }
 
     private final class Delegate: NSObject, XMLParserDelegate {
-        var manufacturer: String?, modelName: String?, serialNumber: String?
+        var manufacturer: String?, modelName: String?, serialNumber: String?, friendlyName: String?
         private var currentText = ""
+
+        /// Treats a value as plain text only: control characters dropped, whitespace collapsed, capped at 64 characters (UDA 1.1 asks for under 64).
+        static func plainText(_ value: String) -> String? {
+            let scalars = value.unicodeScalars.map { CharacterSet.controlCharacters.contains($0) ? " " : String($0) }.joined()
+            let collapsed = scalars.split(whereSeparator: { $0 == " " }).joined(separator: " ")
+            return collapsed.isEmpty ? nil : String(collapsed.prefix(64))
+        }
 
         func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName qName: String?, attributes attributeDict: [String: String] = [:]) {
             currentText = ""
@@ -43,6 +53,7 @@ public enum SSDPDeviceDescription {
             case "manufacturer": if manufacturer == nil, !trimmed.isEmpty { manufacturer = trimmed }
             case "modelName": if modelName == nil, !trimmed.isEmpty { modelName = trimmed }
             case "serialNumber": if serialNumber == nil, !trimmed.isEmpty { serialNumber = trimmed }
+            case "friendlyName": if friendlyName == nil, let clean = Self.plainText(trimmed) { friendlyName = clean }
             default: break
             }
         }

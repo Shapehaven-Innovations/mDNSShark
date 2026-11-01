@@ -34,6 +34,8 @@ final class DeviceEnrichmentCoordinator {
         let ip: String
         let enrichments: [DeviceEnrichment]
         let completesProbeSet: Bool
+        /// The UPnP `friendlyName` from a device description, when one answered; a display-name candidate, not an enrichment field.
+        var upnpName: String? = nil
     }
 
     let results = PassthroughSubject<Result, Never>()
@@ -165,7 +167,9 @@ final class DeviceEnrichmentCoordinator {
                 enrichments.append(DeviceEnrichment(mac: nil, manufacturer: nil, inferredOS: os,
                                                      openPorts: [], source: .ttlGuess))
             }
+            var upnpName: String?
             if let r = await ssdp {
+                upnpName = r.friendlyName
                 enrichments.append(DeviceEnrichment(mac: nil, manufacturer: r.manufacturer, inferredOS: nil,
                                                      openPorts: Self.confirmedPorts(descriptionURL: locationURL), source: .ssdpDescription))
             }
@@ -185,7 +189,7 @@ final class DeviceEnrichmentCoordinator {
 
             // A scan restart cancels this task; its late answer must not land in the new scan's state.
             guard !Task.isCancelled else { return }
-            results.send(Result(ip: ip, enrichments: enrichments, completesProbeSet: true))
+            results.send(Result(ip: ip, enrichments: enrichments, completesProbeSet: true, upnpName: upnpName))
         }
         activeTasks[taskID] = task
     }
@@ -213,7 +217,7 @@ final class DeviceEnrichmentCoordinator {
             let enrichment = DeviceEnrichment(mac: nil, manufacturer: info.manufacturer, inferredOS: nil,
                                                openPorts: Self.confirmedPorts(descriptionURL: locationURL), source: .ssdpDescription)
             guard !Task.isCancelled else { return }
-            results.send(Result(ip: ip, enrichments: [enrichment], completesProbeSet: false))
+            results.send(Result(ip: ip, enrichments: [enrichment], completesProbeSet: false, upnpName: info.friendlyName))
         }
         activeTasks[taskID] = task
     }

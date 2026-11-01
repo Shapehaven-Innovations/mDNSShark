@@ -32,6 +32,8 @@ struct DiscoveredDevice: Identifiable, Equatable {
     var probesSettled: Bool = false
     /// Every address seen for this device, raw as received: IPv4 first, then IPv6 (with its scope, if any).
     var addresses: [String] = []
+    /// The SSDP `SERVER` header as received (OS and product tokens), shown as its own field and never as a name.
+    var ssdpServer: String?
 
     init(id: UUID = UUID(), hostname: String, ipAddress: String,
          macAddress: String? = nil, manufacturer: String? = nil,
@@ -51,7 +53,7 @@ struct DiscoveredDevice: Identifiable, Equatable {
             && l.macAddress == r.macAddress && l.manufacturer == r.manufacturer
             && l.inferredOS == r.inferredOS && l.openPorts == r.openPorts
             && l.bonjourServices == r.bonjourServices
-            && l.probesSettled == r.probesSettled && l.addresses == r.addresses
+            && l.probesSettled == r.probesSettled && l.addresses == r.addresses && l.ssdpServer == r.ssdpServer
     }
 
     var isGateway: Bool { ipAddress.hasSuffix(".1") }

@@ -151,6 +151,9 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
             return key.isEmpty ? nil : key
         }
         
+        /// The SSDP `SERVER` header (OS and product tokens, not a name), kept only to show as a literal field.
+        var ssdpServer: String?
+
         var identifier: String { friendlyName ?? serviceName }
         
         init(serviceName: String, serviceDomain: String, serviceType: String) {
@@ -400,13 +403,13 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
             return
         }
         let usn = headers["usn"] ?? location
-        let server = headers["server"] ?? "SSDP Device"
+        let server = headers["server"]
         
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             if !self.devices.contains(where: { $0.serviceName == usn && $0.serviceDomain == "ssdp" }) {
                 let device = Device(serviceName: usn, serviceDomain: "ssdp", serviceType: "ssdp")
-                device.friendlyName = server
+                device.ssdpServer = server
                 if let url = URL(string: location), let host = url.host {
                     // A DNS-named LOCATION has no address yet; keep the name so the row can attach by host or show as a service.
                     if Self.isIPAddressLiteral(host) { device.resolvedIPAddress = host } else { device.hostName = host }

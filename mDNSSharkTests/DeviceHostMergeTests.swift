@@ -182,16 +182,22 @@ struct DeviceHostMergeTests {
         #expect(result.services.map(\.id) == ["_http._tcp|orphan|local."])
     }
 
-    @Test("a row without a Bonjour host name keeps its own identifier as the display name")
-    func rowWithoutHostNameKeepsIdentifier() {
+    @Test("an SSDP device with no host name shows its UPnP friendly name once it arrives, never the SERVER header or the USN")
+    func ssdpDeviceNameComesFromTheDescription() {
         let vm = viewModel()
         let ssdp = NetworkScanner.Device(serviceName: "uuid:tv", serviceDomain: "ssdp", serviceType: "ssdp")
         ssdp.resolvedIPAddress = "203.0.113.31"
-        ssdp.friendlyName = "Living Room TV"
+        ssdp.ssdpServer = "Linux/4.x UPnP/1.0 Product/1.0"
 
-        let devices = vm.merge(raw: [ssdp])
+        // Before the description answers: the address, with the header kept as a literal field.
+        let before = vm.merge(raw: [ssdp])
+        #expect(before.map(\.hostname) == ["203.0.113.31"])
+        #expect(before.first?.ssdpServer == "Linux/4.x UPnP/1.0 Product/1.0")
 
-        #expect(devices.map(\.hostname) == ["Living Room TV"])
+        vm.ingestEnrichment(ip: "203.0.113.31", enrichments: [], completesProbeSet: false, upnpName: "Living Room TV")
+        let after = vm.merge(raw: [ssdp])
+        #expect(after.map(\.hostname) == ["Living Room TV"])
+        #expect(after.map(\.id) == before.map(\.id))
     }
 
     @Test("two LAN IPv4 addresses on one host key the same IP in either order")
@@ -597,7 +603,7 @@ struct DeviceHostMergeTests {
         let bonjour = bonjourRow(type: "_airplay._tcp", name: "Living Room", ip: "203.0.113.40", host: nil, port: 7000)
         let ssdp = NetworkScanner.Device(serviceName: "uuid:x", serviceDomain: "ssdp", serviceType: "ssdp")
         ssdp.resolvedIPAddress = "203.0.113.40"
-        ssdp.friendlyName = "Linux/5 UPnP/1.1 X/1"
+        ssdp.ssdpServer = "Linux/5 UPnP/1.1 X/1"
         let forward = vm.merge(raw: [ssdp, bonjour, sweepRow("203.0.113.40")])
         let reversed = vm.merge(raw: [sweepRow("203.0.113.40"), bonjour, ssdp])
         #expect(forward.map(\.hostname) == ["Living Room"])
@@ -612,6 +618,14 @@ struct DeviceHostMergeTests {
         let second = DiscoveredDevice(hostname: "Mac", ipAddress: "203.0.113.50", manufacturer: "Apple", bonjourServices: [smb, air])
         #expect(first.deviceType == .computer && second.deviceType == .computer)
         #expect(Set(DeviceType.allCases.map(\.label)).count == DeviceType.allCases.count)
+    }
+
+    @Test("the UPnP friendly name is read as plain text from the root device and capped at 64 characters")
+    func friendlyNameParsing() {
+        let xml = "<root><device><friendlyName>  Living\tRoom   TV </friendlyName><deviceList><device><friendlyName>Embedded</friendlyName></device></deviceList></device></root>"
+        #expect(SSDPDeviceDescription.parse(Data(xml.utf8))?.friendlyName == "Living Room TV")
+        let long = "<root><device><friendlyName>\(String(repeating: "x", count: 200))</friendlyName></device></root>"
+        #expect(SSDPDeviceDescription.parse(Data(long.utf8))?.friendlyName?.count == 64)
     }
 
     // MARK: - Services without a device

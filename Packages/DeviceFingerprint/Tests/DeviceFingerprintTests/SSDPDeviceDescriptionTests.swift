@@ -70,4 +70,16 @@ final class SSDPDeviceDescriptionTests: XCTestCase {
         XCTAssertEqual(info?.modelName, "Nighthawk R7000")
         XCTAssertEqual(info?.serialNumber, "ROOT-SERIAL-1")
     }
+
+    func test_friendlyNameIsPlainTextRootWinsAndCapped() {
+        let long = String(repeating: "x", count: 200)
+        let xml = """
+        <?xml version="1.0"?>
+        <root><device><friendlyName>  Living\tRoom   TV </friendlyName><modelName>M</modelName>
+        <deviceList><device><friendlyName>Embedded</friendlyName></device></deviceList></device></root>
+        """
+        XCTAssertEqual(SSDPDeviceDescription.parse(Data(xml.utf8))?.friendlyName, "Living Room TV")
+        let capped = "<root><device><friendlyName>\(long)</friendlyName></device></root>"
+        XCTAssertEqual(SSDPDeviceDescription.parse(Data(capped.utf8))?.friendlyName?.count, 64)
+    }
 }

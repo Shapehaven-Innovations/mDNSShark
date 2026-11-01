@@ -30,6 +30,11 @@ final class SSDPDescriptionFetcher {
                 logger.debug("SSDPDescriptionFetcher: non-200 response (\(httpResponse.statusCode, privacy: .public)) for \(locationURL.absoluteString, privacy: .public)")
                 return nil
             }
+            // A device description is a few KB; a larger body is not one, so it is not parsed.
+            guard data.count <= 64 * 1024 else {
+                logger.debug("SSDPDescriptionFetcher: body over 64 KB for \(locationURL.absoluteString, privacy: .public)")
+                return nil
+            }
             return SSDPDeviceDescription.parse(data)
         } catch {
             logger.debug("SSDPDescriptionFetcher: fetch failed for \(locationURL.absoluteString, privacy: .public): \(error.localizedDescription)")

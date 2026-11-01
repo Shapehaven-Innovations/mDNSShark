@@ -40,6 +40,8 @@ final class NetworkScanViewModel: ObservableObject {
     private var settledIPsThisScan = Set<String>()
     // The previous scan's results, shown for an address until this scan's probe of it answers, so a rescan does not blank enrichment.
     private var carriedEnrichmentsByIP: [String: Stamped<[DeviceEnrichment]>] = [:]
+    // UPnP friendly names by probed address, kept like `identityByIP` so a TV that is off during a rescan keeps its name for three scans.
+    private var upnpNameByIP: [String: Stamped<String>] = [:]
     // The scanner rows last applied, so an enrichment result rebuilds the same rows instead of patching one device in place.
     private var lastRaw: [NetworkScanner.Device] = []
     // True from scan start until the scanner publishes its first rows, so a result landing meanwhile does not rebuild last scan's rows.
@@ -97,7 +99,7 @@ final class NetworkScanViewModel: ObservableObject {
         enrichmentCoordinator.results
             .receive(on: DispatchQueue.main)
             .sink { [weak self] result in
-                self?.ingestEnrichment(ip: result.ip, enrichments: result.enrichments, completesProbeSet: result.completesProbeSet)
+                self?.ingestEnrichment(ip: result.ip, enrichments: result.enrichments, completesProbeSet: result.completesProbeSet, upnpName: result.upnpName)
             }
             .store(in: &cancellables)
     }
@@ -137,6 +139,7 @@ final class NetworkScanViewModel: ObservableObject {
         scanGeneration += 1
         let oldest = scanGeneration - Self.rememberedScans
         identityByIP = identityByIP.filter { $0.value.generation >= oldest }
+        upnpNameByIP = upnpNameByIP.filter { $0.value.generation >= oldest }
         carriedEnrichmentsByIP = carriedEnrichmentsByIP.filter { $0.value.generation >= oldest }
         ownAddressesThisScan = nil
         networkCIDRThisScan = nil
@@ -190,7 +193,8 @@ final class NetworkScanViewModel: ObservableObject {
 
     /// Stores a probe result under the address it probed and rebuilds the rows; only a full probe set settles the address and retires
     /// its carried result. While the scan start still holds the previous list, the result is stored without rebuilding last scan's rows.
-    func ingestEnrichment(ip: String, enrichments: [DeviceEnrichment], completesProbeSet: Bool = true) {
+    func ingestEnrichment(ip: String, enrichments: [DeviceEnrichment], completesProbeSet: Bool = true, upnpName: String? = nil) {
+        if let upnpName { upnpNameByIP[ip] = Stamped(value: upnpName, generation: scanGeneration) }
         rawEnrichmentsByIP[ip, default: []].append(contentsOf: enrichments)
         if completesProbeSet {
             settledIPsThisScan.insert(ip)
@@ -264,7 +268,7 @@ final class NetworkScanViewModel: ObservableObject {
     /// Plans a merge. One host's services can each resolve to a different address (LAN IPv4, self-assigned 169.254, or IPv6), so
     /// every row sharing a host key collapses onto that host's preferred address; `remembered` is the identity memory from past scans.
     nonisolated static func plan(raw: [NetworkScanner.Device], own: LocalInterfaces.OwnAddresses,
-                                 remembered: [String: String]) -> MergePlan {
+                                 remembered: [String: String], upnpNames: [String: String] = [:]) -> MergePlan {
         var addressesByHost: [String: [String]] = [:]
         for device in raw {
             if let key = device.hostKey, let ip = device.resolvedIPAddress { addressesByHost[key, default: []].append(ip) }
@@ -353,15 +357,21 @@ final class NetworkScanViewModel: ObservableObject {
             guard let host = device.hostName, let ip else { continue }
             if hostNameByIP[ip].map({ host < $0 }) ?? true { hostNameByIP[ip] = host }
         }
-        // No host name: a Bonjour instance name beats a RAOP "MAC@Name" one, which beats an SSDP name, which beats the bare address; within a
-        // tier the smallest wins, so the name never depends on which row arrived first.
+        // No host name: a Bonjour instance name beats a RAOP "MAC@Name" one, which beats the UPnP friendly name, and anything else falls back
+        // to the address (the SSDP SERVER header and a bare USN are never names). Within a tier the smallest wins, so the name never
+        // depends on which row arrived first.
         var fallbackNameByIP: [String: (tier: Int, name: String)] = [:]
-        for (device, ip) in zip(raw, effectiveIPByRow) {
-            guard let ip, hostNameByIP[ip] == nil else { continue }
-            let name = device.identifier
-            let tier = device.serviceType.hasPrefix("_") ? (name.contains("@") ? 1 : 0) : (device.friendlyName != nil ? 2 : 3)
-            if let current = fallbackNameByIP[ip], (current.tier, current.name) <= (tier, name) { continue }
+        func offer(_ ip: String, _ tier: Int, _ name: String) {
+            if let current = fallbackNameByIP[ip], (current.tier, current.name) <= (tier, name) { return }
             fallbackNameByIP[ip] = (tier, name)
+        }
+        for (device, ip) in zip(raw, effectiveIPByRow) {
+            guard let ip, hostNameByIP[ip] == nil, device.serviceType.hasPrefix("_") else { continue }
+            let name = device.identifier
+            offer(ip, name.contains("@") ? 1 : 0, name)
+        }
+        for ip in Set(effectiveIPByRow.compactMap { $0 }) where hostNameByIP[ip] == nil {
+            for address in addressesByEffectiveIP[ip] ?? [ip] { if let name = upnpNames[address] { offer(ip, 2, name) } }
         }
         return MergePlan(effectiveIPByRow: effectiveIPByRow, identityByEffectiveIP: identityByEffectiveIP,
                          addressesByEffectiveIP: addressesByEffectiveIP, hostNameByIP: hostNameByIP,
@@ -373,7 +383,8 @@ final class NetworkScanViewModel: ObservableObject {
     /// advertised (Bonjour resolve or SSDP LOCATION) and stays on the service; open ports arrive solely via the enrichment sink.
     /// A row with no address of its own borrows its host's (matched by `Device.hostKey`); a row with neither is a service, not a device.
     func mergeScan(raw: [NetworkScanner.Device]) -> ScanMerge {
-        let plan = Self.plan(raw: raw, own: currentOwnAddresses(), remembered: identityByIP.mapValues(\.value))
+        let plan = Self.plan(raw: raw, own: currentOwnAddresses(), remembered: identityByIP.mapValues(\.value),
+                             upnpNames: upnpNameByIP.mapValues(\.value))
         for (address, identity) in plan.hostIdentityByAddress {
             identityByIP[address] = Stamped(value: identity, generation: scanGeneration)
         }
@@ -390,7 +401,7 @@ final class NetworkScanViewModel: ObservableObject {
                 guard device.resolveSettled else { continue }
                 // The id uses the dot-stripped type key; the displayed serviceType stays exactly as received.
                 services.append(DiscoveredService(id: "\(device.serviceTypeKey)|\(device.serviceName)|\(device.serviceDomain)",
-                                                  name: device.identifier, serviceType: device.serviceType,
+                                                  name: device.friendlyName ?? device.ssdpServer ?? device.serviceName, serviceType: device.serviceType,
                                                   port: device.port, hostName: device.hostName))
                 continue
             }
@@ -406,6 +417,7 @@ final class NetworkScanViewModel: ObservableObject {
                 if let svc, !existing.bonjourServices.contains(where: { $0.serviceType == svc.serviceType && $0.serviceName == svc.serviceName }) {
                     existing.bonjourServices.append(svc)
                 }
+                if let server = device.ssdpServer { existing.ssdpServer = min(existing.ssdpServer ?? server, server) }
                 if existing.manufacturer == nil {
                     existing.manufacturer = appleManufacturer(serviceType: device.serviceType, txtRecords: device.txtRecords)
                 }
@@ -430,7 +442,7 @@ final class NetworkScanViewModel: ObservableObject {
                 dispatchProbesIfNeeded(ip: ip, locationURL: device.locationURL)
                 var newDevice = DiscoveredDevice(
                     id:              stableID(forIdentity: identity, ip: ip),
-                    hostname:        hostNameByIP[ip] ?? fallbackNameByIP[ip] ?? device.identifier,
+                    hostname:        hostNameByIP[ip] ?? fallbackNameByIP[ip] ?? ip,
                     ipAddress:       ip,
                     macAddress:      mac,
                     manufacturer:    mfr,
@@ -439,6 +451,7 @@ final class NetworkScanViewModel: ObservableObject {
                     probesSettled:   probesSettled(forAddresses: group),
                     addresses:       Self.orderedAddresses(group)
                 )
+                newDevice.ssdpServer = device.ssdpServer
                 // Re-merge stored raw enrichments against the fresh baseline, not a stale merged snapshot.
                 let stored = enrichments(forAddresses: group)
                 if !stored.isEmpty {
