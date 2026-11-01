@@ -43,7 +43,7 @@ struct DeviceDetailView: View {
                 CardView {
                     HStack(spacing: 16) {
                         Image(systemName: device.deviceIcon).font(.system(size: 40))
-                            .foregroundColor(SecurityStatus.of(findings: device.securityFindings, settled: device.probesSettled).color)
+                            .foregroundColor(SecurityStatus.of(findings: device.securityFindings, settled: device.probesSettled, probed: device.wasProbed).color)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(device.hostname).font(.title2.bold())
                             Text(device.ipAddress).foregroundColor(.secondary)
@@ -51,6 +51,10 @@ struct DeviceDetailView: View {
                                 AppBadge(text: "Other network", color: AppColors.pending)
                                 Text("Not on the network you are connected to, so it may not be reachable directly.")
                                     .font(.caption).foregroundColor(.secondary)
+                            }
+                            if let skip = device.paymentVendorSkip {
+                                AppBadge(text: skip.badgeText, color: AppColors.pending)
+                                Text(PaymentVendorSkip.detail).font(.caption).foregroundColor(.secondary)
                             }
                             if let os = device.displayInferredOS { Text(os).font(.caption).foregroundColor(.secondary) }
                         }
@@ -69,7 +73,10 @@ struct DeviceDetailView: View {
                         row("Manufacturer", device.manufacturer ?? "Unknown")
                         row("Inferred OS",  device.displayInferredOS  ?? "Unknown")
                         if let server = device.ssdpServer { row("Server header", server, selectable: true) }
-                        row("Open Ports",   device.openPorts.isEmpty ? "None" : device.openPorts.map { String($0) }.joined(separator: ", "))
+                        row("Open Ports",   device.openPorts.isEmpty ? device.noOpenPortsText : device.openPorts.map { String($0) }.joined(separator: ", "))
+                        if let skip = device.paymentVendorSkip {
+                            Text(skip.note).font(.caption).foregroundColor(.secondary)
+                        }
                     }
                 }
 

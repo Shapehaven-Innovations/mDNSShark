@@ -21,6 +21,27 @@ public struct ARPTableEntry: Equatable {
     }
 }
 
+/// What one read of the ARP table says about one IPv4 address.
+public enum ARPLookup: Equatable, Sendable {
+    /// The entry carries a real MAC.
+    case resolved(String)
+    /// No MAC for this address yet, while other entries show theirs (or the table is empty), so one may still appear.
+    case missing
+    /// Every entry hides its MAC (the sandbox zeroes them without the entitlement), so waiting cannot reveal one.
+    case hidden
+
+    public var mac: String? {
+        if case .resolved(let mac) = self { return mac }
+        return nil
+    }
+
+    public static func state(forIP ip: String, in entries: [ARPTableEntry]) -> ARPLookup {
+        if let mac = entries.first(where: { $0.ipAddress == ip })?.macAddress { return .resolved(mac) }
+        if entries.isEmpty || entries.contains(where: { $0.macAddress != nil }) { return .missing }
+        return .hidden
+    }
+}
+
 /// Decodes the raw buffer a `NET_RT_FLAGS`/`RTF_LLINFO` routing-socket
 /// sysctl returns. Pure and synchronous so it can be exercised with
 /// synthetic buffers in tests; the actual `sysctl(2)` call lives in

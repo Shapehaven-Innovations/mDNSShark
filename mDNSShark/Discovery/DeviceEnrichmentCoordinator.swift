@@ -4,15 +4,13 @@ import Combine
 import DeviceFingerprint
 import os
 
-/// Fans the eight active probes out per discovered IP, each gated by one
+/// Fans the seven active probes out per discovered IP, each gated by one
 /// shared ProbeConcurrencyLimiter (global cap across every probe type and
 /// every IP, never per-IP) and, for the UDP probes, one shared
-/// UDPSendPacer (minimum spacing between sends). The exception is ARPTableProbe,
-/// which is a local sysctl read (no LAN traffic), so it skips the
-/// limiter/pacer, but still runs on a detached task rather than inline:
-/// it's synchronous with no internal `await`, and inline on this
-/// `@MainActor` orchestration it would serialize every device's
-/// enrichment behind each other's ARP read. Publishes each IP's
+/// UDPSendPacer (minimum spacing between sends). The ARP read is not part
+/// of the fan-out: `NetworkScanViewModel` reads it first through
+/// `PaymentVendorGate` and passes the MAC in, so a payment vendor is known
+/// before anything is sent. Publishes each IP's
 /// collected DeviceEnrichment results as they complete; NetworkScanViewModel
 /// folds them into the matching DiscoveredDevice via DeviceFingerprint.merge.
 ///
@@ -55,10 +53,11 @@ final class DeviceEnrichmentCoordinator {
     private let netBIOSProbe = NetBIOSProbe()
     private let ttlProbe = TTLProbe()
     private let ssdpFetcher = SSDPDescriptionFetcher()
-    private let arpTableProbe = ARPTableProbe()
     private let logger = Logger(subsystem: "com.mDNSShark", category: "DeviceEnrichmentCoordinator")
 
     private let probeTimeout: TimeInterval = 1.5
+    /// Reply wait for the vendor gate's one NBSTAT trigger; the ARP entry it creates needs only the exchange, not a full probe wait.
+    private let arpTriggerTimeout: TimeInterval = 0.5
     private let fetchTimeout: TimeInterval = 2.5
     /// 2026-09-20: raised from 1.0s. PortScanner marks an HTTP-shaped port
     /// (80/443/8080/8443) open the moment its TCP handshake reaches
@@ -87,7 +86,9 @@ final class DeviceEnrichmentCoordinator {
     private var activeTasks: [UUID: Task<Void, Never>] = [:]
 
     /// Fire all seven probes for one IP concurrently and publish the combined
-    /// results once every probe has either answered or timed out. Safe to
+    /// results, with the vendor gate's `arpMAC` as the ARP fact, once every
+    /// probe has either answered or timed out. Callers run the payment-vendor
+    /// gate first and never call this for a payment vendor. Safe to
     /// call many times concurrently for different IPs; the shared limiter
     /// is what keeps total outbound traffic bounded, not caller discipline.
     ///
@@ -101,7 +102,7 @@ final class DeviceEnrichmentCoordinator {
     /// every enrichment path goes through. `JNAPHNAPProbe` applies the same
     /// guard again internally since it targets `ip` directly rather than
     /// going through this call site.
-    func enrich(ip: String, locationURL: URL?) {
+    func enrich(ip: String, locationURL: URL?, arpMAC: String?) {
         guard SSDPDescriptionFetcher.isLANLocalAddress(ip) else {
             logger.debug("enrich: refusing non-LAN-local ip \(ip, privacy: .public)")
             return
@@ -116,17 +117,6 @@ final class DeviceEnrichmentCoordinator {
             async let ttl = limitedTTLProbe(ip: ip)
             async let ssdp = limitedSSDPFetch(locationURL: locationURL)
             async let ports = limitedPortScan(ip: ip)
-            // Detached: the sysctl(2) read + full ARP-table parse is
-            // synchronous with no await in it. Called inline (no
-            // .detached), it would run in-place on this @MainActor
-            // Task's executor (once per discovered IP, back-to-back for
-            // every device in a scan), starving the main actor of the
-            // slots every other probe's continuation needs to resume on,
-            // including limitedPortScan's, long enough to blow through
-            // their timeouts.
-            async let arpMac = Task.detached { [arpTableProbe] in
-                arpTableProbe.macAddress(forIP: ip)
-            }.value
 
             var enrichments: [DeviceEnrichment] = []
             if let r = await ubiquiti {
@@ -152,14 +142,9 @@ final class DeviceEnrichmentCoordinator {
                 enrichments.append(DeviceEnrichment(mac: mac, manufacturer: OUIDatabase.shared.manufacturer(for: mac), inferredOS: nil,
                                                      openPorts: [], source: .ouiLookup))
             }
-            // Local kernel read, not network I/O, so it doesn't go through the
-            // limiter/pacer the network probes above share, but still runs
-            // detached (see the async let above), not inline on this
-            // MainActor task. manufacturer comes from the same OUI table
-            // the NetBIOS-sourced mac above resolves through;
-            // arpTableLookup is just another path to a real mac, not a
-            // different kind of signal.
-            if let mac = await arpMac {
+            // Read by the vendor gate before this fan-out started. manufacturer comes from the same OUI table the NetBIOS-sourced mac
+            // above resolves through; arpTableLookup is just another path to a real mac, not a different kind of signal.
+            if let mac = arpMAC {
                 enrichments.append(DeviceEnrichment(mac: mac, manufacturer: OUIDatabase.shared.manufacturer(for: mac), inferredOS: nil,
                                                      openPorts: [], source: .arpTableLookup))
             }
@@ -256,6 +241,15 @@ final class DeviceEnrichmentCoordinator {
             results.send(Result(ip: ip, enrichments: [enrichment], completesProbeSet: false))
         }
         activeTasks[taskID] = task
+    }
+
+    /// The vendor gate's last resort for a host still missing from the ARP table: one NBSTAT datagram, so the kernel resolves the
+    /// address. Returns the MAC the reply carries, if any.
+    func arpTrigger(ip: String) async -> String? {
+        guard SSDPDescriptionFetcher.isLANLocalAddress(ip) else { return nil }
+        await limiter.acquire()
+        defer { Task { await limiter.release() } }
+        return await netBIOSProbe.probe(ip: ip, pacer: udpPacer, timeout: arpTriggerTimeout)?.mac
     }
 
     /// A 2xx description fetch is a real TCP connection to the LOCATION port, so it is the one port an SSDP reply confirms.

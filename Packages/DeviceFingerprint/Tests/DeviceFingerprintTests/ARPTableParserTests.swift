@@ -128,4 +128,25 @@ final class ARPTableParserTests: XCTestCase {
         buffer.removeLast(4) // truncate: rtm_msglen now overstates what's actually present
         XCTAssertTrue(ARPTableParser.parse(Data(buffer)).isEmpty)
     }
+
+    // MARK: - ARPLookup
+
+    func test_lookup_resolvedMAC_isReturned() {
+        let entries = [ARPTableEntry(ipAddress: "10.0.0.7", macAddress: "00:17:6f:01:02:03")]
+        XCTAssertEqual(ARPLookup.state(forIP: "10.0.0.7", in: entries), .resolved("00:17:6f:01:02:03"))
+    }
+
+    func test_lookup_noEntryWhileOthersShowMACs_isMissing() {
+        let entries = [ARPTableEntry(ipAddress: "10.0.0.1", macAddress: "aa:bb:cc:dd:ee:ff"),
+                       ARPTableEntry(ipAddress: "10.0.0.7", macAddress: nil)]
+        XCTAssertEqual(ARPLookup.state(forIP: "10.0.0.7", in: entries), .missing)
+        XCTAssertEqual(ARPLookup.state(forIP: "10.0.0.9", in: entries), .missing)
+        XCTAssertEqual(ARPLookup.state(forIP: "10.0.0.9", in: []), .missing)
+    }
+
+    func test_lookup_everyMACZeroed_isHidden() {
+        let entries = [ARPTableEntry(ipAddress: "10.0.0.1", macAddress: nil), ARPTableEntry(ipAddress: "10.0.0.7", macAddress: nil)]
+        XCTAssertEqual(ARPLookup.state(forIP: "10.0.0.7", in: entries), .hidden)
+        XCTAssertEqual(ARPLookup.state(forIP: "10.0.0.9", in: entries), .hidden)
+    }
 }

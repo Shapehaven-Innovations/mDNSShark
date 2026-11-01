@@ -39,6 +39,40 @@ enum MACAddressFacts {
     }
 }
 
+/// Why a host got no active probes: the vendor of its MAC makes payment, point-of-sale or traffic and roadside equipment.
+struct PaymentVendorSkip: Equatable {
+    enum Category: Equatable { case payment, infrastructure }
+    var category: Category = .payment
+    /// The vendor exactly as the OUI table names it.
+    var vendor: String
+    /// True when the vendor comes from the MAC with its locally administered bit cleared, not from the MAC itself.
+    var inferred: Bool
+    /// True when one NBSTAT datagram went out to fill the ARP table before the vendor was known.
+    var sentARPTrigger: Bool
+
+    static let label = "Payment terminal"
+    static let infrastructureLabel = "Roadside equipment"
+    static let detail = "identified from MAC vendor only, not probed"
+
+    /// The badge text for this host's category.
+    var badgeText: String { (category == .payment ? Self.label : Self.infrastructureLabel) + (inferred ? "?" : "") }
+
+    /// The detail view's note: what was skipped, and what still reached the device before its vendor was known.
+    var note: String {
+        var text: String
+        switch category {
+        case .payment:
+            text = "\(vendor) makes payment or point-of-sale equipment, so mDNSShark skipped its device probes for this address."
+        case .infrastructure:
+            text = "Vendor makes traffic-control, roadside or licence plate equipment, so mDNSShark skipped its device probes for this address."
+        }
+        text += " The subnet sweep's single connection attempt to port 80 runs before any vendor is known, so it is not skipped."
+        if sentARPTrigger { text += " One NetBIOS name query was sent before the vendor was known, so the address would appear in the ARP table." }
+        if inferred { text += " The vendor is inferred from a private MAC address with its locally administered bit cleared, not confirmed." }
+        return text
+    }
+}
+
 struct DiscoveredDevice: Identifiable, Equatable {
     let id: UUID
     var hostname: String
@@ -59,6 +93,10 @@ struct DiscoveredDevice: Identifiable, Equatable {
     var isOnLocalSubnet: Bool?
     /// For a web port that answered with a redirect, the `Location` it sent, as received. Ports with no entry were not seen redirecting.
     var httpRedirectByPort: [Int: String] = [:]
+    /// Set when the payment-vendor gate kept this host passive, so its open ports are unknown rather than none.
+    var paymentVendorSkip: PaymentVendorSkip?
+    /// False for a host that got no active probes (vendor gate or off-subnet), so an empty findings list means unchecked, not clean.
+    var wasProbed: Bool { paymentVendorSkip == nil && isOnLocalSubnet != false }
 
     init(id: UUID = UUID(), hostname: String, ipAddress: String,
          macAddress: String? = nil, manufacturer: String? = nil,
@@ -80,6 +118,7 @@ struct DiscoveredDevice: Identifiable, Equatable {
             && l.bonjourServices == r.bonjourServices
             && l.probesSettled == r.probesSettled && l.addresses == r.addresses && l.ssdpServer == r.ssdpServer
             && l.isOnLocalSubnet == r.isOnLocalSubnet && l.isDefaultGateway == r.isDefaultGateway && l.httpRedirectByPort == r.httpRedirectByPort
+            && l.paymentVendorSkip == r.paymentVendorSkip
     }
 
     /// Whether the system's default gateway is one of this device's addresses; nil when the gateway is unknown.
@@ -87,6 +126,9 @@ struct DiscoveredDevice: Identifiable, Equatable {
 
     /// The system's answer when there is one, otherwise the guess that the router is at x.x.x.1.
     var isGateway: Bool { isDefaultGateway ?? ipAddress.hasSuffix(".1") }
+
+    /// What to show when no open port is known: "Not probed" for a host the payment gate kept passive, since "None" would claim a fact.
+    var noOpenPortsText: String { paymentVendorSkip == nil ? "None" : "Not probed" }
 
     /// True when the MAC is private or derived, so the vendor cannot be read from it.
     var hasLocallyAdministeredMAC: Bool { macAddress.map(MACAddressFacts.isLocallyAdministered) ?? false }

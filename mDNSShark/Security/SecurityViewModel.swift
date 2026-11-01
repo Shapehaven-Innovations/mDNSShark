@@ -214,14 +214,14 @@ final class SecurityViewModel: ObservableObject {
         var counts: [SecurityStatus: Int] = [:]
         for device in devices {
             let own = findings.filter { $0.deviceID == device.id }
-            counts[SecurityStatus.of(findings: own, settled: device.probesSettled), default: 0] += 1
+            counts[SecurityStatus.of(findings: own, settled: device.probesSettled, probed: device.wasProbed), default: 0] += 1
         }
         return counts
     }
 
     /// Devices whose probes have settled and that carry no finding of vulnerable severity.
     func secureDeviceCount(among devices: [DiscoveredDevice]) -> Int {
-        devices.filter { $0.probesSettled && !vulnerableDeviceIDs.contains($0.id) }.count
+        devices.filter { $0.probesSettled && $0.wasProbed && !vulnerableDeviceIDs.contains($0.id) }.count
     }
 
     var allFindingsSorted: [SecurityFinding] {

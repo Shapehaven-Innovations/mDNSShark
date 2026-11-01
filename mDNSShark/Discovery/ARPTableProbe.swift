@@ -1,6 +1,5 @@
 import Foundation
 import DeviceFingerprint
-import os
 
 /// Thin app-layer wrapper around `DeviceFingerprint.ARPTableReader`, kept
 /// as its own file to match every other Discovery/*Probe.swift, even
@@ -10,25 +9,28 @@ import os
 /// go through `ProbeConcurrencyLimiter` or `UDPSendPacer`.
 ///
 /// Still synchronous and blocking (a full `sysctl` + byte-parse of the
-/// whole ARP table, no internal `await`), so `DeviceEnrichmentCoordinator`
-/// must call it from a detached task, never inline on its `@MainActor`
-/// enrichment `Task`: inline, it serializes every device's enrichment
-/// behind this one's sysctl call, starving the main actor of the slots
-/// the other probes' continuations (port scan included) need to resume
-/// on, and can blow their timeouts across an entire scan.
-final class ARPTableProbe {
-    private let logger = Logger(subsystem: "com.mDNSShark", category: "ARPTableProbe")
+/// whole ARP table, no internal `await`): the vendor gate's first look runs
+/// on the main actor once per merge pass thanks to the shared snapshot, and
+/// its polls run on a detached task. A nil MAC is expected on iOS 18-26
+/// (the sandbox zeroes the bytes) or without the `topology-observation`
+/// entitlement; see todo.md item 4.
+// Sendable by hand: the cached snapshot is only touched under `lock`.
+final class ARPTableProbe: @unchecked Sendable {
+    // One table read shared by lookups within `snapshotLifetime`, so a merge pass over many new hosts reads the table once.
+    private let lock = NSLock()
+    private var snapshot: (entries: [ARPTableEntry], readAt: ContinuousClock.Instant)?
+    private static let snapshotLifetime: Duration = .milliseconds(100)
 
-    /// Real link-layer MAC for `ip` if the kernel's ARP table has a
-    /// resolved (non-zero) entry for it. Nil on iOS 18-26 (the sandbox
-    /// zeroes the bytes), before the `topology-observation` entitlement is
-    /// granted, or if this device has never ARPed for `ip` at all; see
-    /// todo.md item 4.
-    func macAddress(forIP ip: String) -> String? {
-        let mac = ARPTableReader.macAddress(forIP: ip)
-        if mac == nil {
-            logger.debug("ARPTableProbe: no resolved ARP entry for \(ip, privacy: .public)")
-        }
-        return mac
+    /// What the ARP table says about `ip` right now, for the payment-vendor gate; safe to call from any thread.
+    func lookup(ip: String) -> ARPLookup {
+        lock.lock()
+        let cached = snapshot.flatMap { ContinuousClock.now - $0.readAt < Self.snapshotLifetime ? $0.entries : nil }
+        lock.unlock()
+        if let cached { return ARPLookup.state(forIP: ip, in: cached) }
+        let entries = ARPTableReader.readEntries()
+        lock.lock()
+        snapshot = (entries, ContinuousClock.now)
+        lock.unlock()
+        return ARPLookup.state(forIP: ip, in: entries)
     }
 }

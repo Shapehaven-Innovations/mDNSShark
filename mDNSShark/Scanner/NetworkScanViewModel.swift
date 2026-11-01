@@ -40,7 +40,7 @@ final class NetworkScanViewModel: ObservableObject {
     // another device keeps the old identity until a row with a host key says otherwise, or until three scans pass without it.
     private var identityByIP: [String: Stamped<String>] = [:]
     // Raw probe results keyed by the probed address, so they survive a device's identity flipping from its IP to its host key.
-    private var rawEnrichmentsByIP: [String: [DeviceEnrichment]] = [:]
+    private(set) var rawEnrichmentsByIP: [String: [DeviceEnrichment]] = [:]
     // Addresses whose full probe set answered this scan, or that the coordinator would refuse; a partial result alone never settles one.
     private var settledIPsThisScan = Set<String>()
     // The previous scan's results, shown for an address until this scan's probe of it answers, so a rescan does not blank enrichment.
@@ -62,6 +62,25 @@ final class NetworkScanViewModel: ObservableObject {
     private var fetchedGoogleWifiIPs = Set<String>()
     // Separate from `knownIDs` so a re-scan gives every device a fresh enrichment pass.
     private var enrichedIPsThisScan = Set<String>()
+    // Addresses refused as off-subnet, not marked enriched, so a later merge that adds an on-subnet address can still probe them.
+    private var skippedOffSubnetIPs = Set<String>()
+    // The payment-vendor gate per probed address this scan: ARP is read and the vendor decided before any probe, fetch or Google Wifi send.
+    private enum VendorGateState { case waiting, passed, skipped }
+    private var vendorGateByIP: [String: VendorGateState] = [:]
+    // Description fetches and Google Wifi probes asked for while an address's gate waited on ARP; sent only if it passes.
+    private var heldDescriptionURLByIP: [String: URL] = [:]
+    private var heldGoogleWifiIPs = Set<String>()
+    // ARP waits in flight, cancelled when a new scan starts.
+    private var vendorGateTasks: [String: Task<Void, Never>] = [:]
+    // The address probed for each row's effective address, which differs when only a later address of the group is on this phone's subnet.
+    private var probeTargetByIP: [String: String] = [:]
+    // Addresses the gate kept passive this scan because their MAC vendor makes payment equipment.
+    private var paymentSkipByIP: [String: PaymentVendorSkip] = [:]
+    // ARP seam for the vendor gate; with the probe seam and no ARP seam the table reads as hidden, so tests never read this Mac's table.
+    private let arpLookup: @Sendable (String) -> ARPLookup
+    // Stands in for the gate's one NBSTAT trigger (device test T9); with the probe seam and no trigger seam none is sent.
+    private let arpTriggerOverride: ((String) async -> String?)?
+    private let vendorGateTiming: PaymentVendorGate.Timing
     // This device's own interface addresses, read once per scan; injectable so tests can supply them.
     private let ownAddressesProvider: () -> LocalInterfaces.OwnAddresses
     private var ownAddressesThisScan: LocalInterfaces.OwnAddresses?
@@ -69,16 +88,39 @@ final class NetworkScanViewModel: ObservableObject {
     private var networkCIDRThisScan: String?
     // Test seam standing in for the enrichment coordinator's enrich(ip:locationURL:); nil means the real coordinator.
     private let probeOverride: ((String, URL?) -> Void)?
+    // Test seams standing in for the SSDP description fetch and the Google Wifi probe; nil means the real coordinator.
+    private let descriptionFetchOverride: ((String, URL) -> Void)?
+    private let googleWifiOverride: ((String) -> Void)?
     private let logger      = Logger(subsystem: "com.mDNSShark", category: "NetworkScanViewModel")
 
     /// Test seam: one address list stands for both the primary interface and all interfaces.
-    convenience init(ownAddresses: @escaping () -> [String], probe: ((String, URL?) -> Void)? = nil) {
-        self.init(ownAddresses: { LocalInterfaces.OwnAddresses(ownAddresses()) }, probe: probe)
+    convenience init(ownAddresses: @escaping () -> [String], probe: ((String, URL?) -> Void)? = nil,
+                     descriptionFetch: ((String, URL) -> Void)? = nil, googleWifi: ((String) -> Void)? = nil,
+                     arpLookup: (@Sendable (String) -> ARPLookup)? = nil, arpTrigger: ((String) async -> String?)? = nil,
+                     vendorGateTiming: PaymentVendorGate.Timing = .standard) {
+        self.init(ownAddresses: { LocalInterfaces.OwnAddresses(ownAddresses()) }, probe: probe,
+                  descriptionFetch: descriptionFetch, googleWifi: googleWifi,
+                  arpLookup: arpLookup, arpTrigger: arpTrigger, vendorGateTiming: vendorGateTiming)
     }
 
     init(ownAddresses: @escaping () -> LocalInterfaces.OwnAddresses = { LocalInterfaces.liveOwnAddresses() },
-         probe: ((String, URL?) -> Void)? = nil) {
+         probe: ((String, URL?) -> Void)? = nil,
+         descriptionFetch: ((String, URL) -> Void)? = nil, googleWifi: ((String) -> Void)? = nil,
+         arpLookup: (@Sendable (String) -> ARPLookup)? = nil, arpTrigger: ((String) async -> String?)? = nil,
+         vendorGateTiming: PaymentVendorGate.Timing = .standard) {
         ownAddressesProvider = ownAddresses
+        descriptionFetchOverride = descriptionFetch
+        googleWifiOverride = googleWifi
+        if let arpLookup {
+            self.arpLookup = arpLookup
+        } else if probe == nil {
+            let table = ARPTableProbe()
+            self.arpLookup = { table.lookup(ip: $0) }
+        } else {
+            self.arpLookup = { _ in .hidden }
+        }
+        arpTriggerOverride = arpTrigger
+        self.vendorGateTiming = vendorGateTiming
         _ = GatewayMonitor.shared   // starts reading the system's default gateway before the first merge asks for it
         probeOverride = probe
         // At most one merge per 250 ms while resolves stream in; the scan-ending sink below applies the final list, so nothing is lost.
@@ -137,6 +179,14 @@ final class NetworkScanViewModel: ObservableObject {
     func resetForNewScan() {
         enrichmentCoordinator.cancelAll()
         enrichedIPsThisScan.removeAll()
+        skippedOffSubnetIPs.removeAll()
+        for task in vendorGateTasks.values { task.cancel() }
+        vendorGateTasks.removeAll()
+        vendorGateByIP.removeAll()
+        probeTargetByIP.removeAll()
+        heldDescriptionURLByIP.removeAll()
+        heldGoogleWifiIPs.removeAll()
+        paymentSkipByIP.removeAll()
         fetchedDescriptionIPs.removeAll()
         fetchedGoogleWifiIPs.removeAll()
         for (ip, raw) in rawEnrichmentsByIP { carriedEnrichmentsByIP[ip] = Stamped(value: raw, generation: scanGeneration) }
@@ -161,16 +211,83 @@ final class NetworkScanViewModel: ObservableObject {
         return addresses
     }
 
-    /// Fires the probe set for an address once per scan. An address the coordinator would refuse (not LAN-local) gets an empty
-    /// result recorded at once, so its probes count as settled instead of pending forever.
-    private func dispatchProbesIfNeeded(ip: String, locationURL: URL?) {
-        guard !enrichedIPsThisScan.contains(ip) else { return }
-        enrichedIPsThisScan.insert(ip)
-        guard SSDPDescriptionFetcher.isLANLocalAddress(ip) else {
+    /// Fires the probe set for an address once per scan. A host known to be off this phone's networks (reflected from another VLAN)
+    /// and an address the coordinator would refuse (not LAN-local) get no probes and count as settled instead of pending forever.
+    /// `ip` is the row's effective address; probes go to `probeIP`, the group's first address on a connected subnet.
+    private func dispatchProbesIfNeeded(ip: String, probeIP: String, locationURL: URL?, onLocalSubnet: Bool?) {
+        if onLocalSubnet == false {
+            skippedOffSubnetIPs.insert(ip)
             settledIPsThisScan.insert(ip)
             return
         }
-        if let probeOverride { probeOverride(ip, locationURL) } else { enrichmentCoordinator.enrich(ip: ip, locationURL: locationURL) }
+        if skippedOffSubnetIPs.remove(ip) != nil { settledIPsThisScan.remove(ip) }
+        probeTargetByIP[ip] = probeIP
+        guard !enrichedIPsThisScan.contains(probeIP) else { return }
+        enrichedIPsThisScan.insert(probeIP)
+        guard SSDPDescriptionFetcher.isLANLocalAddress(probeIP) else {
+            settledIPsThisScan.insert(probeIP)
+            return
+        }
+        startVendorGate(ip: probeIP, locationURL: locationURL)
+    }
+
+    /// Reads ARP before anything is sent. An entry already present decides at once, a missing one waits (bounded) on a task, and the
+    /// phone's own row and IPv6 addresses (no ARP) are never gated.
+    private func startVendorGate(ip: String, locationURL: URL?) {
+        let ownKeys = Set(currentOwnAddresses().all.map(LocalInterfaces.addressMatchKey))
+        let first: ARPLookup = ip.contains(":") ? .hidden : arpLookup(ip)
+        if ownKeys.contains(LocalInterfaces.addressMatchKey(ip)) {
+            passVendorGate(ip: ip, locationURL: locationURL, arpMAC: first.mac)
+            return
+        }
+        switch first {
+        case .resolved(let mac):
+            decideVendorGate(ip: ip, locationURL: locationURL, reading: .init(mac: mac, source: .arpTableLookup, sentTrigger: false), applyNow: false)
+        case .hidden:
+            passVendorGate(ip: ip, locationURL: locationURL, arpMAC: nil)
+        case .missing:
+            vendorGateByIP[ip] = .waiting
+            let generation = scanGeneration
+            let lookup = arpLookup, trigger = vendorGateTrigger(), timing = vendorGateTiming
+            vendorGateTasks[ip] = Task { [weak self] in
+                let reading = await PaymentVendorGate.waitForMAC(ip: ip, lookup: lookup, trigger: trigger, timing: timing)
+                guard !Task.isCancelled, let self, self.scanGeneration == generation else { return }
+                self.vendorGateTasks[ip] = nil
+                self.decideVendorGate(ip: ip, locationURL: locationURL, reading: reading, applyNow: true)
+            }
+        }
+    }
+
+    /// The NBSTAT trigger the gate sends after its wait, nil when the T9 constant turns it off or a test seam stands in for the probes.
+    private func vendorGateTrigger() -> ((String) async -> String?)? {
+        guard PaymentVendorGate.sendsNBSTATTriggerAfterWait else { return nil }
+        if let arpTriggerOverride { return arpTriggerOverride }
+        guard probeOverride == nil else { return nil }
+        let coordinator = enrichmentCoordinator
+        return { await coordinator.arpTrigger(ip: $0) }
+    }
+
+    /// A payment vendor gets only its ARP and OUI facts and counts as settled; anything else gets the probe set and any held sends.
+    /// `applyNow` is false inside a merge, which reads the stored result itself.
+    private func decideVendorGate(ip: String, locationURL: URL?, reading: PaymentVendorGate.Reading, applyNow: Bool) {
+        guard let mac = reading.mac,
+              let skip = PaymentVendorGate.vendorSkip(forMAC: mac, sentTrigger: reading.sentTrigger, vendorLookup: ouiDB.manufacturer(for:)) else {
+            passVendorGate(ip: ip, locationURL: locationURL, arpMAC: reading.source == .arpTableLookup ? reading.mac : nil)
+            return
+        }
+        vendorGateByIP[ip] = .skipped
+        paymentSkipByIP[ip] = skip
+        heldDescriptionURLByIP[ip] = nil
+        heldGoogleWifiIPs.remove(ip)
+        let passive = DeviceEnrichment(mac: mac, manufacturer: ouiDB.manufacturer(for: mac), inferredOS: nil, openPorts: [], source: reading.source)
+        if applyNow { ingestEnrichment(ip: ip, enrichments: [passive]) } else { store(ip: ip, enrichments: [passive], completesProbeSet: true) }
+    }
+
+    private func passVendorGate(ip: String, locationURL: URL?, arpMAC: String?) {
+        vendorGateByIP[ip] = .passed
+        if let probeOverride { probeOverride(ip, locationURL) } else { enrichmentCoordinator.enrich(ip: ip, locationURL: locationURL, arpMAC: arpMAC) }
+        if let url = heldDescriptionURLByIP.removeValue(forKey: ip) { sendDescriptionFetch(ip: ip, locationURL: url) }
+        if heldGoogleWifiIPs.remove(ip) != nil { sendGoogleWifi(ip: ip) }
     }
 
     /// True once any address of the group had its full probe set answer this scan (an all-timeout set counts) or carries last scan's.
@@ -242,13 +359,17 @@ final class NetworkScanViewModel: ObservableObject {
     /// its carried result. While the scan start still holds the previous list, the result is stored without rebuilding last scan's rows.
     func ingestEnrichment(ip: String, enrichments: [DeviceEnrichment], completesProbeSet: Bool = true, upnpName: String? = nil) {
         if let upnpName { upnpNameByIP[ip] = Stamped(value: upnpName, generation: scanGeneration) }
+        store(ip: ip, enrichments: enrichments, completesProbeSet: completesProbeSet)
+        guard !holdingUntilFirstResult else { return }
+        apply(raw: lastRaw)
+    }
+
+    private func store(ip: String, enrichments: [DeviceEnrichment], completesProbeSet: Bool) {
         rawEnrichmentsByIP[ip, default: []].append(contentsOf: enrichments)
         if completesProbeSet {
             settledIPsThisScan.insert(ip)
             carriedEnrichmentsByIP.removeValue(forKey: ip)
         }
-        guard !holdingUntilFirstResult else { return }
-        apply(raw: lastRaw)
     }
 
     /// Merges and publishes, assigning only when the result changed so SwiftUI and the assess pipeline see real changes only.
@@ -470,8 +591,8 @@ final class NetworkScanViewModel: ObservableObject {
                     existing.manufacturer = appleManufacturer(serviceType: device.serviceType, txtRecords: device.txtRecords)
                 }
                 byIP[ip] = existing
-                dispatchDescriptionFetchIfNeeded(ip: ip, locationURL: device.locationURL)
-                dispatchGoogleWifiIfNeeded(ip: ip, serviceType: device.serviceType)
+                dispatchDescriptionFetchIfNeeded(ip: ip, locationURL: device.locationURL, onLocalSubnet: existing.isOnLocalSubnet)
+                dispatchGoogleWifiIfNeeded(ip: ip, serviceType: device.serviceType, onLocalSubnet: existing.isOnLocalSubnet)
             } else {
                 let mac = device.txtRecords?["mac"]
                 var mfr = mac.flatMap { ouiDB.manufacturer(for: String($0.prefix(8))) }
@@ -487,7 +608,10 @@ final class NetworkScanViewModel: ObservableObject {
                 let os = inferOS(serviceType: device.serviceType, manufacturer: mfr, txtRecords: device.txtRecords)
                 let identity = identityByEffectiveIP[ip] ?? ip
                 let group = addressesByEffectiveIP[ip] ?? [ip]
-                dispatchProbesIfNeeded(ip: ip, locationURL: device.locationURL)
+                let onLocalSubnet = LocalInterfaces.isOnLocalSubnet(addresses: Array(group), subnets: own.ipv4Subnets)
+                let probeIP = group.sorted(by: NetworkScanner.isAddressOrdered)
+                    .first { LocalInterfaces.isOnLocalSubnet(addresses: [$0], subnets: own.ipv4Subnets) == true } ?? ip
+                dispatchProbesIfNeeded(ip: ip, probeIP: probeIP, locationURL: device.locationURL, onLocalSubnet: onLocalSubnet)
                 var newDevice = DiscoveredDevice(
                     id:              stableID(forIdentity: identity, ip: ip),
                     hostname:        hostNameByIP[ip] ?? fallbackNameByIP[ip] ?? ip,
@@ -501,7 +625,8 @@ final class NetworkScanViewModel: ObservableObject {
                 )
                 newDevice.ssdpServer = device.ssdpServer
                 newDevice.isDefaultGateway = own.gatewaysIPv4.isEmpty ? nil : !own.gatewaysIPv4.filter(group.contains).isEmpty
-                newDevice.isOnLocalSubnet = LocalInterfaces.isOnLocalSubnet(addresses: Array(group), subnets: own.ipv4Subnets)
+                newDevice.isOnLocalSubnet = onLocalSubnet
+                newDevice.paymentVendorSkip = group.sorted().lazy.compactMap { self.paymentSkipByIP[$0] }.first
                 // Re-merge stored raw enrichments against the fresh baseline, not a stale merged snapshot.
                 let stored = enrichments(forAddresses: group)
                 if !stored.isEmpty {
@@ -515,8 +640,8 @@ final class NetworkScanViewModel: ObservableObject {
                     newDevice.httpRedirectByPort = merged.httpRedirectByPort
                 }
                 byIP[ip] = newDevice
-                dispatchDescriptionFetchIfNeeded(ip: ip, locationURL: device.locationURL)
-                dispatchGoogleWifiIfNeeded(ip: ip, serviceType: device.serviceType)
+                dispatchDescriptionFetchIfNeeded(ip: ip, locationURL: device.locationURL, onLocalSubnet: onLocalSubnet)
+                dispatchGoogleWifiIfNeeded(ip: ip, serviceType: device.serviceType, onLocalSubnet: onLocalSubnet)
             }
         }
         services.sort { ($0.name, $0.typeLabel, $0.id) < ($1.name, $1.typeLabel, $1.id) }
@@ -560,18 +685,36 @@ final class NetworkScanViewModel: ObservableObject {
         return fresh
     }
 
-    /// Fires the SSDP description fetch the first time any row for this IP reveals a `locationURL`.
-    private func dispatchDescriptionFetchIfNeeded(ip: String, locationURL: URL?) {
-        guard let locationURL, !fetchedDescriptionIPs.contains(ip) else { return }
+    /// Fires the SSDP description fetch the first time any row for this IP reveals a `locationURL`, once the vendor gate allows it.
+    private func dispatchDescriptionFetchIfNeeded(ip: String, locationURL: URL?, onLocalSubnet: Bool?) {
+        guard onLocalSubnet != false, let locationURL, !fetchedDescriptionIPs.contains(ip) else { return }
         fetchedDescriptionIPs.insert(ip)
-        enrichmentCoordinator.enrichDescription(ip: ip, locationURL: locationURL)
+        let target = probeTargetByIP[ip] ?? ip
+        switch vendorGateByIP[target] {
+        case .skipped:         return
+        case .waiting:         heldDescriptionURLByIP[target] = locationURL
+        case .passed, .none:   sendDescriptionFetch(ip: target, locationURL: locationURL)
+        }
     }
 
-    /// Fires the Google Wifi probe only for hosts that advertise `_googlecast._tcp`, never blindly.
-    private func dispatchGoogleWifiIfNeeded(ip: String, serviceType: String) {
-        guard serviceType == "_googlecast._tcp", !fetchedGoogleWifiIPs.contains(ip) else { return }
+    private func sendDescriptionFetch(ip: String, locationURL: URL) {
+        if let descriptionFetchOverride { descriptionFetchOverride(ip, locationURL) } else { enrichmentCoordinator.enrichDescription(ip: ip, locationURL: locationURL) }
+    }
+
+    /// Fires the Google Wifi probe only for hosts that advertise `_googlecast._tcp`, never blindly, and only once the vendor gate allows it.
+    private func dispatchGoogleWifiIfNeeded(ip: String, serviceType: String, onLocalSubnet: Bool?) {
+        guard onLocalSubnet != false, serviceType == "_googlecast._tcp", !fetchedGoogleWifiIPs.contains(ip) else { return }
         fetchedGoogleWifiIPs.insert(ip)
-        enrichmentCoordinator.enrichGoogleWifi(ip: ip)
+        let target = probeTargetByIP[ip] ?? ip
+        switch vendorGateByIP[target] {
+        case .skipped:         return
+        case .waiting:         heldGoogleWifiIPs.insert(target)
+        case .passed, .none:   sendGoogleWifi(ip: target)
+        }
+    }
+
+    private func sendGoogleWifi(ip: String) {
+        if let googleWifiOverride { googleWifiOverride(ip) } else { enrichmentCoordinator.enrichGoogleWifi(ip: ip) }
     }
 
     /// AirPlay/RAOP advertise the hardware model ("model" / "am", e.g. "MacBookPro16,2"). Only those rows are

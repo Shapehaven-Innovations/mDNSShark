@@ -51,6 +51,16 @@ public func guessFromBanner(_ banner: String) -> BannerGuess {
     } else if lower.contains("uc-httpd") || lower.contains("netsurveillance") {
         // Xiongmai white-label DVRs and cameras sell under many brand names.
         manufacturer = "Xiongmai"
+    } else if lower.contains("cradlepoint") {
+        manufacturer = "Cradlepoint"
+    } else if lower.contains("sierra wireless inc, embedded server") || lower.contains("modem@airlink.com") || lower.contains("aleos") {
+        manufacturer = "Sierra Wireless"
+    } else if lower.contains("moxahttp") || lower.contains("nport web console") || lower.contains("ssh-2.0-moxa_") {
+        manufacturer = "Moxa"
+    } else if lower.contains("lantronix") {
+        manufacturer = "Lantronix"
+    } else if lower.contains("digi configuration and management") || lower.contains("transport wr") {
+        manufacturer = "Digi"
     } else if lower.contains("asus") {
         // Specific-before-generic: "asus" alone can false-positive on words
         // like "pegasus" (same accepted risk class as "unifi"/"unified"

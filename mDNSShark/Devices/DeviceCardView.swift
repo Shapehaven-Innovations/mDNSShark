@@ -16,10 +16,11 @@ struct DeviceCardView: View {
                         HStack(spacing: 6) {
                             Text(device.ipAddress).font(.subheadline).foregroundColor(.secondary)
                             if device.isOnLocalSubnet == false { AppBadge(text: "Other network", color: AppColors.pending) }
+                            if let skip = device.paymentVendorSkip { AppBadge(text: skip.badgeText, color: AppColors.pending) }
                         }
                     }
                     Spacer()
-                    AppBadge(text: issueCount == 0 ? "No findings" : "\(issueCount) \(issueCount == 1 ? "finding" : "findings")",
+                    AppBadge(text: issueCount == 0 ? (device.wasProbed ? "No findings" : "Not probed") : "\(issueCount) \(issueCount == 1 ? "finding" : "findings")",
                              color: badgeColor)
                 }
                 Divider()
@@ -36,7 +37,7 @@ struct DeviceCardView: View {
                     cell("Manufacturer", device.manufacturer ?? (device.hasLocallyAdministeredMAC ? "Unknown (private MAC)" : "Unknown"))
                     cell("Type",         device.deviceType.label)
                     cell("OS",           device.displayInferredOS  ?? "Unknown")
-                    cell("Open Ports",   device.openPorts.isEmpty ? "None" : "\(device.openPorts.count) detected")
+                    cell("Open Ports",   device.openPorts.isEmpty ? device.noOpenPortsText : "\(device.openPorts.count) detected")
                 }
             }
         }

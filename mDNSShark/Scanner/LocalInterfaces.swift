@@ -42,12 +42,15 @@ enum LocalInterfaces {
 
     /// Whether a device with these addresses is on the network this phone or Mac is connected to: true when an IPv4 address lies in one of
     /// `subnets` (a self-assigned 169.254 peer counts only when this host has a 169.254 interface too), false when it has IPv4 addresses and
-    /// none do, and nil when nothing can be decided (no subnets known, or no IPv4 address, since IPv6 scopes are not compared).
+    /// none do, and nil when nothing can be decided (no subnets known, no IPv4 address since IPv6 scopes are not compared, or only
+    /// self-assigned addresses with no 169.254 interface here, since a failed DHCP lease on this Wi-Fi looks the same).
     static func isOnLocalSubnet(addresses: [String], subnets: [IPv4Subnet]) -> Bool? {
         guard !subnets.isEmpty else { return nil }
         let values = addresses.compactMap(ipv4Value)
         guard !values.isEmpty else { return nil }
-        return values.contains { value in subnets.contains { $0.contains(value) } }
+        if values.contains(where: { value in subnets.contains { $0.contains(value) } }) { return true }
+        if values.allSatisfy({ $0 >> 16 == 0xA9FE }) { return nil }
+        return false
     }
 
     /// This device's own addresses as the scan merge needs them: `primary` ranks the row's display address, `all` is what a

@@ -45,7 +45,7 @@ struct AppHeaderView: View {
                         AppBadge(text: "\(serviceCount) \(serviceCount == 1 ? "service" : "services")", color: AppColors.info)
                     }
                     // One chip per non-empty status, in the same colour as the node, badge and legend. Pending has its own chip below.
-                    ForEach([SecurityStatus.secure, .warning, .critical], id: \.self) { status in
+                    ForEach([SecurityStatus.secure, .warning, .critical, .notProbed], id: \.self) { status in
                         if let n = counts[status], n > 0 { AppBadge(text: "\(n) \(status.label.lowercased())", color: status.color) }
                     }
                     // One badge whose text changes, so the view keeps its identity instead of being swapped when a scan starts or ends.

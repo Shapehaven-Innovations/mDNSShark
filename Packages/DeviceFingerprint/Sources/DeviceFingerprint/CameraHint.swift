@@ -10,6 +10,7 @@ public enum CameraHint {
         "tvt co", "zhuhai raysharp", "lorex", "swann communications", "vivotek", "mobotix",
         "geovision", "hanwha vision", "samsung techwin", "verkada", "ring llc",
         "blink by amazon", "wyze labs", "arlo technology", "nest labs", "xiongmai",
+        "flock safety", "adaptive recognition",
     ]
 
     /// True for a manufacturer name that belongs to a camera-only vendor. TP-Link, Ubiquiti and Anker also make cameras but mostly other gear, so they are left out.

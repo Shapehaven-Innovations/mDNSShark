@@ -18,7 +18,7 @@ struct DevicesView: View {
                         ForEach(scanVM.devices) { device in
                             let findings = securityVM.findings.filter { $0.deviceID == device.id }
                             let issueCount = findings.count
-                            let badgeColor = SecurityStatus.of(findings: findings, settled: device.probesSettled).color
+                            let badgeColor = SecurityStatus.of(findings: findings, settled: device.probesSettled, probed: device.wasProbed).color
                             NavigationLink(destination: DeviceDetailView(device: device)) {
                                 DeviceCardView(device: device, issueCount: issueCount, badgeColor: badgeColor)
                             }

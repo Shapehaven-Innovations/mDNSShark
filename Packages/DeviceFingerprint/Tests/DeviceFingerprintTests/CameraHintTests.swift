@@ -9,6 +9,11 @@ final class CameraHintTests: XCTestCase {
         }
     }
 
+    func test_licensePlateCameraVendors_matchAnchored_andGenetecTattileDoNot() {
+        for name in ["Flock Safety", "Adaptive Recognition Hungary, Inc"] { XCTAssertTrue(CameraHint.isCameraVendor(name), name) }
+        for name in ["Genetec Inc.", "Tattile SRL", "Not Flock Safety", "Recognition Adaptive"] { XCTAssertFalse(CameraHint.isCameraVendor(name), name) }
+    }
+
     func test_unrelatedVendorsContainingShortWords_doNotMatch() {
         for name in ["Carlo Gavazzi Controls SpA", "enblink Technology", "Align Engineering LLC", "TP-Link Technologies", "Ubiquiti Inc", "Apple, Inc."] {
             XCTAssertFalse(CameraHint.isCameraVendor(name), name)
@@ -51,5 +56,22 @@ final class CameraHintTests: XCTestCase {
         XCTAssertEqual(guessFromBanner("Server: uc-httpd 1.0.0").manufacturer, "Xiongmai")
         XCTAssertEqual(guessFromBanner("<title>Amcrest Web</title>").manufacturer, "Amcrest")
         XCTAssertEqual(guessFromBanner("Server: UniFi").manufacturer, "Ubiquiti")
+    }
+
+    func test_gatewayAndSerialServerBanners_guessManufacturerOnly() {
+        XCTAssertEqual(guessFromBanner("Server: CradlepointHTTPService/1.0").manufacturer, "Cradlepoint")
+        XCTAssertEqual(guessFromBanner("<title>CradlePoint MBR1400 Gateway</title>").manufacturer, "Cradlepoint")
+        XCTAssertEqual(guessFromBanner("Server: Sierra Wireless Inc, Embedded Server").manufacturer, "Sierra Wireless")
+        XCTAssertEqual(guessFromBanner("realm=\"Modem@AirLink.com\"").manufacturer, "Sierra Wireless")
+        XCTAssertEqual(guessFromBanner("Welcome to the ALEOS Environment").manufacturer, "Sierra Wireless")
+        XCTAssertEqual(guessFromBanner("Server: MoxaHttp/1.0").manufacturer, "Moxa")
+        XCTAssertEqual(guessFromBanner("<title>NPort Web Console</title>").manufacturer, "Moxa")
+        XCTAssertEqual(guessFromBanner("SSH-2.0-moxa_1.0").manufacturer, "Moxa")
+        XCTAssertEqual(guessFromBanner("<title>Lantronix Web Manager</title>").manufacturer, "Lantronix")
+        XCTAssertEqual(guessFromBanner("<title>Digi Configuration and Management</title>").manufacturer, "Digi")
+        XCTAssertEqual(guessFromBanner("<title>TransPort WR21 Configuration</title>").manufacturer, "Digi")
+        XCTAssertNil(guessFromBanner("Server: CradlepointHTTPService/1.0").os)
+        XCTAssertNil(guessFromBanner("Server: MoxaHttp/1.0").os)
+        XCTAssertEqual(guessFromBanner("Server: AsusWRT").manufacturer, "ASUS")
     }
 }
