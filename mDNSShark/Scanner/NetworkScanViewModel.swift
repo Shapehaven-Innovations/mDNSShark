@@ -255,6 +255,8 @@ final class NetworkScanViewModel: ObservableObject {
         var addressesByEffectiveIP: [String: Set<String>]
         /// The raw Bonjour host name shown for a device address.
         var hostNameByIP: [String: String]
+        /// The display name for an address with no Bonjour host name, chosen from every row at the address by tier, not by arrival.
+        var fallbackNameByIP: [String: String]
         /// Addresses seen on host-keyed rows mapped to that host key, for the cross-scan identity memory; address-keyed groups are left out.
         var hostIdentityByAddress: [String: String]
     }
@@ -351,8 +353,19 @@ final class NetworkScanViewModel: ObservableObject {
             guard let host = device.hostName, let ip else { continue }
             if hostNameByIP[ip].map({ host < $0 }) ?? true { hostNameByIP[ip] = host }
         }
+        // No host name: a Bonjour instance name beats a RAOP "MAC@Name" one, which beats an SSDP name, which beats the bare address; within a
+        // tier the smallest wins, so the name never depends on which row arrived first.
+        var fallbackNameByIP: [String: (tier: Int, name: String)] = [:]
+        for (device, ip) in zip(raw, effectiveIPByRow) {
+            guard let ip, hostNameByIP[ip] == nil else { continue }
+            let name = device.identifier
+            let tier = device.serviceType.hasPrefix("_") ? (name.contains("@") ? 1 : 0) : (device.friendlyName != nil ? 2 : 3)
+            if let current = fallbackNameByIP[ip], (current.tier, current.name) <= (tier, name) { continue }
+            fallbackNameByIP[ip] = (tier, name)
+        }
         return MergePlan(effectiveIPByRow: effectiveIPByRow, identityByEffectiveIP: identityByEffectiveIP,
                          addressesByEffectiveIP: addressesByEffectiveIP, hostNameByIP: hostNameByIP,
+                         fallbackNameByIP: fallbackNameByIP.mapValues(\.name),
                          hostIdentityByAddress: hostIdentityByAddress)
     }
 
@@ -367,6 +380,7 @@ final class NetworkScanViewModel: ObservableObject {
         let identityByEffectiveIP = plan.identityByEffectiveIP
         let addressesByEffectiveIP = plan.addressesByEffectiveIP
         let hostNameByIP = plan.hostNameByIP
+        let fallbackNameByIP = plan.fallbackNameByIP
         var byIP: [String: DiscoveredDevice] = [:]
 
         var services: [DiscoveredService] = []
@@ -416,7 +430,7 @@ final class NetworkScanViewModel: ObservableObject {
                 dispatchProbesIfNeeded(ip: ip, locationURL: device.locationURL)
                 var newDevice = DiscoveredDevice(
                     id:              stableID(forIdentity: identity, ip: ip),
-                    hostname:        hostNameByIP[ip] ?? device.identifier,
+                    hostname:        hostNameByIP[ip] ?? fallbackNameByIP[ip] ?? device.identifier,
                     ipAddress:       ip,
                     macAddress:      mac,
                     manufacturer:    mfr,

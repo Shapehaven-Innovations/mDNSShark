@@ -2,8 +2,20 @@
 import Foundation
 import DeviceFingerprint
 
-enum DeviceType: Hashable {
+enum DeviceType: Hashable, CaseIterable {
     case router, apple, computer, printer, tv, unknown
+
+    /// The one label every surface shows (Topology chips, pin picker, Devices card).
+    var label: String {
+        switch self {
+        case .router:   return "Router"
+        case .apple:    return "Other Apple"
+        case .computer: return "Computer"
+        case .printer:  return "Printer"
+        case .tv:       return "TV"
+        case .unknown:  return "Unknown"
+        }
+    }
 }
 
 struct DiscoveredDevice: Identifiable, Equatable {
@@ -56,13 +68,19 @@ struct DiscoveredDevice: Identifiable, Equatable {
         inferredOS ?? manufacturer.flatMap { inferredOSFamily(forManufacturer: $0) }
     }
 
+    /// Every model string the services advertise, so the type is a function of all the evidence and not of which service arrived first.
+    private var advertisedModels: [String] { bonjourServices.compactMap { $0.txtRecords["model"] ?? $0.txtRecords["am"] } }
+
     var deviceType: DeviceType {
         if isGateway { return .router }
         let types = bonjourServices.map { $0.serviceType }
+        let models = advertisedModels
         if types.contains("_airplay._tcp") || types.contains("_raop._tcp") {
             guard manufacturer?.contains("Apple") == true else { return .tv }
-            let model = bonjourServices.lazy.compactMap { $0.txtRecords["model"] ?? $0.txtRecords["am"] }.first
-            return model.map { $0.hasPrefix("Mac") || $0.hasPrefix("iMac") } == true ? .computer : .apple
+            if models.contains(where: { $0.hasPrefix("Mac") || $0.hasPrefix("iMac") }) { return .computer }
+            // An AirPlay row with no usable model must not hide a file-sharing service that marks a Mac.
+            if models.isEmpty, types.contains("_smb._tcp") || types.contains("_afpovertcp._tcp") { return .computer }
+            return .apple
         }
         if types.contains("_ipp._tcp") || types.contains("_printer._tcp") { return .printer }
         // _rdlink._tcp is advertised only by iPhone and iPad, so it marks an Apple device without saying which.
@@ -85,9 +103,9 @@ struct DiscoveredDevice: Identifiable, Equatable {
 
     /// Phone or tablet glyph only when a service's model string names one; otherwise nil so the generic Apple icon shows.
     private var appleModelIcon: String? {
-        let model = bonjourServices.lazy.compactMap { $0.txtRecords["model"] ?? $0.txtRecords["am"] }.first
-        if model?.hasPrefix("iPhone") == true { return "iphone" }
-        if model?.hasPrefix("iPad") == true { return "ipad" }
+        let models = advertisedModels
+        if models.contains(where: { $0.hasPrefix("iPhone") }) { return "iphone" }
+        if models.contains(where: { $0.hasPrefix("iPad") }) { return "ipad" }
         return nil
     }
 }

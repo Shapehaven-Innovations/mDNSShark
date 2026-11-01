@@ -591,6 +591,29 @@ struct DeviceHostMergeTests {
         #expect(plan.effectiveIPByRow == ["203.0.113.10", "203.0.113.10"])
     }
 
+    @Test("without a host name the display name is the same whichever row arrived first, and never an SSDP header")
+    func fallbackNameDoesNotDependOnOrder() {
+        let vm = viewModel()
+        let bonjour = bonjourRow(type: "_airplay._tcp", name: "Living Room", ip: "203.0.113.40", host: nil, port: 7000)
+        let ssdp = NetworkScanner.Device(serviceName: "uuid:x", serviceDomain: "ssdp", serviceType: "ssdp")
+        ssdp.resolvedIPAddress = "203.0.113.40"
+        ssdp.friendlyName = "Linux/5 UPnP/1.1 X/1"
+        let forward = vm.merge(raw: [ssdp, bonjour, sweepRow("203.0.113.40")])
+        let reversed = vm.merge(raw: [sweepRow("203.0.113.40"), bonjour, ssdp])
+        #expect(forward.map(\.hostname) == ["Living Room"])
+        #expect(reversed.map(\.hostname) == ["Living Room"])
+    }
+
+    @Test("a Mac is a computer whatever order its services arrive in, and each device type has its own label")
+    func macTypeAndLabels() {
+        let air = BonjourService(serviceType: "_airplay._tcp", serviceName: "Mac", port: 7000)
+        let smb = BonjourService(serviceType: "_smb._tcp", serviceName: "Mac", port: 445)
+        let first = DiscoveredDevice(hostname: "Mac", ipAddress: "203.0.113.50", manufacturer: "Apple", bonjourServices: [air, smb])
+        let second = DiscoveredDevice(hostname: "Mac", ipAddress: "203.0.113.50", manufacturer: "Apple", bonjourServices: [smb, air])
+        #expect(first.deviceType == .computer && second.deviceType == .computer)
+        #expect(Set(DeviceType.allCases.map(\.label)).count == DeviceType.allCases.count)
+    }
+
     // MARK: - Services without a device
 
     @Test("a Bonjour row whose resolve has not answered yet is neither a device nor a service")

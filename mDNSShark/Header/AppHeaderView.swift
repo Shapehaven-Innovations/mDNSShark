@@ -65,7 +65,7 @@ struct AppHeaderView: View {
     private var serviceCount: Int { scanVM.unattachedServices.count }
 
     private func statusBadge(icon: String, text: String, color: Color) -> some View {
-        Label(text, systemImage: icon)
+        Label { Text(text) } icon: { WifiGlyph().frame(width: 14, height: 14) }
             .font(.caption.weight(.medium))
             .padding(.horizontal, 10).padding(.vertical, 5)
             .background(Color(.tertiarySystemBackground))

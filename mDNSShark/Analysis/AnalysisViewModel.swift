@@ -22,12 +22,33 @@ final class AnalysisViewModel: ObservableObject {
 
     init() {}
 
+    // Running totals, so each publish walks only the appended packets. seenCount and lastID detect a reset or replacement and force a recount.
+    private var seenCount = 0
+    private var lastID: UUID?
+    private var protocolCounts: [String: Int] = [:]
+
     // Decrypted requests duplicate bytes already counted as encrypted frames and have no pcap record, so only real frames count.
     func ingest(packets: [PacketModel]) {
-        let frames = packets.filter { !$0.isDecryptedRequest }
-        totalPackets = frames.count
-        updateTraffic(packets: frames)
-        updateDistribution(packets: frames)
+        let appendOnly = packets.count >= seenCount && (seenCount == 0 || packets[seenCount - 1].id == lastID)
+        if !appendOnly {
+            seenCount = 0; lastID = nil; protocolCounts = [:]
+            totalPackets = 0; inboundBytes = 0; outboundBytes = 0
+        }
+        var frames = 0
+        var inbound: Int64 = 0
+        var outbound: Int64 = 0
+        for p in packets[seenCount...] where !p.isDecryptedRequest {
+            frames += 1
+            if p.direction == .inbound { inbound += Int64(p.length) } else if p.direction == .outbound { outbound += Int64(p.length) }
+            protocolCounts[p.protocolName, default: 0] += 1
+        }
+        seenCount = packets.count
+        lastID = packets.last?.id
+        totalPackets += frames
+        inboundBytes += inbound
+        outboundBytes += outbound
+        let total = Double(totalPackets)
+        protocolDistribution = total > 0 ? protocolCounts.mapValues { Double($0) / total * 100.0 } : [:]
     }
 
     func update(findings: [SecurityFinding]) {
@@ -59,20 +80,5 @@ final class AnalysisViewModel: ObservableObject {
             actionTitle: "View Topology", action: .navigateToTopology
         ))
         recommendations = recs
-    }
-
-    private func updateTraffic(packets: [PacketModel]) {
-        let inbound  = packets.filter { $0.direction == .inbound  }.reduce(0) { $0 + $1.length }
-        let outbound = packets.filter { $0.direction == .outbound }.reduce(0) { $0 + $1.length }
-        inboundBytes  = Int64(inbound)
-        outboundBytes = Int64(outbound)
-    }
-
-    private func updateDistribution(packets: [PacketModel]) {
-        guard !packets.isEmpty else { return }
-        let total = Double(packets.count)
-        var counts: [String: Int] = [:]
-        for p in packets { counts[p.protocolName, default: 0] += 1 }
-        protocolDistribution = counts.mapValues { Double($0) / total * 100.0 }
     }
 }

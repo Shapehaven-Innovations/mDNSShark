@@ -31,6 +31,7 @@ struct DeviceCardView: View {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 8) {
                     cell("MAC",          device.macAddress ?? "Unknown")
                     cell("Manufacturer", device.manufacturer ?? "Unknown")
+                    cell("Type",         device.deviceType.label)
                     cell("OS",           device.displayInferredOS  ?? "Unknown")
                     cell("Open Ports",   device.openPorts.isEmpty ? "None" : "\(device.openPorts.count) detected")
                 }

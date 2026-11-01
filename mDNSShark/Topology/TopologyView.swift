@@ -37,15 +37,8 @@ struct TopologyView: View {
         let auto      = Array(prioritySorted(nonPinned, findings: findings).prefix(10))
         let toShow    = pinned + auto
 
-        let filtered = toShow.filter { device in
-            let secStatus = TopologyNode.status(findings: findings.filter { $0.deviceID == device.id },
-                                                settled: device.probesSettled)
-            let secOK  = TopologyNode.matchesFilters(secStatus, securityFilters)
-            let typeOK = typeFilters.isEmpty || typeFilters.contains(device.deviceType)
-            return secOK && typeOK
-        }
-
-        guard !filtered.isEmpty else { return [] }
+        // The layout comes from every shown device, so toggling a chip never moves a node; chips only hide nodes (see `matchingIDs`).
+        let filtered = toShow
 
         let gateway   = filtered.first { $0.isGateway } ?? filtered[0]
         let others    = filtered.filter { $0.id != gateway.id }
@@ -58,6 +51,14 @@ struct TopologyView: View {
             result.append(TopologyNode(device: enriched(d, findings), position: unitPosition(index: i, of: slots)))
         }
         return result
+    }
+
+    /// The nodes the active chips let through; the rest keep their slot but are not drawn.
+    private func matchingIDs(_ nodes: [TopologyNode]) -> Set<UUID> {
+        Set(nodes.filter { node in
+            TopologyNode.matchesFilters(node.securityStatus, securityFilters)
+                && (typeFilters.isEmpty || typeFilters.contains(node.device.deviceType))
+        }.map(\.id))
     }
 
     private func unitPosition(index: Int, of total: Int) -> CGPoint {
@@ -75,6 +76,7 @@ struct TopologyView: View {
     var body: some View {
         // Evaluate once per render pass - avoids triple-computation and cross-call drift
         let nodes = visibleNodes
+        let shown = matchingIDs(nodes)
         let servicesPos = servicesPosition(nodes: nodes)
         let services = scanVM.unattachedServices
         NavigationStack {
@@ -87,7 +89,7 @@ struct TopologyView: View {
                             VStack(alignment: .leading, spacing: 0) {
                                 // Title - never covered by nodes
                                 HStack {
-                                    Label("Network Topology", systemImage: "wifi")
+                                    Label { Text("Network Topology") } icon: { WifiGlyph().frame(width: 20, height: 20) }
                                         .font(.headline)
                                     Spacer()
                                     Button { showingPicker = true } label: {
@@ -118,7 +120,7 @@ struct TopologyView: View {
 
                                     ZStack {
                                         Canvas { ctx, _ in
-                                            var targets: [CGPoint] = nodes.dropFirst().map { $0.position }
+                                            var targets: [CGPoint] = nodes.dropFirst().filter { shown.contains($0.id) }.map { $0.position }
                                             if let servicesPos, !nodes.isEmpty { targets.append(servicesPos) }
                                             for target in targets {
                                                 let nPos = pixelPos(target)
@@ -135,6 +137,9 @@ struct TopologyView: View {
                                                 .transition(.opacity)
                                                 .scaleEffect(scale)
                                                 .position(pixelPos(node.position))
+                                                .opacity(shown.contains(node.id) ? 1 : 0)
+                                                .allowsHitTesting(shown.contains(node.id))
+                                                .accessibilityHidden(!shown.contains(node.id))
                                                 .onTapGesture {
                                                     selectedDeviceID = node.device.id
                                                     selectedDevice = node.device
@@ -151,7 +156,7 @@ struct TopologyView: View {
                                                 .accessibilityAddTraits(.isButton)
                                         }
 
-                                        if nodes.isEmpty && servicesPos == nil {
+                                        if shown.isEmpty && servicesPos == nil {
                                             Text("No devices match the current filter.")
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
@@ -216,12 +221,7 @@ struct TopologyView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     typeChip(nil,       "All")
-                    typeChip(.router,   "Router")
-                    typeChip(.apple,    "Apple (other)")
-                    typeChip(.computer, "Computer")
-                    typeChip(.printer,  "Printer")
-                    typeChip(.tv,       "TV")
-                    typeChip(.unknown,  "Unknown")
+                    ForEach(DeviceType.allCases, id: \.self) { typeChip($0, $0.label) }
                 }
                 .padding(.horizontal, 2)
             }

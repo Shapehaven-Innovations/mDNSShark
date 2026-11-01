@@ -51,17 +51,6 @@ struct DevicePickerSheet: View {
         pinnedIPsRaw = ips.joined(separator: ",")
     }
 
-    private func typeLabel(_ type: DeviceType) -> String {
-        switch type {
-        case .router:   return "Router"
-        case .apple:    return "Apple"
-        case .computer: return "Computer"
-        case .printer:  return "Printer"
-        case .tv:       return "TV"
-        case .unknown:  return "Unknown"
-        }
-    }
-
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
@@ -98,7 +87,7 @@ struct DevicePickerSheet: View {
                                 Text(device.hostname)
                                     .font(.subheadline.weight(.medium))
                                     .foregroundColor(.primary)
-                                Text("\(device.ipAddress) · \(typeLabel(device.deviceType))")
+                                Text("\(device.ipAddress) · \(device.deviceType.label)")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }

@@ -37,4 +37,38 @@ struct AnalysisViewModelTests {
         let findings = [finding(UUID(), .informational)]
         #expect(findings.vulnerableDeviceIDs.isEmpty)
     }
+
+    private func pkt(_ proto: String, _ length: Int) -> PacketModel {
+        PacketModel(frameNumber: 1, sourceIP: "a", destinationIP: "b", protocolName: proto, length: length, info: "", hexDump: "")
+    }
+
+    @Test("feeding packets in two steps gives the same totals as feeding them at once")
+    func incrementalMatchesOneShot() {
+        let all = [pkt("TCP", 10), pkt("TCP", 20), pkt("UDP", 30), pkt("TCP", 40)]
+        let step = AnalysisViewModel()
+        step.ingest(packets: Array(all[..<2]))
+        step.ingest(packets: all)
+        let once = AnalysisViewModel()
+        once.ingest(packets: all)
+        #expect(step.totalPackets == 4 && step.totalPackets == once.totalPackets)
+        #expect(step.protocolDistribution == once.protocolDistribution)
+        step.ingest(packets: all)
+        #expect(step.totalPackets == 4)
+    }
+
+    @Test("an emptied capture clears the totals and the protocol percentages")
+    func resetClearsDistribution() {
+        let vm = AnalysisViewModel()
+        vm.ingest(packets: [pkt("TCP", 10)])
+        vm.ingest(packets: [])
+        #expect(vm.totalPackets == 0 && vm.protocolDistribution.isEmpty)
+    }
+
+    @Test("a new capture of the same length is counted afresh, not added to the old one")
+    func replacementRecounts() {
+        let vm = AnalysisViewModel()
+        vm.ingest(packets: [pkt("TCP", 10), pkt("TCP", 10)])
+        vm.ingest(packets: [pkt("UDP", 10), pkt("UDP", 10)])
+        #expect(vm.totalPackets == 2 && vm.protocolDistribution == ["UDP": 100])
+    }
 }
