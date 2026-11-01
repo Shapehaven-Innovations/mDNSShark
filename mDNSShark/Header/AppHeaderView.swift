@@ -48,12 +48,11 @@ struct AppHeaderView: View {
                     ForEach([SecurityStatus.secure, .warning, .critical], id: \.self) { status in
                         if let n = counts[status], n > 0 { AppBadge(text: "\(n) \(status.label.lowercased())", color: status.color) }
                     }
-                    if scanVM.isScanning {
-                        AppBadge(text: "Scanning…", color: Color(.systemGray))
-                            .accessibilityLabel("Scanning for devices")
-                    } else if pendingCount > 0 {
-                        AppBadge(text: "\(pendingCount) pending", color: Color(.systemGray))
-                            .accessibilityLabel("\(pendingCount) \(pendingCount == 1 ? "device" : "devices") still being probed")
+                    // One badge whose text changes, so the view keeps its identity instead of being swapped when a scan starts or ends.
+                    if scanVM.isScanning || pendingCount > 0 {
+                        AppBadge(text: scanVM.isScanning ? "Scanning…" : "\(pendingCount) pending", color: AppColors.pending)
+                            .accessibilityLabel(scanVM.isScanning ? "Scanning for devices"
+                                : "\(pendingCount) \(pendingCount == 1 ? "device" : "devices") still being probed")
                     }
                 }
                 .padding(.horizontal, 16).padding(.bottom, 8)

@@ -132,6 +132,7 @@ struct TopologyView: View {
 
                                         ForEach(nodes) { node in
                                             TopologyNodeView(node: node)
+                                                .transition(.opacity)
                                                 .scaleEffect(scale)
                                                 .position(pixelPos(node.position))
                                                 .onTapGesture {
@@ -157,6 +158,8 @@ struct TopologyView: View {
                                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                                         }
                                     }
+                                    // Nodes glide to their new slots when devices join or leave, instead of jumping.
+                                    .animation(.snappy(duration: 0.3), value: nodes.map(\.id))
                                 }
                                 .frame(height: 280)
 

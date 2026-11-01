@@ -31,6 +31,7 @@ struct DevicesView: View {
                     }
                 }
                 .padding(.horizontal).padding(.top, 8)
+                .animation(.default, value: scanVM.devices.map(\.id))
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .navigationBar)

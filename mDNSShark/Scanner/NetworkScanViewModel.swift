@@ -73,8 +73,9 @@ final class NetworkScanViewModel: ObservableObject {
          probe: ((String, URL?) -> Void)? = nil) {
         ownAddressesProvider = ownAddresses
         probeOverride = probe
+        // At most one merge per 250 ms while resolves stream in; the scan-ending sink below applies the final list, so nothing is lost.
         scanner.$devices
-            .receive(on: DispatchQueue.main)
+            .throttle(for: .milliseconds(250), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] raw in self?.apply(raw: raw) }
             .store(in: &cancellables)
 
