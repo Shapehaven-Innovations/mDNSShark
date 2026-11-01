@@ -215,7 +215,7 @@ final class NetworkScanViewModel: ObservableObject {
         let settledKeys = Set(raw.filter { $0.resolveSettled && $0.serviceType.hasPrefix("_") }.map { "\($0.serviceType)|\($0.serviceName)" })
         var devices = merged.devices
         for held in heldDevicesByID.values.sorted(by: { $0.ipAddress < $1.ipAddress }) {
-            if let i = devices.firstIndex(where: { $0.id == held.id || $0.ipAddress == held.ipAddress }) {
+            if let i = devices.firstIndex(where: { $0.id == held.id }) ?? devices.firstIndex(where: { $0.ipAddress == held.ipAddress }) {
                 for service in held.bonjourServices where !settledKeys.contains(service.id) && !devices[i].bonjourServices.contains(where: { $0.id == service.id }) {
                     devices[i].bonjourServices.append(service)
                 }
@@ -266,8 +266,20 @@ final class NetworkScanViewModel: ObservableObject {
         for device in raw {
             if let key = device.hostKey, let ip = device.resolvedIPAddress { addressesByHost[key, default: []].append(ip) }
         }
+        func isLANIPv4(_ ip: String) -> Bool { !ip.contains(":") && !ip.hasPrefix("169.254.") }
+        // A host-less row (sweep, SSDP) at a LAN IPv4 remembered for a host in this merge joins that host when the host's own
+        // resolves carry no LAN IPv4 yet, so the host's address does not depend on which record a resolve reported first.
+        let adoptedKeyByRow: [String?] = raw.map { device in
+            guard device.hostKey == nil, let ip = device.resolvedIPAddress, isLANIPv4(ip), let key = remembered[ip],
+                  let resolved = addressesByHost[key], !resolved.contains(where: isLANIPv4) else { return nil }
+            return key
+        }
+        for (device, key) in zip(raw, adoptedKeyByRow) {
+            if let key, let ip = device.resolvedIPAddress { addressesByHost[key, default: []].append(ip) }
+        }
         let addressByHost = addressesByHost.compactMapValues { NetworkScanner.preferredAddress(from: $0) }
-        let hostIPs: [String?] = raw.map { device in device.hostKey.flatMap { addressByHost[$0] } ?? device.resolvedIPAddress }
+        let keyByRow: [String?] = zip(raw, adoptedKeyByRow).map { $0.hostKey ?? $1 }
+        let hostIPs: [String?] = zip(raw, keyByRow).map { device, key in key.flatMap { addressByHost[$0] } ?? device.resolvedIPAddress }
 
         // This device: any group holding one of the phone's own addresses on any interface (a set intersection on zone-free keys,
         // since it has several IPv6 addresses) folds onto the phone's Wi-Fi IPv4, so it is listed under 192.168.x.y rather than an
@@ -290,8 +302,8 @@ final class NetworkScanViewModel: ObservableObject {
         // Identity key per address group: the smallest host key at that address, else the identity last remembered for the address,
         // else the address. A key is claimed by one group only.
         var hostKeysByIP: [String: Set<String>] = [:]
-        for (device, ip) in zip(raw, effectiveIPByRow) {
-            if let ip, let key = device.hostKey { hostKeysByIP[ip, default: []].insert(key) }
+        for (key, ip) in zip(keyByRow, effectiveIPByRow) {
+            if let ip, let key { hostKeysByIP[ip, default: []].insert(key) }
         }
         var identityByEffectiveIP: [String: String] = [:]
         var claimed = Set<String>()

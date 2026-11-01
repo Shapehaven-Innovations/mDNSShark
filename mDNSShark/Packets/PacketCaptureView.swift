@@ -2,7 +2,7 @@
 import SwiftUI
 
 struct PacketCaptureView: View {
-    @EnvironmentObject var coordinator: AppCoordinator
+    @EnvironmentObject var captureManager: PacketCaptureManager
     @State private var selectedProtocol = "All"
     @State private var decryptedOnly = false
     @State private var showWarning = false
@@ -11,7 +11,7 @@ struct PacketCaptureView: View {
     private let protocols = PacketCaptureChip.all
 
     private var filtered: [PacketModel] {
-        coordinator.packetCaptureManager.packets.filtered(byChip: selectedProtocol, decryptedOnly: decryptedOnly)
+        captureManager.packets.filtered(byChip: selectedProtocol, decryptedOnly: decryptedOnly)
     }
 
     var body: some View {
@@ -45,12 +45,12 @@ struct PacketCaptureView: View {
                     Spacer()
                     VStack(spacing: 12) {
                         Image(systemName: "waveform").font(.system(size: 48)).foregroundColor(.secondary)
-                        Text(coordinator.packetCaptureManager.isCapturing
+                        Text(captureManager.isCapturing
                              ? "Waiting for packets…"
                              : "Tap Start to begin capturing.")
                         .foregroundColor(.secondary)
                         if selectedProtocol == "mDNS" {
-                            Text(MDNSEmptyState.text(isCapturing: coordinator.packetCaptureManager.isCapturing,
+                            Text(MDNSEmptyState.text(isCapturing: captureManager.isCapturing,
                                                      filterOn: SharedSettings.captureFilterProtocols.contains("mDNS"),
                                                      listenerStatus: SharedSettings.mdnsListenerStatus))
                                 .font(.caption)
@@ -83,8 +83,8 @@ struct PacketCaptureView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    if coordinator.packetCaptureManager.hasCapture &&
-                       !coordinator.packetCaptureManager.isCapturing {
+                    if captureManager.hasCapture &&
+                       !captureManager.isCapturing {
                         HStack(spacing: 12) {
                             Button { exportPCAP() } label: {
                                 Label("Export", systemImage: "square.and.arrow.up")
@@ -94,7 +94,7 @@ struct PacketCaptureView: View {
                             }
                             .foregroundColor(AppColors.critical)
                             // Wait for .disconnected so the extension can't rewrite capture-meta.json after deletion.
-                            .disabled(!coordinator.packetCaptureManager.isTunnelDisconnected)
+                            .disabled(!captureManager.isTunnelDisconnected)
                         }
                     }
                 }
@@ -102,21 +102,21 @@ struct PacketCaptureView: View {
                     Text("Packet Capture").font(.headline)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(coordinator.packetCaptureManager.isCapturing ? "Stop" : "Start") {
-                        if coordinator.packetCaptureManager.isCapturing {
-                            coordinator.packetCaptureManager.stopCapture()
+                    Button(captureManager.isCapturing ? "Stop" : "Start") {
+                        if captureManager.isCapturing {
+                            captureManager.stopCapture()
                         } else {
                             showWarning = true
                         }
                     }
-                    .foregroundColor(coordinator.packetCaptureManager.isCapturing
+                    .foregroundColor(captureManager.isCapturing
                                      ? AppColors.critical : AppColors.info)
                     .font(.subheadline.weight(.semibold))
                 }
             }
             .sheet(isPresented: $showWarning) {
                 CaptureWarningSheet(
-                    onConfirm: { coordinator.packetCaptureManager.startCapture() },
+                    onConfirm: { captureManager.startCapture() },
                     isPresented: $showWarning
                 )
                 .presentationDetents([PresentationDetent.medium])
@@ -128,7 +128,7 @@ struct PacketCaptureView: View {
             }
             .confirmationDialog("Delete Capture?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
                 Button("Delete Capture", role: .destructive) {
-                    coordinator.packetCaptureManager.deleteCapture()
+                    captureManager.deleteCapture()
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
@@ -138,7 +138,7 @@ struct PacketCaptureView: View {
     }
 
     private func exportPCAP() {
-        guard let urls = coordinator.packetCaptureManager.exportURLs() else {
+        guard let urls = captureManager.exportURLs() else {
             showExportError = true
             return
         }
@@ -176,7 +176,7 @@ struct PacketCaptureView: View {
             frac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             if let d = ISO8601DateFormatter().date(from: str) ?? frac.date(from: str) { return d }
         }
-        return coordinator.packetCaptureManager.packets.first?.timestamp ?? Date()
+        return captureManager.packets.first?.timestamp ?? Date()
     }
 }
 

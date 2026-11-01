@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var coordinator: AppCoordinator
+    @EnvironmentObject var scanVM: NetworkScanViewModel
     @AppStorage("hasShownOnboarding")   private var hasShownOnboarding: Bool = false
     @Environment(\.scenePhase) private var scenePhase
     @State private var showBanner = false
@@ -15,7 +16,7 @@ struct ContentView: View {
             if showBanner {
                 OnboardingBannerView(isVisible: $showBanner).padding(.top, 4)
             }
-            if coordinator.networkScanViewModel.isLocalNetworkDenied {
+            if scanVM.isLocalNetworkDenied {
                 LocalNetworkDeniedBanner().padding(.horizontal, 16).padding(.top, 4)
             }
             if !tlsError.isEmpty {

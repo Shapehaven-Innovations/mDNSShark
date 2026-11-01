@@ -2,20 +2,21 @@
 import SwiftUI
 
 struct DeviceDetailView: View {
-    @EnvironmentObject var coordinator: AppCoordinator
+    @EnvironmentObject var scanVM: NetworkScanViewModel
+    @EnvironmentObject var securityVM: SecurityViewModel
     @Environment(\.dismiss) private var dismiss
     // Navigation-time snapshot. Only a fallback; see `device` below.
     private let snapshot: DiscoveredDevice
 
     init(device: DiscoveredDevice) { snapshot = device }
 
-    /// The live row for this device, re-read from the coordinator on every
+    /// The live row for this device, re-read from the scan and security view models on every
     /// body evaluation, with the current security findings applied.
     ///
-    /// Reading `coordinator` here (rather than rendering whatever value
+    /// Reading the view models here (rather than rendering whatever value
     /// the parent passed in) is what keeps an already-pushed detail
     /// screen updating as enrichment streams in. `@EnvironmentObject`
-    /// registers a dependency on `coordinator.objectWillChange`, so any
+    /// registers a dependency on each object's `objectWillChange`, so any
     /// devices/findings mutation re-runs this body. A parent-supplied
     /// value alone cannot: SwiftUI decides whether to re-run a child's
     /// body by comparing the old and new view values field-by-field using
@@ -25,8 +26,8 @@ struct DeviceDetailView: View {
     /// stuck on "Unknown". The snapshot is used only if the row has since
     /// left the live list.
     private var device: DiscoveredDevice {
-        var live = coordinator.networkScanViewModel.devices.first { $0.id == snapshot.id } ?? snapshot
-        live.securityFindings = coordinator.securityViewModel.findings.filter { $0.deviceID == snapshot.id }
+        var live = scanVM.devices.first { $0.id == snapshot.id } ?? snapshot
+        live.securityFindings = securityVM.findings.filter { $0.deviceID == snapshot.id }
         return live
     }
 
@@ -41,7 +42,8 @@ struct DeviceDetailView: View {
                 }
                 CardView {
                     HStack(spacing: 16) {
-                        Image(systemName: device.deviceIcon).font(.system(size: 40)).foregroundColor(AppColors.info)
+                        Image(systemName: device.deviceIcon).font(.system(size: 40))
+                            .foregroundColor(SecurityStatus.of(findings: device.securityFindings, settled: device.probesSettled).color)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(device.hostname).font(.title2.bold())
                             Text(device.ipAddress).foregroundColor(.secondary)
@@ -62,13 +64,14 @@ struct DeviceDetailView: View {
                     }
                 }
 
-                // Only when the device has more than its primary address; a single address is already shown above.
-                if device.addresses.count > 1 {
+                // Never empty: a device with no resolved list still lists the address shown in its header.
+                let addresses = device.addresses.isEmpty ? [device.ipAddress] : device.addresses
+                if !addresses.isEmpty {
                     CardView {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("Addresses").font(.headline)
                             Divider()
-                            ForEach(device.addresses, id: \.self) { address in
+                            ForEach(addresses, id: \.self) { address in
                                 row(address.contains(":") ? "IPv6" : "IPv4", address, selectable: true)
                             }
                         }

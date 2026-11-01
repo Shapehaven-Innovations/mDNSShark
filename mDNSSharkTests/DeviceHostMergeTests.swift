@@ -583,6 +583,14 @@ struct DeviceHostMergeTests {
         #expect(vm.devices.count == 1)
     }
 
+    @Test("a LAN IPv4 sweep row joins its remembered host when the host's resolves carry only a link-local address")
+    func sweepRowJoinsHostWithoutLANAddress() {
+        let air = bonjourRow(type: "_airplay._tcp", name: "Mac", ip: "169.254.46.247", host: "Mac.local.", port: 7000)
+        let sweep = sweepRow("203.0.113.10")
+        let plan = NetworkScanViewModel.plan(raw: [air, sweep], own: .none, remembered: ["203.0.113.10": "mac.local"])
+        #expect(plan.effectiveIPByRow == ["203.0.113.10", "203.0.113.10"])
+    }
+
     // MARK: - Services without a device
 
     @Test("a Bonjour row whose resolve has not answered yet is neither a device nor a service")

@@ -10,13 +10,13 @@ struct DeviceCardView: View {
         CardView {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Image(systemName: device.deviceIcon).font(.title2).foregroundColor(AppColors.info).frame(width: 32)
+                    Image(systemName: device.deviceIcon).font(.title2).foregroundColor(badgeColor).frame(width: 32)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(device.hostname).font(.headline)
                         Text(device.ipAddress).font(.subheadline).foregroundColor(.secondary)
                     }
                     Spacer()
-                    AppBadge(text: issueCount == 0 ? "0 issues" : "\(issueCount) issues",
+                    AppBadge(text: "\(issueCount) \(issueCount == 1 ? "issue" : "issues")",
                              color: badgeColor)
                 }
                 Divider()

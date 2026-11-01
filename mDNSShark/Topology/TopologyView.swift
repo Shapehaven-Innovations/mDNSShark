@@ -2,7 +2,8 @@
 import SwiftUI
 
 struct TopologyView: View {
-    @EnvironmentObject var coordinator: AppCoordinator
+    @EnvironmentObject var scanVM: NetworkScanViewModel
+    @EnvironmentObject var securityVM: SecurityViewModel
     // Only the id, not a DiscoveredDevice snapshot: `DiscoveredDevice` is a
     // struct, so a stored value here would freeze mac/manufacturer/
     // inferredOS at whatever they were at tap time. Re-deriving the live
@@ -26,8 +27,8 @@ struct TopologyView: View {
     // Unit-circle positions: gateway at .zero, others at (cos θ, sin θ).
     // Actual pixel radius is applied at render time inside GeometryReader.
     private var visibleNodes: [TopologyNode] {
-        let allDevices = coordinator.networkScanViewModel.devices
-        let findings   = coordinator.securityViewModel.findings
+        let allDevices = scanVM.devices
+        let findings   = securityVM.findings
         guard !allDevices.isEmpty else { return [] }
 
         let ips       = pinnedIPs
@@ -52,7 +53,7 @@ struct TopologyView: View {
         guard !others.isEmpty else { return result }
 
         // One slot is held back for the services node so it never overlaps a device.
-        let slots = others.count + (coordinator.networkScanViewModel.unattachedServices.isEmpty ? 0 : 1)
+        let slots = others.count + (scanVM.unattachedServices.isEmpty ? 0 : 1)
         for (i, d) in others.enumerated() {
             result.append(TopologyNode(device: enriched(d, findings), position: unitPosition(index: i, of: slots)))
         }
@@ -66,8 +67,8 @@ struct TopologyView: View {
 
     /// Where the services node sits: the last ring slot, the centre when no device exists, or nil when filters hide every device.
     private func servicesPosition(nodes: [TopologyNode]) -> CGPoint? {
-        guard !coordinator.networkScanViewModel.unattachedServices.isEmpty else { return nil }
-        if nodes.isEmpty { return coordinator.networkScanViewModel.devices.isEmpty ? .zero : nil }
+        guard !scanVM.unattachedServices.isEmpty else { return nil }
+        if nodes.isEmpty { return scanVM.devices.isEmpty ? .zero : nil }
         return unitPosition(index: nodes.count - 1, of: nodes.count)
     }
 
@@ -75,11 +76,11 @@ struct TopologyView: View {
         // Evaluate once per render pass - avoids triple-computation and cross-call drift
         let nodes = visibleNodes
         let servicesPos = servicesPosition(nodes: nodes)
-        let services = coordinator.networkScanViewModel.unattachedServices
+        let services = scanVM.unattachedServices
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    if coordinator.networkScanViewModel.devices.isEmpty && services.isEmpty {
+                    if scanVM.devices.isEmpty && services.isEmpty {
                         emptyState
                     } else {
                         CardView {
@@ -161,11 +162,7 @@ struct TopologyView: View {
 
                                 // Legend - never covered by nodes
                                 HStack(spacing: 14) {
-                                    legendDot(Color(.systemGray), "Pending")
-                                    legendDot(AppColors.secure,   "Secure")
-                                    legendDot(AppColors.info,     "Info")
-                                    legendDot(AppColors.warning,  "Warning")
-                                    legendDot(AppColors.critical, "Critical")
+                                    ForEach(SecurityStatus.allCases, id: \.self) { legendDot($0.color, $0.label) }
                                 }
                                 .font(.caption)
                                 .padding(.top, 10)
@@ -174,8 +171,8 @@ struct TopologyView: View {
                         .sheet(isPresented: $showingPicker) {
                             DevicePickerSheet(
                                 pinnedIPsRaw: $pinnedIPsRaw,
-                                allDevices: coordinator.networkScanViewModel.devices,
-                                findings: coordinator.securityViewModel.findings
+                                allDevices: scanVM.devices,
+                                findings: securityVM.findings
                             )
                         }
                         .padding(.horizontal)
@@ -186,21 +183,18 @@ struct TopologyView: View {
             .navigationBarHidden(true)
             .sheet(isPresented: $showingServices) {
                 ScrollView {
-                    UnattachedServicesSection(services: coordinator.networkScanViewModel.unattachedServices)
+                    UnattachedServicesSection(services: scanVM.unattachedServices)
                         .padding()
                 }
             }
+            // Keeps the pushed screen's fallback at the last live row, not the tap-time one, if a rescan has not re-found the device.
+            .onChange(of: scanVM.devices) { _, devices in
+                if let id = selectedDeviceID, let live = devices.first(where: { $0.id == id }) { selectedDevice = live }
+            }
             .navigationDestination(isPresented: $navigateToDetail) {
-                // Looked up from the raw (unfiltered, uncapped) devices
-                // array, not `nodes`: `nodes` drops out-of-filter/beyond
-                // top-10 devices, and a filter change or new device joining
-                // while this detail view is open must not blank it out.
-                // No findings overlay here: DeviceDetailView re-reads the
-                // live row and findings from the coordinator itself.
-                if let id = selectedDeviceID,
-                   let device = coordinator.networkScanViewModel.devices.first(where: { $0.id == id }) ?? selectedDevice {
-                    DeviceDetailView(device: device)
-                }
+                // The device is held in state, not looked up from `nodes`, so a filter change or a rescan cannot blank the pushed screen;
+                // DeviceDetailView re-reads its live row and findings itself.
+                if let selectedDevice { DeviceDetailView(device: selectedDevice) }
             }
         }
     }
@@ -212,11 +206,7 @@ struct TopologyView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     secChip(nil,             "All")
-                    secChip(.pending,        "Pending")
-                    secChip(.secure,         "Secure")
-                    secChip(.informational,  "Info")
-                    secChip(.warning,        "Warning")
-                    secChip(.critical,       "Critical")
+                    ForEach(SecurityStatus.allCases, id: \.self) { secChip($0, $0.label) }
                 }
                 .padding(.horizontal, 2)
             }
@@ -237,16 +227,7 @@ struct TopologyView: View {
 
     private func secChip(_ status: SecurityStatus?, _ label: String) -> some View {
         let active: Bool = status == nil ? securityFilters.isEmpty : securityFilters.contains(status!)
-        let color: Color = {
-            switch status {
-            case .none:             return AppColors.info
-            case .pending:          return Color(.systemGray)
-            case .secure:           return AppColors.secure
-            case .informational:    return AppColors.info
-            case .warning:          return AppColors.warning
-            case .critical:         return AppColors.critical
-            }
-        }()
+        let color: Color = status?.color ?? AppColors.info
         return Button {
             if let s = status {
                 if securityFilters.contains(s) { securityFilters.remove(s) }

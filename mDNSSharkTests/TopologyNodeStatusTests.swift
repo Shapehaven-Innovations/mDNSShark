@@ -38,7 +38,7 @@ struct TopologyNodeStatusTests {
 
     @Test("no active chip shows every status, pending included")
     func noChipShowsEverything() {
-        for status in [SecurityStatus.pending, .secure, .informational, .warning, .critical] {
+        for status in SecurityStatus.allCases {
             #expect(TopologyNode.matchesFilters(status, []))
         }
     }
@@ -48,15 +48,13 @@ struct TopologyNodeStatusTests {
         #expect(TopologyNode.matchesFilters(.pending, [.pending]))
         #expect(TopologyNode.matchesFilters(.pending, [.pending, .critical]))
         #expect(!TopologyNode.matchesFilters(.pending, [.secure]))
-        #expect(!TopologyNode.matchesFilters(.pending, [.secure, .informational, .warning, .critical]))
+        #expect(!TopologyNode.matchesFilters(.pending, [.secure, .warning, .critical]))
         #expect(!TopologyNode.matchesFilters(.secure, [.pending]))
     }
 
-    @Test("Secure also shows informational-only devices, and each other chip shows only its own status")
-    func secureCoversInformational() {
-        #expect(TopologyNode.matchesFilters(.informational, [.secure]))
-        #expect(TopologyNode.matchesFilters(.informational, [.informational]))
-        #expect(!TopologyNode.matchesFilters(.secure, [.informational]))
+    @Test("each chip shows only its own status")
+    func eachChipShowsOnlyItsOwnStatus() {
+        #expect(TopologyNode.matchesFilters(.secure, [.secure]))
         #expect(TopologyNode.matchesFilters(.warning, [.warning]))
         #expect(!TopologyNode.matchesFilters(.warning, [.critical]))
         #expect(!TopologyNode.matchesFilters(.critical, [.secure, .warning]))
@@ -94,10 +92,24 @@ struct TopologyNodeStatusTests {
         #expect(ServicesGroupNodeView.accessibilityLabel(count: 3) == "3 services without a device")
     }
 
+    @Test("the one status rule: unsettled is pending, worst device finding wins, info and vendor findings stay secure")
+    func statusRule() {
+        let id = UUID()
+        func f(_ severity: Severity, vendor: Bool = false) -> SecurityFinding {
+            SecurityFinding(deviceID: id, deviceName: "d", deviceIcon: "tv", severity: severity, title: "t", description: "d",
+                            recommendation: "r", source: vendor ? .vendorAdvisory : .portRule)
+        }
+        #expect(SecurityStatus.of(findings: [f(.critical)], settled: false) == .pending)
+        #expect(SecurityStatus.of(findings: [], settled: true) == .secure)
+        #expect(SecurityStatus.of(findings: [f(.informational)], settled: true) == .secure)
+        #expect(SecurityStatus.of(findings: [f(.warning, vendor: true)], settled: true) == .secure)
+        #expect(SecurityStatus.of(findings: [f(.warning), f(.informational)], settled: true) == .warning)
+        #expect(SecurityStatus.of(findings: [f(.warning), f(.critical)], settled: true) == .critical)
+    }
+
     @Test("every status has a spoken name")
     func everyStatusHasASpokenName() {
         #expect(SecurityStatus.pending.accessibilityName == "pending")
-        #expect(SecurityStatus.informational.accessibilityName == "informational")
         #expect(SecurityStatus.critical.accessibilityName == "critical")
     }
 }

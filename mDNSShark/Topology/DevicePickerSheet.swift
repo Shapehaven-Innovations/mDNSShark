@@ -93,7 +93,7 @@ struct DevicePickerSheet: View {
                         HStack(spacing: 12) {
                             Image(systemName: device.deviceIcon)
                                 .frame(width: 24)
-                                .foregroundColor(AppColors.info)
+                                .foregroundColor(SecurityStatus.of(findings: findings.filter { $0.deviceID == device.id }, settled: device.probesSettled).color)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(device.hostname)
                                     .font(.subheadline.weight(.medium))

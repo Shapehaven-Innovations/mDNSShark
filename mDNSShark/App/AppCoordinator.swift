@@ -66,25 +66,9 @@ final class AppCoordinator: ObservableObject {
     }
 
     private func wire() {
-        networkScanViewModel.objectWillChange
-            .sink { [weak self] in self?.objectWillChange.send() }
-            .store(in: &cancellables)
-
-        securityViewModel.objectWillChange
-            .sink { [weak self] in self?.objectWillChange.send() }
-            .store(in: &cancellables)
-
         // Runs inside `devices`' willSet, so the sink parameter is the new list and `networkScanViewModel.devices` is still the old one.
         networkScanViewModel.$devices
             .sink { [weak self] in self?.securityViewModel.assess(devices: $0) }
-            .store(in: &cancellables)
-
-        packetCaptureManager.objectWillChange
-            .sink { [weak self] in self?.objectWillChange.send() }
-            .store(in: &cancellables)
-
-        analysisViewModel.objectWillChange
-            .sink { [weak self] in self?.objectWillChange.send() }
             .store(in: &cancellables)
 
         packetCaptureManager.$packets

@@ -2,14 +2,15 @@
 import SwiftUI
 
 struct SecurityView: View {
-    @EnvironmentObject var coordinator: AppCoordinator
+    @EnvironmentObject var securityVM: SecurityViewModel
+    @EnvironmentObject var captureManager: PacketCaptureManager
     @State private var criticalExpanded = true
     @State private var warningExpanded  = true
     @State private var infoExpanded     = false
     @State private var sharePresented   = false
     @State private var showRefreshSuccess = false
 
-    private var vm: SecurityViewModel { coordinator.securityViewModel }
+    private var vm: SecurityViewModel { securityVM }
 
     var body: some View {
         NavigationView {
@@ -57,7 +58,7 @@ struct SecurityView: View {
                 HStack {
                     stat(vm.findings.count,        "Findings",              AppColors.info)
                     Divider().frame(height: 40)
-                    stat(vm.vulnerableDeviceCount, "Vulnerable Devices",    AppColors.warning)
+                    stat(vm.vulnerableDeviceCount, "Vulnerable Devices",    SecurityStatus.warning.color)
                 }
             }
         }
@@ -147,7 +148,7 @@ struct SecurityView: View {
         }.padding(40)
     }
 
-    private var isCapturing: Bool { coordinator.packetCaptureManager.isCapturing }
+    private var isCapturing: Bool { captureManager.isCapturing }
 
     private var footerButtons: some View {
         VStack(spacing: 8) {
@@ -274,11 +275,7 @@ private struct DeviceFindingsSectionView: View {
     let findings: [SecurityFinding]
     @State private var expanded = true
 
-    private var worstColor: Color {
-        if findings.contains(where: { $0.severity == .critical }) { return AppColors.critical }
-        if findings.contains(where: { $0.severity == .warning   }) { return AppColors.warning  }
-        return AppColors.info
-    }
+    private var worstColor: Color { SecurityStatus.of(findings: findings, settled: true).color }
 
     var body: some View {
         CardView {

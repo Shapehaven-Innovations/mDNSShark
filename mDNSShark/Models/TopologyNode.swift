@@ -2,16 +2,28 @@
 import Foundation
 import CoreGraphics
 
-/// `pending` is a device whose probes have not settled yet; it is neither secure nor vulnerable.
-enum SecurityStatus: Hashable {
-    case pending, secure, informational, warning, critical
+/// The one device status every screen uses (header, Topology, Devices, legend). `pending` is a device whose probes have not settled yet.
+/// Secure means no warning or critical finding about the device itself; informational and vendor-advisory findings never change it.
+enum SecurityStatus: Hashable, CaseIterable {
+    case pending, secure, warning, critical
+
+    /// Findings alone never colour a device whose probes are still running.
+    static func of(findings: [SecurityFinding], settled: Bool) -> SecurityStatus {
+        guard settled else { return .pending }
+        switch findings.worstDeviceSeverity {
+        case .critical: return .critical
+        case .warning:  return .warning
+        default:        return .secure
+        }
+    }
+
+    var label: String { accessibilityName.capitalized }
 
     /// Spoken form for VoiceOver, since the UI otherwise conveys the status by border colour alone.
     var accessibilityName: String {
         switch self {
         case .pending:       return "pending"
         case .secure:        return "secure"
-        case .informational: return "informational"
         case .warning:       return "warning"
         case .critical:      return "critical"
         }
@@ -29,20 +41,11 @@ struct TopologyNode: Identifiable {
         self.securityStatus = Self.status(findings: device.securityFindings, settled: device.probesSettled)
     }
 
-    /// Findings alone never colour a node whose probes are still running.
-    static func status(findings: [SecurityFinding], settled: Bool) -> SecurityStatus {
-        guard settled else { return .pending }
-        switch findings.worstDeviceSeverity {
-        case .critical:      return .critical
-        case .warning:       return .warning
-        case .informational: return .informational
-        default:             return .secure
-        }
-    }
+    static func status(findings: [SecurityFinding], settled: Bool) -> SecurityStatus { .of(findings: findings, settled: settled) }
 
-    /// Chip semantics: no chip shows every device, each chip shows its own status, and Secure also covers informational-only devices.
+    /// Chip semantics: no chip shows every device, each chip shows its own status.
     static func matchesFilters(_ status: SecurityStatus, _ filters: Set<SecurityStatus>) -> Bool {
-        filters.isEmpty || filters.contains(status) || (status == .informational && filters.contains(.secure))
+        filters.isEmpty || filters.contains(status)
     }
 
     /// VoiceOver text for the node: "<hostname>, <ip>, <status>[, vendor advisory]".

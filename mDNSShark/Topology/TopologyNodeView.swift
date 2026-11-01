@@ -35,15 +35,7 @@ struct ServicesGroupNodeView: View {
 struct TopologyNodeView: View {
     let node: TopologyNode
 
-    private var borderColor: Color {
-        switch node.securityStatus {
-        case .pending:       return Color(.systemGray)
-        case .secure:        return AppColors.secure
-        case .informational: return AppColors.info
-        case .warning:       return AppColors.warning
-        case .critical:      return AppColors.critical
-        }
-    }
+    private var borderColor: Color { node.securityStatus.color }
 
     var body: some View {
         VStack(spacing: 4) {

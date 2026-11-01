@@ -5,7 +5,7 @@ import UIKit
 import StoreKit
 
 struct SettingsView: View {
-    @EnvironmentObject var coordinator: AppCoordinator
+    @EnvironmentObject var securityVM: SecurityViewModel
     @StateObject private var purchase = PurchaseManager.shared
     @State private var showManageSubscriptions = false
 
@@ -579,7 +579,7 @@ struct SettingsView: View {
                 Label("Setup guide", systemImage: "arrow.up.right.square")
             }
             NavigationLink {
-                LegalAdvisoriesView(viewModel: coordinator.securityViewModel)
+                LegalAdvisoriesView(viewModel: securityVM)
             } label: {
                 Label("Legal and Advisories", systemImage: "info.circle")
             }
