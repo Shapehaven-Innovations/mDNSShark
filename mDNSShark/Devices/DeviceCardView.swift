@@ -16,7 +16,7 @@ struct DeviceCardView: View {
                         Text(device.ipAddress).font(.subheadline).foregroundColor(.secondary)
                     }
                     Spacer()
-                    AppBadge(text: "\(issueCount) \(issueCount == 1 ? "issue" : "issues")",
+                    AppBadge(text: issueCount == 0 ? "No findings" : "\(issueCount) \(issueCount == 1 ? "finding" : "findings")",
                              color: badgeColor)
                 }
                 Divider()
