@@ -349,8 +349,12 @@ final class NetworkScanViewModel: ObservableObject {
     /// Cached once a prefix is found; "Unknown" is never cached, so a link that comes up before the first scan is still picked up.
     var networkCIDR: String {
         if let cached = networkCIDRThisScan { return cached }
-        guard let prefix = localUtil.getLocalIPPrefix(), !prefix.isEmpty else { return "Unknown" }
-        let cidr = "\(prefix)0/24"
+        let cidr: String
+        if let subnet = currentOwnAddresses().primarySubnet {
+            cidr = subnet.cidr
+        } else if let prefix = localUtil.getLocalIPPrefix(), !prefix.isEmpty {
+            cidr = "\(prefix)0/24"
+        } else { return "Unknown" }
         networkCIDRThisScan = cidr
         return cidr
     }

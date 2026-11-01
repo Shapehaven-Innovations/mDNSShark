@@ -26,6 +26,12 @@ enum LocalInterfaces {
         func contains(_ address: UInt32) -> Bool {
             prefixLength == 0 ? true : (address ^ network) >> UInt32(32 - prefixLength) == 0
         }
+
+        /// The network address in dotted form, a slash and the prefix length, e.g. "10.10.30.0/23".
+        var cidr: String {
+            let octets = (0..<4).map { String(network >> UInt32(24 - 8 * $0) & 0xFF) }
+            return octets.joined(separator: ".") + "/\(prefixLength)"
+        }
     }
 
     /// Parses a dotted IPv4 literal into its 32-bit value, nil for anything else (IPv6, hostnames, zone-suffixed text).
@@ -64,8 +70,11 @@ enum LocalInterfaces {
         var ipv4Subnets: [IPv4Subnet] = []
         /// The default gateways' IPv4 addresses as the system reports them; empty when unknown, and then the ".1" guess is the fallback.
         var gatewaysIPv4: [String] = []
+        /// The subnet of the primary interface that contains its preferred IPv4; nil when unknown.
+        var primarySubnet: IPv4Subnet?
 
-        init(primary: [String], all: [String], ipv4Subnets: [IPv4Subnet] = [], gatewaysIPv4: [String] = []) {
+        init(primary: [String], all: [String], ipv4Subnets: [IPv4Subnet] = [], gatewaysIPv4: [String] = [], primarySubnet: IPv4Subnet? = nil) {
+            self.primarySubnet = primarySubnet
             self.primary = primary
             self.all = all
             self.ipv4Subnets = ipv4Subnets
@@ -91,8 +100,11 @@ enum LocalInterfaces {
 
     /// The live interfaces read once into an `OwnAddresses`.
     static func ownAddresses(from interfaces: [Interface] = interfaces()) -> OwnAddresses {
-        OwnAddresses(primary: primaryInterface(from: interfaces)?.addresses ?? [], all: interfaces.flatMap(\.addresses),
-                     ipv4Subnets: interfaces.flatMap(\.ipv4Subnets))
+        let primary = primaryInterface(from: interfaces)
+        let preferred = primary.flatMap { NetworkScanner.preferredAddress(from: $0.ipv4) }.flatMap(ipv4Value)
+        let primarySubnet = preferred.flatMap { value in primary?.ipv4Subnets.first { $0.contains(value) } }
+        return OwnAddresses(primary: primary?.addresses ?? [], all: interfaces.flatMap(\.addresses),
+                            ipv4Subnets: interfaces.flatMap(\.ipv4Subnets), primarySubnet: primarySubnet)
     }
 
     /// Internal match key for an address: the "%zone" suffix dropped and lowercased, since getifaddrs and a resolve can name the

@@ -127,8 +127,8 @@ struct DiscoveredDevice: Identifiable, Equatable {
     /// The system's answer when there is one, otherwise the guess that the router is at x.x.x.1.
     var isGateway: Bool { isDefaultGateway ?? ipAddress.hasSuffix(".1") }
 
-    /// What to show when no open port is known: "Not probed" for a host the payment gate kept passive, since "None" would claim a fact.
-    var noOpenPortsText: String { paymentVendorSkip == nil ? "None" : "Not probed" }
+    /// What to show when no open port is known: "Not probed" for a host that was never probed (payment skip, off-subnet or refused), since "None" would claim a fact.
+    var noOpenPortsText: String { wasProbed ? "None" : "Not probed" }
 
     /// True when the MAC is private or derived, so the vendor cannot be read from it.
     var hasLocallyAdministeredMAC: Bool { macAddress.map(MACAddressFacts.isLocallyAdministered) ?? false }
