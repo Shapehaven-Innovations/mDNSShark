@@ -184,7 +184,9 @@ final class DeviceEnrichmentCoordinator {
                     bannerOS = bannerOS ?? guess.os
                 }
                 enrichments.append(DeviceEnrichment(mac: nil, manufacturer: bannerManufacturer, inferredOS: bannerOS,
-                                                     openPorts: scannedPorts.map(\.port), source: .portBanner))
+                                                     openPorts: scannedPorts.map(\.port), source: .portBanner,
+                                                     httpRedirectByPort: Dictionary(scannedPorts.compactMap { p in p.redirectLocation.map { (p.port, $0) } },
+                                                                                    uniquingKeysWith: { first, _ in first })))
             }
 
             // A scan restart cancels this task; its late answer must not land in the new scan's state.

@@ -464,6 +464,7 @@ final class NetworkScanViewModel: ObservableObject {
                     newDevice.manufacturer = merged.manufacturer
                     newDevice.inferredOS = merged.inferredOS
                     newDevice.openPorts = merged.openPorts
+                    newDevice.httpRedirectByPort = merged.httpRedirectByPort
                 }
                 byIP[ip] = newDevice
                 dispatchDescriptionFetchIfNeeded(ip: ip, locationURL: device.locationURL)

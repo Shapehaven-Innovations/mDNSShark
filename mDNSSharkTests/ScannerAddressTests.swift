@@ -119,6 +119,23 @@ struct ScannerAddressTests {
         #expect(LocalInterfaces.isOnLocalSubnet(addresses: ["10.10.10.87"], subnets: []) == nil)
     }
 
+    @Test("a locally administered MAC is detected from its first octet, and clearing the bit gives the base address")
+    func locallyAdministeredMAC() {
+        #expect(MACAddressFacts.isLocallyAdministered("1a:e8:29:ac:a0:6b"))
+        #expect(!MACAddressFacts.isLocallyAdministered("18:e8:29:ac:a0:6b"))
+        #expect(MACAddressFacts.clearingLocalBit("1a:e8:29:ac:a0:6b") == "18:e8:29:ac:a0:6b")
+        #expect(MACAddressFacts.clearingLocalBit("18:e8:29:ac:a0:6b") == nil)
+        #expect(!MACAddressFacts.isLocallyAdministered("zz") && !MACAddressFacts.isLocallyAdministered(""))
+
+        var router = DiscoveredDevice(hostname: "192.168.203.1", ipAddress: "192.168.203.1", macAddress: "1a:e8:29:ac:a0:6b")
+        #expect(router.hasLocallyAdministeredMAC)
+        let withVendor = router.macNote { $0 == "18:e8:29:ac:a0:6b" ? "Ubiquiti Inc" : nil }
+        #expect(withVendor?.contains("18:e8:29:ac:a0:6b") == true && withVendor?.contains("Ubiquiti Inc") == true && withVendor?.contains("inferred") == true)
+        #expect(router.macNote { _ in nil }?.contains("cannot be read") == true)
+        router.macAddress = "18:e8:29:ac:a0:6b"
+        #expect(router.macNote { _ in "x" } == nil && !router.hasLocallyAdministeredMAC)
+    }
+
     @Test("a netmask is a prefix length only when it is a contiguous run of ones")
     func netmaskPrefixLength() {
         #expect(LocalInterfaces.prefixLength(maskBits: 0) == 0)

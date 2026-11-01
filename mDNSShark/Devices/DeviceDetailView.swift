@@ -63,6 +63,9 @@ struct DeviceDetailView: View {
                         Text("Device Info").font(.headline)
                         Divider()
                         row("MAC Address",  device.macAddress ?? "Unknown")
+                        if let note = device.macNote(vendorLookup: { OUIDatabase.shared.manufacturer(for: $0) }) {
+                            Text(note).font(.caption).foregroundColor(.secondary)
+                        }
                         row("Manufacturer", device.manufacturer ?? "Unknown")
                         row("Inferred OS",  device.displayInferredOS  ?? "Unknown")
                         if let server = device.ssdpServer { row("Server header", server, selectable: true) }

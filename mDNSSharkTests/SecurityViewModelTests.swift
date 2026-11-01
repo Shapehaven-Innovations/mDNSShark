@@ -154,6 +154,29 @@ struct SecurityViewModelTests {
         #expect(!vm.findings.contains { $0.source == .vendorAdvisory && $0.severity == .critical })
     }
 
+    // Issue #17: a port 80 that only redirects to https is described as that.
+    @Test("an open port 80 that redirects to https says so, one that does not keeps the plain text, and the finding keeps its title")
+    func port80RedirectWording() {
+        let vm = makeViewModel()
+        var plain = DiscoveredDevice(hostname: "router", ipAddress: "192.168.1.1", openPorts: [80])
+        vm.assess(devices: [plain])
+        let plainFinding = vm.findings.first { $0.title == "HTTP Service" }
+        #expect(plainFinding?.description.hasPrefix("Unencrypted HTTP service") == true)
+
+        plain.httpRedirectByPort = [80: "https://192.168.1.1/"]
+        vm.assess(devices: [plain])
+        let redirect = vm.findings.first { $0.title == "HTTP Service" }
+        #expect(redirect?.description.contains("redirect to https://192.168.1.1/") == true)
+        #expect(redirect?.severity == .informational)
+
+        plain.httpRedirectByPort = [80: "http://192.168.1.1:8080/"]
+        vm.assess(devices: [plain])
+        #expect(vm.findings.first { $0.title == "HTTP Service" }?.description.hasPrefix("Unencrypted HTTP service") == true)
+        plain.httpRedirectByPort = [80: "/login"]
+        vm.assess(devices: [plain])
+        #expect(vm.findings.first { $0.title == "HTTP Service" }?.description.hasPrefix("Unencrypted HTTP service") == true)
+    }
+
     // Issue #4: only cleartext-credential open ports are critical.
     @Test("an open VNC port is a warning, not critical")
     func vncOpenPortIsWarning() {

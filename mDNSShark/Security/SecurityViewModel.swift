@@ -68,7 +68,7 @@ final class SecurityViewModel: ObservableObject {
         "_ssh._tcp":              (.informational,"SSH Advertised via Bonjour",     "An SSH remote access service is advertised.",                                        "Use key-based auth. Disable root login."),
         "_smb._tcp":              (.informational,"SMB File Sharing Advertised",    "A Windows-compatible file sharing service is advertised.",                           "Keep SMB patched. Restrict shares."),
         "_workstation._tcp":      (.informational,"SMB Workstation Advertised",     "A workstation SMB service is advertised.",                                           "Ensure SMB shares require authentication."),
-        "_http._tcp":             (.informational,"HTTP Service Advertised",        "Unencrypted web service detected.",                                                  "Prefer HTTPS."),
+        "_http._tcp":             (.informational,"HTTP Service Advertised",        "A web service is advertised over Bonjour; whether it is encrypted is not known.",                                                  "Prefer HTTPS."),
         "_airplay._tcp":          (.informational,"AirPlay Receiver Advertised",    "This device accepts AirPlay streams from other devices on the network.",             "Limit AirPlay to the current user or turn it off when unused."),
         "_raop._tcp":             (.informational,"AirPlay Receiver Advertised",    "This device accepts AirPlay streams from other devices on the network.",             "Limit AirPlay to the current user or turn it off when unused."),
         "_hap._tcp":              (.informational,"HomeKit Accessory Present",      "A HomeKit device is on your network.",                                               "Ensure HomeKit uses a secure home hub."),
@@ -285,7 +285,13 @@ final class SecurityViewModel: ObservableObject {
         let name = "\(device.hostname) · \(device.ipAddress)"
         let icon = device.deviceIcon
         return device.openPorts.compactMap { port -> SecurityFinding? in
-            guard let (sev, title, desc, rec) = portRules[port] else { return nil }
+            guard let (sev, title, rule, ruleRec) = portRules[port] else { return nil }
+            // A web port that only answers with a redirect to https:// keeps its title (so the finding keeps its identity) but is described as that.
+            var desc = rule, rec = ruleRec
+            if [80, 8080].contains(port), let location = device.httpRedirectByPort[port], location.lowercased().hasPrefix("https://") {
+                desc = "Port \(port) answers with a redirect to \(location). Only the first request travels unencrypted."
+                rec = "Confirm the HTTPS interface uses a strong password."
+            }
             return SecurityFinding(
                 deviceID: device.id, deviceName: name, deviceIcon: icon,
                 severity: sev, title: title, description: desc,

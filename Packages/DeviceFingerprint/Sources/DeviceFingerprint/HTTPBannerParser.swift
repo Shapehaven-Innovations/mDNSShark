@@ -4,11 +4,17 @@ public struct HTTPBannerInfo {
     public let server: String?
     public let title: String?
     public let authRealm: String?
+    /// The numeric status of the response's first line ("HTTP/1.1 301 ..." gives 301), nil when there is no status line.
+    public let statusCode: Int?
+    /// The `Location:` header value exactly as received.
+    public let location: String?
 
-    public init(server: String?, title: String?, authRealm: String?) {
+    public init(server: String?, title: String?, authRealm: String?, statusCode: Int? = nil, location: String? = nil) {
         self.server = server
         self.title = title
         self.authRealm = authRealm
+        self.statusCode = statusCode
+        self.location = location
     }
 }
 
@@ -57,7 +63,22 @@ public enum HTTPBannerParser {
         let authRealm = headers["www-authenticate"].flatMap(extractRealm)
         let title = extractTitle(body)
 
-        return HTTPBannerInfo(server: server, title: title, authRealm: authRealm)
+        return HTTPBannerInfo(server: server, title: title, authRealm: authRealm,
+                              statusCode: statusCode(ofHeaderBlock: headerBlock), location: headers["location"])
+    }
+
+    /// The status code from a leading "HTTP/x.y NNN ..." line, nil for anything else.
+    private static func statusCode(ofHeaderBlock block: String) -> Int? {
+        guard let firstLine = block.split(whereSeparator: { $0 == "\r\n" || $0 == "\n" }).first else { return nil }
+        let parts = firstLine.split(separator: " ", omittingEmptySubsequences: true)
+        guard parts.count >= 2, parts[0].uppercased().hasPrefix("HTTP/"), let code = Int(parts[1]), (100...599).contains(code) else { return nil }
+        return code
+    }
+
+    /// The `Location` of a 301, 302, 303, 307 or 308 response, nil for any other answer.
+    public static func redirectLocation(_ response: Data) -> String? {
+        guard let info = parse(response), let code = info.statusCode, [301, 302, 303, 307, 308].contains(code) else { return nil }
+        return info.location
     }
 
     /// Splits a header block into a lowercase-keyed name->value map. Skips

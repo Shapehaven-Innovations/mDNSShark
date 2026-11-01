@@ -18,6 +18,26 @@ enum DeviceType: Hashable, CaseIterable {
     }
 }
 
+/// Facts readable from a MAC address string alone, with no lookup.
+enum MACAddressFacts {
+    /// IEEE 802: bit 0x02 of the first octet marks a locally administered (private, randomized or derived) address, which no vendor owns.
+    static func isLocallyAdministered(_ mac: String) -> Bool {
+        guard let first = firstOctet(mac) else { return false }
+        return first & 0x02 != 0
+    }
+
+    /// The same address with the locally administered bit cleared, in the same text format, nil when it is not set or the text is not a MAC.
+    static func clearingLocalBit(_ mac: String) -> String? {
+        guard let first = firstOctet(mac), first & 0x02 != 0 else { return nil }
+        return String(format: "%02x", first & ~0x02) + mac.dropFirst(2)
+    }
+
+    private static func firstOctet(_ mac: String) -> UInt8? {
+        guard mac.count >= 2 else { return nil }
+        return UInt8(mac.prefix(2), radix: 16)
+    }
+}
+
 struct DiscoveredDevice: Identifiable, Equatable {
     let id: UUID
     var hostname: String
@@ -36,6 +56,8 @@ struct DiscoveredDevice: Identifiable, Equatable {
     var ssdpServer: String?
     /// False when every IPv4 address is outside the networks this phone or Mac is connected to (a reflected advertisement from another VLAN), nil when unknown.
     var isOnLocalSubnet: Bool?
+    /// For a web port that answered with a redirect, the `Location` it sent, as received. Ports with no entry were not seen redirecting.
+    var httpRedirectByPort: [Int: String] = [:]
 
     init(id: UUID = UUID(), hostname: String, ipAddress: String,
          macAddress: String? = nil, manufacturer: String? = nil,
@@ -56,10 +78,24 @@ struct DiscoveredDevice: Identifiable, Equatable {
             && l.inferredOS == r.inferredOS && l.openPorts == r.openPorts
             && l.bonjourServices == r.bonjourServices
             && l.probesSettled == r.probesSettled && l.addresses == r.addresses && l.ssdpServer == r.ssdpServer
-            && l.isOnLocalSubnet == r.isOnLocalSubnet
+            && l.isOnLocalSubnet == r.isOnLocalSubnet && l.httpRedirectByPort == r.httpRedirectByPort
     }
 
     var isGateway: Bool { ipAddress.hasSuffix(".1") }
+
+    /// True when the MAC is private or derived, so the vendor cannot be read from it.
+    var hasLocallyAdministeredMAC: Bool { macAddress.map(MACAddressFacts.isLocallyAdministered) ?? false }
+
+    /// A plain-text note about a locally administered MAC, nil otherwise. When the address with that bit cleared belongs to a known vendor
+    /// (a guest network's address is often derived from the device's own that way) it says so and marks that as inferred.
+    func macNote(vendorLookup: (String) -> String?) -> String? {
+        guard let mac = macAddress, MACAddressFacts.isLocallyAdministered(mac) else { return nil }
+        var note = "Private or locally administered MAC address, so the vendor cannot be read from it."
+        if let cleared = MACAddressFacts.clearingLocalBit(mac), let vendor = vendorLookup(cleared) {
+            note += " With that bit cleared the address is \(cleared), which belongs to \(vendor). This is inferred, not confirmed."
+        }
+        return note
+    }
 
     /// `inferredOS` if any real source (banner text, ground-truth
     /// discovery reply, etc) ever supplied one; otherwise a generic

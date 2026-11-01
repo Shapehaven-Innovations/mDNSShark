@@ -45,10 +45,13 @@ public struct DeviceEnrichment {
     public let inferredOS: String?
     public let openPorts: [Int]
     public let source: EnrichmentSource
+    /// For a web port that answered with a redirect, the `Location` it sent, as received.
+    public let httpRedirectByPort: [Int: String]
 
-    public init(mac: String?, manufacturer: String?, inferredOS: String?, openPorts: [Int], source: EnrichmentSource) {
+    public init(mac: String?, manufacturer: String?, inferredOS: String?, openPorts: [Int], source: EnrichmentSource,
+                httpRedirectByPort: [Int: String] = [:]) {
         self.mac = mac; self.manufacturer = manufacturer; self.inferredOS = inferredOS
-        self.openPorts = openPorts; self.source = source
+        self.openPorts = openPorts; self.source = source; self.httpRedirectByPort = httpRedirectByPort
     }
 }
 
@@ -60,10 +63,11 @@ public struct EnrichedFields {
     public var manufacturer: String?
     public var inferredOS: String?
     public var openPorts: [Int]
+    public var httpRedirectByPort: [Int: String]
 
-    public init(mac: String?, manufacturer: String?, inferredOS: String?, openPorts: [Int]) {
+    public init(mac: String?, manufacturer: String?, inferredOS: String?, openPorts: [Int], httpRedirectByPort: [Int: String] = [:]) {
         self.mac = mac; self.manufacturer = manufacturer; self.inferredOS = inferredOS
-        self.openPorts = openPorts
+        self.openPorts = openPorts; self.httpRedirectByPort = httpRedirectByPort
     }
 }
 
@@ -105,6 +109,9 @@ public func merge(existing: EnrichedFields, incoming: [DeviceEnrichment]) -> Enr
     var ports = Set(result.openPorts)
     for e in incoming { ports.formUnion(e.openPorts) }
     result.openPorts = Array(ports).sorted()
+
+    // Per port the first answer in source-strength order wins, and a port already known keeps its value.
+    for e in byStrength { for (port, location) in e.httpRedirectByPort where result.httpRedirectByPort[port] == nil { result.httpRedirectByPort[port] = location } }
 
     return result
 }

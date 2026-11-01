@@ -25,6 +25,8 @@ struct ScannedPort: Identifiable {
     var id: Int { port }
     let port: Int
     let banner: String?
+    /// The `Location` of a redirect answer from an HTTP port, as received.
+    var redirectLocation: String? = nil
 }
 
 // A simple port scanner that uses NWConnection to check TCP ports and grab banner info.
@@ -66,8 +68,9 @@ class PortScanner {
     /// Ports worth checking specifically because they're where UniFi gear
     /// and common LAN devices expose identifying services: 22 SSH, 80/443
     /// HTTP(S), 8080/8443 UniFi inform/classic-controller, 23 telnet, 6789
-    /// UniFi speed test, 7442/7447 UniFi Protect.
-    static let uniFiRelevantPorts = [22, 80, 443, 8080, 8443, 23, 6789, 7442, 7447]
+    /// UniFi speed test, 7442/7447 UniFi Protect, and 53 DNS, which nearly
+    /// every router and hotspot answers even when it filters everything else.
+    static let uniFiRelevantPorts = [22, 80, 443, 8080, 8443, 23, 6789, 7442, 7447, 53]
 
     /// Plaintext-HTTP-shaped ports: we speak the request, plaintext TCP.
     private static let httpPlainPorts: Set<Int> = [80, 8080]
@@ -209,7 +212,8 @@ class PortScanner {
                             connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { data, _, _, _ in
                                 guard flag.setCompleted() else { return }
                                 let banner = PortScanner.httpBannerString(from: data)
-                                resultsQueue.sync { results.append(ScannedPort(port: port, banner: banner)) }
+                                let redirect = data.flatMap { HTTPBannerParser.redirectLocation($0) }
+                                resultsQueue.sync { results.append(ScannedPort(port: port, banner: banner, redirectLocation: redirect)) }
                                 connection.cancel()
                                 group.leave()
                             }

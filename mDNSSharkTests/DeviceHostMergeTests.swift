@@ -642,6 +642,31 @@ struct DeviceHostMergeTests {
         #expect(byName["TV.local."] == true)
     }
 
+    @Test("the redirect of a web port is read from the status line and Location header, and only for redirect statuses")
+    func redirectLocationParsing() {
+        func answer(_ text: String) -> String? { HTTPBannerParser.redirectLocation(Data(text.utf8)) }
+        #expect(answer("HTTP/1.1 301 Moved Permanently\r\nLocation: https://10.10.30.1/\r\nServer: x\r\n\r\n") == "https://10.10.30.1/")
+        #expect(answer("HTTP/1.0 302 Found\nlocation: http://10.10.30.1:8080/\n\n") == "http://10.10.30.1:8080/")
+        #expect(answer("HTTP/1.1 200 OK\r\nLocation: https://10.10.30.1/\r\n\r\n") == nil)
+        #expect(answer("HTTP/1.1 301 Moved\r\n\r\n") == nil)
+        #expect(answer("not http at all") == nil)
+        #expect(answer("") == nil)
+    }
+
+    @Test("a redirect found by the port scan reaches the device row and survives a rescan")
+    func redirectReachesTheRow() {
+        let vm = viewModel()
+        let sweep = sweepRow("192.168.1.9")
+        _ = vm.merge(raw: [sweep])
+        let probe = DeviceEnrichment(mac: nil, manufacturer: nil, inferredOS: nil, openPorts: [80], source: .portBanner,
+                                     httpRedirectByPort: [80: "https://192.168.1.9/"])
+        vm.ingestEnrichment(ip: "192.168.1.9", enrichments: [probe], completesProbeSet: true)
+
+        #expect(vm.merge(raw: [sweep]).first?.httpRedirectByPort == [80: "https://192.168.1.9/"])
+        vm.resetForNewScan()
+        #expect(vm.merge(raw: [sweepRow("192.168.1.9")]).first?.httpRedirectByPort == [80: "https://192.168.1.9/"])
+    }
+
     // MARK: - Services without a device
 
     @Test("a Bonjour row whose resolve has not answered yet is neither a device nor a service")
