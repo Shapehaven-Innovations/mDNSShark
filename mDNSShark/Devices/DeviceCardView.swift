@@ -13,7 +13,10 @@ struct DeviceCardView: View {
                     Image(systemName: device.deviceIcon).font(.title2).foregroundColor(badgeColor).frame(width: 32)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(device.hostname).font(.headline)
-                        Text(device.ipAddress).font(.subheadline).foregroundColor(.secondary)
+                        HStack(spacing: 6) {
+                            Text(device.ipAddress).font(.subheadline).foregroundColor(.secondary)
+                            if device.isOnLocalSubnet == false { AppBadge(text: "Other network", color: AppColors.pending) }
+                        }
                     }
                     Spacer()
                     AppBadge(text: issueCount == 0 ? "No findings" : "\(issueCount) \(issueCount == 1 ? "finding" : "findings")",

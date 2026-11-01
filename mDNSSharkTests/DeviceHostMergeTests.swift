@@ -628,6 +628,20 @@ struct DeviceHostMergeTests {
         #expect(SSDPDeviceDescription.parse(Data(long.utf8))?.friendlyName?.count == 64)
     }
 
+    @Test("a device on another network is flagged, one on the phone's subnet is not")
+    func otherNetworkIsFlagged() {
+        let subnet = LocalInterfaces.IPv4Subnet(network: LocalInterfaces.ipv4Value("10.10.30.0")!, prefixLength: 24)
+        let vm = NetworkScanViewModel(ownAddresses: { LocalInterfaces.OwnAddresses(primary: ["10.10.30.5"], all: ["10.10.30.5"], ipv4Subnets: [subnet]) },
+                                      probe: { _, _ in })
+        let camera = bonjourRow(type: "_http._tcp", name: "Camera", ip: "10.10.10.87", host: "Camera.local.", port: 80)
+        let tv = bonjourRow(type: "_http._tcp", name: "TV", ip: "10.10.30.80", host: "TV.local.", port: 80)
+
+        let byName = Dictionary(uniqueKeysWithValues: vm.merge(raw: [camera, tv]).map { ($0.hostname, $0.isOnLocalSubnet) })
+
+        #expect(byName["Camera.local."] == false)
+        #expect(byName["TV.local."] == true)
+    }
+
     // MARK: - Services without a device
 
     @Test("a Bonjour row whose resolve has not answered yet is neither a device nor a service")

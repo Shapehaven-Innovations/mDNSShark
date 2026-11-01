@@ -34,6 +34,8 @@ struct DiscoveredDevice: Identifiable, Equatable {
     var addresses: [String] = []
     /// The SSDP `SERVER` header as received (OS and product tokens), shown as its own field and never as a name.
     var ssdpServer: String?
+    /// False when every IPv4 address is outside the networks this phone or Mac is connected to (a reflected advertisement from another VLAN), nil when unknown.
+    var isOnLocalSubnet: Bool?
 
     init(id: UUID = UUID(), hostname: String, ipAddress: String,
          macAddress: String? = nil, manufacturer: String? = nil,
@@ -54,6 +56,7 @@ struct DiscoveredDevice: Identifiable, Equatable {
             && l.inferredOS == r.inferredOS && l.openPorts == r.openPorts
             && l.bonjourServices == r.bonjourServices
             && l.probesSettled == r.probesSettled && l.addresses == r.addresses && l.ssdpServer == r.ssdpServer
+            && l.isOnLocalSubnet == r.isOnLocalSubnet
     }
 
     var isGateway: Bool { ipAddress.hasSuffix(".1") }

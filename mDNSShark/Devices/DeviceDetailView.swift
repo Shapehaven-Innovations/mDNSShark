@@ -47,6 +47,11 @@ struct DeviceDetailView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(device.hostname).font(.title2.bold())
                             Text(device.ipAddress).foregroundColor(.secondary)
+                            if device.isOnLocalSubnet == false {
+                                AppBadge(text: "Other network", color: AppColors.pending)
+                                Text("Not on the network you are connected to, so it may not be reachable directly.")
+                                    .font(.caption).foregroundColor(.secondary)
+                            }
                             if let os = device.displayInferredOS { Text(os).font(.caption).foregroundColor(.secondary) }
                         }
                         Spacer()

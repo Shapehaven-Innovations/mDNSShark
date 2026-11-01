@@ -96,6 +96,40 @@ struct ScannerAddressTests {
         LocalInterfaces.Interface(name: name, functionalType: type, ipv4: v4, ipv6: v6)
     }
 
+    @Test("an address is on the local network when it falls in an interface subnet or is self-assigned, and off it otherwise")
+    func onLocalSubnet() {
+        let lan = LocalInterfaces.IPv4Subnet(network: LocalInterfaces.ipv4Value("10.10.30.0")!, prefixLength: 24)
+        let wide = LocalInterfaces.IPv4Subnet(network: LocalInterfaces.ipv4Value("10.10.30.0")!, prefixLength: 23)
+        #expect(LocalInterfaces.isOnLocalSubnet(addresses: ["10.10.30.80"], subnets: [lan]) == true)
+        #expect(LocalInterfaces.isOnLocalSubnet(addresses: ["10.10.10.87"], subnets: [lan]) == false)
+        #expect(LocalInterfaces.isOnLocalSubnet(addresses: ["10.10.31.5"], subnets: [lan]) == false)
+        #expect(LocalInterfaces.isOnLocalSubnet(addresses: ["10.10.31.5"], subnets: [wide]) == true)
+        // A self-assigned peer is on this network only when this host has a 169.254 interface as well.
+        let linkLocal = LocalInterfaces.IPv4Subnet(network: LocalInterfaces.ipv4Value("169.254.0.0")!, prefixLength: 16)
+        #expect(LocalInterfaces.isOnLocalSubnet(addresses: ["169.254.4.4"], subnets: [lan]) == false)
+        #expect(LocalInterfaces.isOnLocalSubnet(addresses: ["169.254.4.4"], subnets: [lan, linkLocal]) == true)
+        #expect(LocalInterfaces.IPv4Subnet(network: 0, prefixLength: 0).contains(0xC0A8_0101))
+        #expect(LocalInterfaces.IPv4Subnet(network: 0x0A0A_1E05, prefixLength: 32).contains(0x0A0A_1E05))
+        #expect(!LocalInterfaces.IPv4Subnet(network: 0x0A0A_1E05, prefixLength: 32).contains(0x0A0A_1E06))
+        #expect(LocalInterfaces.ipv4Value("256.1.1.1") == nil && LocalInterfaces.ipv4Value("1.2.3") == nil
+                && LocalInterfaces.ipv4Value("1.2.3.4%en0") == nil)
+        // One on-link address is enough, an IPv6-only device cannot be decided, and no known subnet means no verdict.
+        #expect(LocalInterfaces.isOnLocalSubnet(addresses: ["10.10.10.87", "10.10.30.9"], subnets: [lan]) == true)
+        #expect(LocalInterfaces.isOnLocalSubnet(addresses: ["fe80::1"], subnets: [lan]) == nil)
+        #expect(LocalInterfaces.isOnLocalSubnet(addresses: ["10.10.10.87"], subnets: []) == nil)
+    }
+
+    @Test("a netmask is a prefix length only when it is a contiguous run of ones")
+    func netmaskPrefixLength() {
+        #expect(LocalInterfaces.prefixLength(maskBits: 0) == 0)
+        #expect(LocalInterfaces.prefixLength(maskBits: 0xFF00_0000) == 8)
+        #expect(LocalInterfaces.prefixLength(maskBits: 0xFFFF_FF00) == 24)
+        #expect(LocalInterfaces.prefixLength(maskBits: 0xFFFF_FFFE) == 31)
+        #expect(LocalInterfaces.prefixLength(maskBits: 0xFFFF_FFFF) == 32)
+        #expect(LocalInterfaces.prefixLength(maskBits: 0xFF00_FF00) == nil)
+        #expect(LocalInterfaces.prefixLength(maskBits: 0x0000_FFFF) == nil)
+    }
+
     @Test("the Wi-Fi infrastructure interface is chosen by type, preferring the one that carries an IPv4 address")
     func primaryInterfacePicksWiFiByType() {
         let interfaces = [

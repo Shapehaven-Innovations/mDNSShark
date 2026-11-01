@@ -383,7 +383,8 @@ final class NetworkScanViewModel: ObservableObject {
     /// advertised (Bonjour resolve or SSDP LOCATION) and stays on the service; open ports arrive solely via the enrichment sink.
     /// A row with no address of its own borrows its host's (matched by `Device.hostKey`); a row with neither is a service, not a device.
     func mergeScan(raw: [NetworkScanner.Device]) -> ScanMerge {
-        let plan = Self.plan(raw: raw, own: currentOwnAddresses(), remembered: identityByIP.mapValues(\.value),
+        let own = currentOwnAddresses()
+        let plan = Self.plan(raw: raw, own: own, remembered: identityByIP.mapValues(\.value),
                              upnpNames: upnpNameByIP.mapValues(\.value))
         for (address, identity) in plan.hostIdentityByAddress {
             identityByIP[address] = Stamped(value: identity, generation: scanGeneration)
@@ -452,6 +453,7 @@ final class NetworkScanViewModel: ObservableObject {
                     addresses:       Self.orderedAddresses(group)
                 )
                 newDevice.ssdpServer = device.ssdpServer
+                newDevice.isOnLocalSubnet = LocalInterfaces.isOnLocalSubnet(addresses: Array(group), subnets: own.ipv4Subnets)
                 // Re-merge stored raw enrichments against the fresh baseline, not a stale merged snapshot.
                 let stored = enrichments(forAddresses: group)
                 if !stored.isEmpty {

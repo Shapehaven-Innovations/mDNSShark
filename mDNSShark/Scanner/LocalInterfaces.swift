@@ -12,7 +12,41 @@ enum LocalInterfaces {
         let functionalType: UInt32?
         var ipv4: [String]
         var ipv6: [String]
+        /// The subnet each IPv4 address sits on, read from the interface netmask; empty when none was reported.
+        var ipv4Subnets: [IPv4Subnet] = []
         var addresses: [String] { ipv4 + ipv6 }
+    }
+
+    /// An IPv4 network as an address and prefix length, for asking whether another address is on the same link.
+    struct IPv4Subnet: Equatable {
+        let network: UInt32
+        let prefixLength: Int
+
+        func contains(_ address: UInt32) -> Bool {
+            prefixLength == 0 ? true : (address ^ network) >> UInt32(32 - prefixLength) == 0
+        }
+    }
+
+    /// Parses a dotted IPv4 literal into its 32-bit value, nil for anything else (IPv6, hostnames, zone-suffixed text).
+    static func ipv4Value(_ text: String) -> UInt32? {
+        let parts = text.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 4 else { return nil }
+        var value: UInt32 = 0
+        for part in parts {
+            guard let octet = UInt8(part) else { return nil }
+            value = value << 8 | UInt32(octet)
+        }
+        return value
+    }
+
+    /// Whether a device with these addresses is on the network this phone or Mac is connected to: true when an IPv4 address lies in one of
+    /// `subnets` (a self-assigned 169.254 peer counts only when this host has a 169.254 interface too), false when it has IPv4 addresses and
+    /// none do, and nil when nothing can be decided (no subnets known, or no IPv4 address, since IPv6 scopes are not compared).
+    static func isOnLocalSubnet(addresses: [String], subnets: [IPv4Subnet]) -> Bool? {
+        guard !subnets.isEmpty else { return nil }
+        let values = addresses.compactMap(ipv4Value)
+        guard !values.isEmpty else { return nil }
+        return values.contains { value in subnets.contains { $0.contains(value) } }
     }
 
     /// This device's own addresses as the scan merge needs them: `primary` ranks the row's display address, `all` is what a
@@ -22,10 +56,13 @@ enum LocalInterfaces {
         var primary: [String]
         /// Every up, non-loopback interface's addresses, IPv4 and IPv6, raw with scope.
         var all: [String]
+        /// The IPv4 subnets this device is on, from every up interface's netmask; empty in tests and when none was reported.
+        var ipv4Subnets: [IPv4Subnet] = []
 
-        init(primary: [String], all: [String]) {
+        init(primary: [String], all: [String], ipv4Subnets: [IPv4Subnet] = []) {
             self.primary = primary
             self.all = all
+            self.ipv4Subnets = ipv4Subnets
         }
 
         /// One list standing for both, for tests and single-interface hosts.
@@ -40,7 +77,8 @@ enum LocalInterfaces {
 
     /// The live interfaces read once into an `OwnAddresses`.
     static func ownAddresses(from interfaces: [Interface] = interfaces()) -> OwnAddresses {
-        OwnAddresses(primary: primaryInterface(from: interfaces)?.addresses ?? [], all: interfaces.flatMap(\.addresses))
+        OwnAddresses(primary: primaryInterface(from: interfaces)?.addresses ?? [], all: interfaces.flatMap(\.addresses),
+                     ipv4Subnets: interfaces.flatMap(\.ipv4Subnets))
     }
 
     /// Internal match key for an address: the "%zone" suffix dropped and lowercased, since getifaddrs and a resolve can name the
@@ -73,7 +111,12 @@ enum LocalInterfaces {
                 order.append(name)
             }
             guard let text = numericHost(addr) else { continue }
-            if family == AF_INET { byName[name]?.ipv4.append(text) } else { byName[name]?.ipv6.append(text) }
+            if family == AF_INET {
+                byName[name]?.ipv4.append(text)
+                if let value = ipv4Value(text), let mask = entry.ifa_netmask, let prefix = prefixLength(of: mask) {
+                    byName[name]?.ipv4Subnets.append(IPv4Subnet(network: prefixLength(prefix, applyTo: value), prefixLength: prefix))
+                }
+            } else { byName[name]?.ipv6.append(text) }
         }
         return order.compactMap { byName[$0] }
     }
@@ -107,6 +150,28 @@ enum LocalInterfaces {
         }
         guard ioctl(fd, functionalTypeRequest, &req) == 0 else { return nil }
         return req.ifr_ifru.ifru_functional_type
+    }
+
+    /// The prefix length of an IPv4 netmask sockaddr. getifaddrs may trim trailing zero bytes (sa_len 5 or 7), so only the bytes sa_len
+    /// covers are read, through a raw pointer, and the rest count as zero.
+    private static func prefixLength(of mask: UnsafeMutablePointer<sockaddr>) -> Int? {
+        let base = UnsafeRawPointer(mask)
+        let length = min(Int(base.load(as: UInt8.self)), 8)
+        guard length > 4 else { return nil }
+        var bits: UInt32 = 0
+        for index in 4..<length { bits = bits << 8 | UInt32(base.load(fromByteOffset: index, as: UInt8.self)) }
+        bits <<= UInt32(8 * (8 - length))
+        return prefixLength(maskBits: bits)
+    }
+
+    /// The prefix length of a netmask value, nil unless it is a contiguous run of ones from the top.
+    static func prefixLength(maskBits bits: UInt32) -> Int? {
+        let ones = bits.nonzeroBitCount
+        return bits == (ones == 0 ? 0 : ~UInt32(0) << UInt32(32 - ones)) ? ones : nil
+    }
+
+    private static func prefixLength(_ prefix: Int, applyTo value: UInt32) -> UInt32 {
+        prefix == 0 ? 0 : value & (~UInt32(0) << UInt32(32 - prefix))
     }
 
     private static func numericHost(_ addr: UnsafeMutablePointer<sockaddr>) -> String? {
