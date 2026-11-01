@@ -1,59 +1,59 @@
 {
-  "images" : [
+  "images": [
     {
-      "filename" : "shark.png",
-      "idiom" : "universal",
-      "scale" : "1x"
+      "filename": "shark-1x.png",
+      "idiom": "universal",
+      "scale": "1x"
     },
     {
-      "filename" : "shark.png",
-      "idiom" : "universal",
-      "scale" : "2x"
+      "filename": "shark-2x.png",
+      "idiom": "universal",
+      "scale": "2x"
     },
     {
-      "filename" : "shark.png",
-      "idiom" : "universal",
-      "scale" : "3x"
+      "filename": "shark-3x.png",
+      "idiom": "universal",
+      "scale": "3x"
     },
     {
-      "appearances" : [
+      "appearances": [
         {
-          "appearance" : "luminosity",
-          "value" : "dark"
+          "appearance": "luminosity",
+          "value": "dark"
         }
       ],
-      "filename" : "shark-dark.png",
-      "idiom" : "universal",
-      "scale" : "1x"
+      "filename": "shark-dark-1x.png",
+      "idiom": "universal",
+      "scale": "1x"
     },
     {
-      "appearances" : [
+      "appearances": [
         {
-          "appearance" : "luminosity",
-          "value" : "dark"
+          "appearance": "luminosity",
+          "value": "dark"
         }
       ],
-      "filename" : "shark-dark.png",
-      "idiom" : "universal",
-      "scale" : "2x"
+      "filename": "shark-dark-2x.png",
+      "idiom": "universal",
+      "scale": "2x"
     },
     {
-      "appearances" : [
+      "appearances": [
         {
-          "appearance" : "luminosity",
-          "value" : "dark"
+          "appearance": "luminosity",
+          "value": "dark"
         }
       ],
-      "filename" : "shark-dark.png",
-      "idiom" : "universal",
-      "scale" : "3x"
+      "filename": "shark-dark-3x.png",
+      "idiom": "universal",
+      "scale": "3x"
     }
   ],
-  "info" : {
-    "author" : "xcode",
-    "version" : 1
+  "info": {
+    "author": "xcode",
+    "version": 1
   },
-  "properties" : {
-    "template-rendering-intent" : "original"
+  "properties": {
+    "template-rendering-intent": "original"
   }
 }
