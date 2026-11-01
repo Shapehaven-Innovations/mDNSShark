@@ -78,10 +78,14 @@ struct DiscoveredDevice: Identifiable, Equatable {
             && l.inferredOS == r.inferredOS && l.openPorts == r.openPorts
             && l.bonjourServices == r.bonjourServices
             && l.probesSettled == r.probesSettled && l.addresses == r.addresses && l.ssdpServer == r.ssdpServer
-            && l.isOnLocalSubnet == r.isOnLocalSubnet && l.httpRedirectByPort == r.httpRedirectByPort
+            && l.isOnLocalSubnet == r.isOnLocalSubnet && l.isDefaultGateway == r.isDefaultGateway && l.httpRedirectByPort == r.httpRedirectByPort
     }
 
-    var isGateway: Bool { ipAddress.hasSuffix(".1") }
+    /// Whether the system's default gateway is one of this device's addresses; nil when the gateway is unknown.
+    var isDefaultGateway: Bool?
+
+    /// The system's answer when there is one, otherwise the guess that the router is at x.x.x.1.
+    var isGateway: Bool { isDefaultGateway ?? ipAddress.hasSuffix(".1") }
 
     /// True when the MAC is private or derived, so the vendor cannot be read from it.
     var hasLocallyAdministeredMAC: Bool { macAddress.map(MACAddressFacts.isLocallyAdministered) ?? false }

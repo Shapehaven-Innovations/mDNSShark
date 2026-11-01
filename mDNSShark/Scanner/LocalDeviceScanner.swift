@@ -9,9 +9,9 @@ class LocalDeviceScanner: ObservableObject {
     @Published var discoveredIPs: [String] = []
     private let logger = Logger(subsystem: "com.mDNSShark", category: "LocalDeviceScanner")
     
-    /// Heuristic default gateway: the router is assumed at x.x.x.1 of the device's Wi-Fi prefix.
+    /// The default gateway on this prefix as the system reports it, else the guess that the router is at x.x.x.1.
     private func getDefaultGateway(prefix: String) -> String {
-        "\(prefix)1"
+        GatewayMonitor.shared.ipv4.first { $0.hasPrefix(prefix) } ?? "\(prefix)1"
     }
 
     /// Scans the local /24 subnet by iterating over each IP and attempting a TCP connection.
@@ -22,7 +22,7 @@ class LocalDeviceScanner: ObservableObject {
             return
         }
         let defaultGatewayIP: String? = getDefaultGateway(prefix: localPrefix)
-        logger.info("Default gateway (heuristic) detected: \(defaultGatewayIP ?? "unknown")")
+        logger.info("Default gateway detected: \(defaultGatewayIP ?? "unknown")")
         logger.info("Starting local subnet scan on prefix \(localPrefix)")
         
         let group = DispatchGroup()

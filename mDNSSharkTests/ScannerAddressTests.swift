@@ -1,5 +1,6 @@
 // mDNSSharkTests/ScannerAddressTests.swift
 import Testing
+import Network
 import Foundation
 import Darwin
 @testable import mDNSShark
@@ -134,6 +135,15 @@ struct ScannerAddressTests {
         #expect(router.macNote { _ in nil }?.contains("cannot be read") == true)
         router.macAddress = "18:e8:29:ac:a0:6b"
         #expect(router.macNote { _ in "x" } == nil && !router.hasLocallyAdministeredMAC)
+    }
+
+    @Test("gateway endpoints are read as IPv4 literals, ignoring IPv6 and any zone")
+    func gatewayEndpoints() {
+        let v4 = NWEndpoint.hostPort(host: .ipv4(IPv4Address("192.168.203.1")!), port: 0)
+        let v6 = NWEndpoint.hostPort(host: .ipv6(IPv6Address("fe80::1%en0")!), port: 0)
+        #expect(GatewayMonitor.ipv4Addresses(of: [v4, v6]) == ["192.168.203.1"])
+        #expect(GatewayMonitor.ipv4Addresses(of: [v6]).isEmpty)
+        #expect(GatewayMonitor.ipv4Addresses(of: []).isEmpty)
     }
 
     @Test("a netmask is a prefix length only when it is a contiguous run of ones")

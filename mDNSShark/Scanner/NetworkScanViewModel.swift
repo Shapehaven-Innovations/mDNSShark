@@ -71,9 +71,10 @@ final class NetworkScanViewModel: ObservableObject {
         self.init(ownAddresses: { LocalInterfaces.OwnAddresses(ownAddresses()) }, probe: probe)
     }
 
-    init(ownAddresses: @escaping () -> LocalInterfaces.OwnAddresses = { LocalInterfaces.ownAddresses() },
+    init(ownAddresses: @escaping () -> LocalInterfaces.OwnAddresses = { LocalInterfaces.liveOwnAddresses() },
          probe: ((String, URL?) -> Void)? = nil) {
         ownAddressesProvider = ownAddresses
+        _ = GatewayMonitor.shared   // starts reading the system's default gateway before the first merge asks for it
         probeOverride = probe
         // At most one merge per 250 ms while resolves stream in; the scan-ending sink below applies the final list, so nothing is lost.
         scanner.$devices
@@ -453,6 +454,7 @@ final class NetworkScanViewModel: ObservableObject {
                     addresses:       Self.orderedAddresses(group)
                 )
                 newDevice.ssdpServer = device.ssdpServer
+                newDevice.isDefaultGateway = own.gatewaysIPv4.isEmpty ? nil : !own.gatewaysIPv4.filter(group.contains).isEmpty
                 newDevice.isOnLocalSubnet = LocalInterfaces.isOnLocalSubnet(addresses: Array(group), subnets: own.ipv4Subnets)
                 // Re-merge stored raw enrichments against the fresh baseline, not a stale merged snapshot.
                 let stored = enrichments(forAddresses: group)

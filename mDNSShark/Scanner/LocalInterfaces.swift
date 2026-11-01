@@ -1,6 +1,7 @@
 // mDNSShark/Scanner/LocalInterfaces.swift
 import Foundation
 import Darwin
+import Network
 
 /// This device's own network interfaces, read with getifaddrs and classified with the SIOCGIFFUNCTIONALTYPE ioctl,
 /// so the Wi-Fi link is chosen by type rather than by the iOS-only "en0" name. Addresses are returned exactly as
@@ -58,11 +59,14 @@ enum LocalInterfaces {
         var all: [String]
         /// The IPv4 subnets this device is on, from every up interface's netmask; empty in tests and when none was reported.
         var ipv4Subnets: [IPv4Subnet] = []
+        /// The default gateways' IPv4 addresses as the system reports them; empty when unknown, and then the ".1" guess is the fallback.
+        var gatewaysIPv4: [String] = []
 
-        init(primary: [String], all: [String], ipv4Subnets: [IPv4Subnet] = []) {
+        init(primary: [String], all: [String], ipv4Subnets: [IPv4Subnet] = [], gatewaysIPv4: [String] = []) {
             self.primary = primary
             self.all = all
             self.ipv4Subnets = ipv4Subnets
+            self.gatewaysIPv4 = gatewaysIPv4
         }
 
         /// One list standing for both, for tests and single-interface hosts.
@@ -74,6 +78,13 @@ enum LocalInterfaces {
     }
 
     static let wifiInfrastructureType: UInt32 = 3
+
+    /// The live interfaces with the system's default gateways added, for the scan merge.
+    static func liveOwnAddresses() -> OwnAddresses {
+        var own = ownAddresses()
+        own.gatewaysIPv4 = GatewayMonitor.shared.ipv4
+        return own
+    }
 
     /// The live interfaces read once into an `OwnAddresses`.
     static func ownAddresses(from interfaces: [Interface] = interfaces()) -> OwnAddresses {
@@ -182,3 +193,35 @@ enum LocalInterfaces {
         return String(cString: host)
     }
 }
+
+/// The default gateways the system reports for the current network path (NWPath.gateways, public API, no entitlement). It starts at first
+/// use and keeps the latest answer, so reading `ipv4` is cheap and never waits.
+final class GatewayMonitor {
+    static let shared = GatewayMonitor()
+
+    private let monitor = NWPathMonitor()
+    private let lock = NSLock()
+    private var current: [String] = []
+
+    private init() {
+        monitor.pathUpdateHandler = { [weak self] path in
+            let addresses = Self.ipv4Addresses(of: path.gateways)
+            self?.lock.lock(); self?.current = addresses; self?.lock.unlock()
+        }
+        monitor.start(queue: DispatchQueue(label: "GatewayMonitor"))
+    }
+
+    var ipv4: [String] {
+        lock.lock(); defer { lock.unlock() }
+        return current
+    }
+
+    /// The IPv4 literals among the gateway endpoints, as received; IPv6 gateways are ignored here.
+    static func ipv4Addresses(of endpoints: [NWEndpoint]) -> [String] {
+        endpoints.compactMap { endpoint -> String? in
+            guard case let .hostPort(host, _) = endpoint, case let .ipv4(address) = host else { return nil }
+            return String(describing: address).split(separator: "%").first.map(String.init)
+        }
+    }
+}
+

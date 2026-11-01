@@ -667,6 +667,19 @@ struct DeviceHostMergeTests {
         #expect(vm.merge(raw: [sweepRow("192.168.1.9")]).first?.httpRedirectByPort == [80: "https://192.168.1.9/"])
     }
 
+    @Test("the system's gateway decides which device is the router, and the .1 guess is only the fallback")
+    func gatewayComesFromTheSystem() {
+        let own = LocalInterfaces.OwnAddresses(primary: ["10.10.30.5"], all: ["10.10.30.5"], gatewaysIPv4: ["10.10.30.254"])
+        let vm = NetworkScanViewModel(ownAddresses: { own }, probe: { _, _ in })
+        let rows = vm.merge(raw: [sweepRow("10.10.30.1"), sweepRow("10.10.30.254")])
+        let byIP = Dictionary(uniqueKeysWithValues: rows.map { ($0.ipAddress, $0.isGateway) })
+        #expect(byIP["10.10.30.254"] == true)
+        #expect(byIP["10.10.30.1"] == false)
+
+        let unknown = NetworkScanViewModel(ownAddresses: { [] }, probe: { _, _ in })
+        #expect(unknown.merge(raw: [sweepRow("10.10.30.1")]).first?.isGateway == true)
+    }
+
     // MARK: - Services without a device
 
     @Test("a Bonjour row whose resolve has not answered yet is neither a device nor a service")
