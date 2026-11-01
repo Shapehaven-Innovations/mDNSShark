@@ -101,7 +101,10 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
     private var bonjourBrowsers: [NWBrowser] = []
     private var serviceToDeviceId: [ObjectIdentifier: UUID] = [:]
     // Strong references for in-flight resolves: NetService.schedule(in:forMode:) does not retain it, so without this it is deallocated mid-resolve.
+    // Held until netServiceDidStop or didNotResolve, because the resolve keeps reporting addresses until its timeout.
     private var activeNetServices: [ObjectIdentifier: NetService] = [:]
+    // Services whose DNS-SD fallback already started, so a second address-less callback does not start another.
+    private var fallbackStarted = Set<ObjectIdentifier>()
     
     // Logger
     private let logger = Logger(subsystem: "com.mDNSShark", category: "NetworkScanner")
@@ -122,15 +125,29 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         let serviceName: String
         let serviceDomain: String
         let serviceType: String
-        
+        /// `serviceType` with one trailing dot stripped, for ids and matching; the displayed type stays as received.
+        let serviceTypeKey: String
+
         @Published var resolvedIPAddress: String? = nil
         @Published var friendlyName: String? = nil
         @Published var model: String? = nil
         @Published var port: Int? = nil
         @Published var txtRecords: [String: String]? = nil
         @Published var locationURL: URL? = nil
-        /// Bonjour host name from the resolve (e.g. "Users-MacBook-Pro.local."), shared by every service one host advertises.
-        var hostName: String?
+        /// Host name as received (e.g. "Users-MacBook-Pro.local."), kept for display. Set by a Bonjour resolve, the fallback resolver or an SSDP DNS-named LOCATION.
+        var hostName: String? {
+            didSet { hostKey = Self.normalizedHostKey(hostName) }
+        }
+        /// `hostName` lowercased with one trailing dot stripped: the identity shared by every service one host advertises.
+        private(set) var hostKey: String?
+        /// False until the resolve answered (address, host-only fallback, or failure); sweep and SSDP rows are born settled.
+        var resolveSettled = false
+
+        static func normalizedHostKey(_ host: String?) -> String? {
+            guard let lowered = host?.lowercased(), !lowered.isEmpty else { return nil }
+            let key = lowered.hasSuffix(".") ? String(lowered.dropLast()) : lowered
+            return key.isEmpty ? nil : key
+        }
         
         var identifier: String { friendlyName ?? serviceName }
         
@@ -138,6 +155,7 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
             self.serviceName = serviceName
             self.serviceDomain = serviceDomain
             self.serviceType = serviceType
+            self.serviceTypeKey = serviceType.hasSuffix(".") ? String(serviceType.dropLast()) : serviceType
         }
     }
     
@@ -153,9 +171,7 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         bonjourBrowsers.removeAll()
         devices.removeAll()
         isScanning = true
-        serviceToDeviceId.removeAll()
-        activeNetServices.values.forEach { $0.stop() }
-        activeNetServices.removeAll()
+        stopActiveResolves()
         logger.info("Starting network scan for service types: \(self.serviceTypes)")
         
         // Start Bonjour scanning.
@@ -175,6 +191,7 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
                     if !self.devices.contains(where: { $0.resolvedIPAddress == ip }) {
                         let device = Device(serviceName: ip, serviceDomain: "local", serviceType: "tcp")
                         device.resolvedIPAddress = ip
+                        device.resolveSettled = true
                         self.devices.append(device)
                         self.logger.info("Local scan discovered device at IP: \(ip)")
                     }
@@ -205,8 +222,18 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         ssdpSource = nil
         discoveredIPsSubscription?.cancel()
         discoveredIPsSubscription = nil
+        stopActiveResolves()
         isScanning = false
         logger.info("Scan cancelled for restart.")
+    }
+
+    /// Stops every in-flight resolve and drops its references first, so the callbacks a stop() triggers find no mapping and return.
+    private func stopActiveResolves() {
+        let inFlight = Array(activeNetServices.values)
+        activeNetServices.removeAll()
+        serviceToDeviceId.removeAll()
+        fallbackStarted.removeAll()
+        for service in inFlight { service.stop() }
     }
     
     // MARK: - Bonjour Scanning
@@ -239,7 +266,7 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
             case .service(let name, let type, let domain, _):
                 // Never surface this app's own Bonjour preflight probe
                 // (LocalNetworkPermissionGate.swift) as a discovered device.
-                // NWBrowser reports service types with a trailing dot, hence the prefix check.
+                // The prefix check tolerates the type with or without a trailing dot (devices have reported it undotted).
                 guard !type.hasPrefix("_mdnssharklnp._tcp"),
                       !name.hasPrefix("_mdnssharklnp._tcp") else { continue }
                 DispatchQueue.main.async {
@@ -263,15 +290,30 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         netService.delegate = self
         netService.schedule(in: RunLoop.main, forMode: .common)
         // Must outlive this function's scope until a delegate callback
-        // fires — see the activeNetServices doc comment above.
+        // fires; see the activeNetServices doc comment above.
         activeNetServices[ObjectIdentifier(netService)] = netService
         if let device = self.devices.first(where: { $0.serviceName == name &&
                                                      $0.serviceDomain == domain &&
                                                      $0.serviceType == type }) {
             serviceToDeviceId[ObjectIdentifier(netService)] = device.id
+            // Backstop for a resolve whose fallback never calls back, so the row cannot stay hidden as pending forever.
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.resolveSettleTimeout) { [weak self] in
+                guard let self, !device.resolveSettled else { return }
+                self.settleResolve(device, reason: "timed out")
+            }
         }
         logger.info("Resolving service: \(name) \(type) \(domain)")
         netService.resolve(withTimeout: 10.0)
+    }
+
+    /// Longer than the NetService resolve timeout so it only fires when neither delegate path nor the fallback resolver settled the row.
+    static let resolveSettleTimeout: TimeInterval = 15.0
+
+    /// Marks a row's resolve as answered and republishes so the view model stops holding it back. Main queue only.
+    private func settleResolve(_ device: Device, reason: String) {
+        device.resolveSettled = true
+        logger.debug("Resolve settled (\(reason)): name=\(device.serviceName) type=\(device.serviceType) hostName=\(device.hostName ?? "nil") ip=\(device.resolvedIPAddress ?? "nil")")
+        republishDevices()
     }
     
     // MARK: - SSDP/UPnP Scanning via UDP
@@ -364,10 +406,12 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
                 let device = Device(serviceName: usn, serviceDomain: "ssdp", serviceType: "ssdp")
                 device.friendlyName = server
                 if let url = URL(string: location), let host = url.host {
-                    device.resolvedIPAddress = host
+                    // A DNS-named LOCATION has no address yet; keep the name so the row can attach by host or show as a service.
+                    if Self.isIPAddressLiteral(host) { device.resolvedIPAddress = host } else { device.hostName = host }
                     device.port = url.port ?? 80
                     device.locationURL = url
                 }
+                device.resolveSettled = true
                 self.devices.append(device)
                 self.logger.info("SSDP discovered device: \(usn) at \(location)")
             }
@@ -375,114 +419,129 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
     }
     
     // MARK: - NetServiceDelegate
+    /// Sent once per address found while the resolve runs to its timeout (see NetService.resolve(withTimeout:)), so the service
+    /// stays alive here and the row is recomputed from every address known so far; release happens in didStop or didNotResolve.
     func netServiceDidResolveAddress(_ sender: NetService) {
         let key = ObjectIdentifier(sender)
-        activeNetServices.removeValue(forKey: key)
-        guard let deviceID = serviceToDeviceId[key],
+        guard activeNetServices[key] != nil, let deviceID = serviceToDeviceId[key],
               let device = devices.first(where: { $0.id == deviceID }) else {
-            logger.error("No device mapping for resolved service \(sender.name)")
+            // Expected after cancelScan or a restart released the resolve; the late callback has nothing to update.
+            logger.debug("No device mapping for resolved service \(sender.name)")
             return
         }
-        
-        var foundIP: String? = nil
-        if let addresses = sender.addresses, !addresses.isEmpty {
-            logger.info("\(sender.name) has \(addresses.count) addresses")
-            // A host that also has a self-assigned 169.254 address answers with both IPv4s in no fixed order, so pick by preference rather than arrival.
-            foundIP = Self.preferredAddress(from: addresses.compactMap { ipAddressFromData($0) })
-            if let ip = foundIP {
-                logger.info("Found IP \(ip) for \(sender.name)")
-            } else {
-                logger.warning("No valid IP parsed for \(sender.name)")
-            }
-        } else {
-            logger.warning("No addresses available for \(sender.name)")
-        }
-        
-        if foundIP == nil {
-            logger.info("Attempting fallback resolution for \(sender.name)")
-            DNSServiceResolver.resolve(name: sender.name, type: sender.type, domain: sender.domain) { host, port in
-                if let host = host, let port = port {
-                    DispatchQueue.main.async {
-                        device.resolvedIPAddress = host
-                        // The fallback yields the host name, not an address; keep it so merge() can fold this row into the host's other rows.
-                        device.hostName = host
-                        device.port = Int(port)
-                        self.logger.info("Fallback resolved \(sender.name) to IP: \(host) on port: \(port)")
-                        self.republishDevices()
-                    }
-                } else {
-                    self.logger.error("Fallback resolution failed for \(sender.name)")
-                }
-            }
+        let parsed = (sender.addresses ?? []).compactMap { Self.ipAddress(fromSockaddr: $0) }
+        logger.debug("Resolved service: name=\(sender.name) type=\(sender.type) hostName=\(sender.hostName ?? "nil") addresses=\(parsed)")
+        // A host that also has a self-assigned 169.254 address answers with both IPv4s in no fixed order, so pick by preference rather than arrival.
+        guard let foundIP = Self.preferredAddress(from: parsed) else {
+            logger.warning("No valid IP parsed yet for \(sender.name)")
+            startFallbackResolveIfNeeded(for: sender, device: device)
             return
         }
-        
+        let txt = Self.txtRecords(from: sender.txtRecordData())
+        let hostName = sender.hostName
+        let port = sender.port
         DispatchQueue.main.async {
             device.resolvedIPAddress = foundIP
-            device.hostName = sender.hostName
-            device.port = sender.port
-            self.logger.info("Resolved \(sender.name) to IP: \(foundIP!) on port: \(sender.port)")
-        }
-        
-        if let txtData = sender.txtRecordData() {
-            let txtDict = NetService.dictionary(fromTXTRecord: txtData)
-            if txtDict.isEmpty {
-                logger.debug("TXT record data empty for \(sender.name)")
-            } else {
-                var allTXTRecords = [String: String]()
-                for (key, value) in txtDict {
-                    if let stringValue = String(data: value, encoding: .utf8) {
-                        allTXTRecords[key] = stringValue
-                    }
-                }
-                DispatchQueue.main.async {
-                    device.txtRecords = allTXTRecords
-                    self.logger.info("TXT records for \(sender.name): \(allTXTRecords)")
-                }
-                if let friendlyData = txtDict["fn"] ?? txtDict["n"],
-                   let friendly = String(data: friendlyData, encoding: .utf8),
-                   !friendly.isEmpty {
-                    DispatchQueue.main.async {
-                        device.friendlyName = friendly
-                        self.logger.info("Resolved friendly name for \(sender.name): \(friendly)")
-                    }
-                } else {
-                    logger.debug("No friendly name found for \(sender.name)")
-                }
-                if let modelData = txtDict["md"],
-                   let model = String(data: modelData, encoding: .utf8),
-                   !model.isEmpty {
-                    DispatchQueue.main.async {
-                        device.model = model
-                        self.logger.info("Resolved model for \(sender.name): \(model)")
-                    }
-                } else {
-                    logger.debug("No model info found for \(sender.name)")
-                }
+            if let hostName { device.hostName = hostName }
+            if port > 0 { device.port = port }
+            if let txt, !txt.isEmpty {
+                device.txtRecords = txt
+                if let friendly = txt["fn"] ?? txt["n"], !friendly.isEmpty { device.friendlyName = friendly }
+                if let model = txt["md"], !model.isEmpty { device.model = model }
             }
-        } else {
-            logger.debug("No TXT record data available for \(sender.name)")
-        }
-        // Queued last so it runs after every in-place field update dispatched above.
-        DispatchQueue.main.async {
-            self.republishDevices()
+            self.logger.info("Resolved \(sender.name) to IP: \(foundIP) on port: \(port) from \(parsed.count) address(es)")
+            // Settled on the first address so the row shows promptly; later callbacks only refine and republish it.
+            self.settleResolve(device, reason: "address")
         }
     }
 
-    /// Picks the address a host is keyed by: a LAN IPv4 first, then a link-local IPv4, then the first IPv6, then a bare host
-    /// name from the fallback resolver, since every enrichment probe is IPv4-only and a self-assigned 169.254 address is never the host's main one.
+    /// Sent when the resolve reached its timeout or was stopped; the one place a service that found addresses is released.
+    func netServiceDidStop(_ sender: NetService) {
+        guard let device = releaseResolve(for: sender) else { return }
+        logger.debug("Resolve stopped: name=\(sender.name) ip=\(device.resolvedIPAddress ?? "nil")")
+        DispatchQueue.main.async {
+            guard !device.resolveSettled else { return }
+            self.settleResolve(device, reason: "stopped without an address")
+        }
+    }
+
+    func netService(_ sender: NetService, didNotResolve errorDict: [String : NSNumber]) {
+        logger.error("Failed to resolve \(sender.name) with error: \(errorDict)")
+        // A failed row still counts as answered: it is shown as a service instead of being held back as pending.
+        guard let device = releaseResolve(for: sender) else { return }
+        DispatchQueue.main.async {
+            guard !device.resolveSettled else { return }
+            self.settleResolve(device, reason: "did not resolve")
+        }
+    }
+
+    /// Drops the strong reference and mapping for a finished resolve; nil when already released, so a repeated callback is a no-op.
+    private func releaseResolve(for sender: NetService) -> Device? {
+        let key = ObjectIdentifier(sender)
+        guard activeNetServices.removeValue(forKey: key) != nil else { return nil }
+        fallbackStarted.remove(key)
+        guard let deviceID = serviceToDeviceId.removeValue(forKey: key) else { return nil }
+        return devices.first(where: { $0.id == deviceID })
+    }
+
+    /// The DNS-SD fallback, started once per service when a resolve callback carried no usable address.
+    private func startFallbackResolveIfNeeded(for sender: NetService, device: Device) {
+        let key = ObjectIdentifier(sender)
+        guard !fallbackStarted.contains(key) else { return }
+        fallbackStarted.insert(key)
+        logger.info("Attempting fallback resolution for \(sender.name)")
+        DNSServiceResolver.resolve(name: sender.name, type: sender.type, domain: sender.domain) { host, port in
+            DispatchQueue.main.async {
+                // A real address that arrived meanwhile wins; the fallback only ever names the host.
+                guard device.resolvedIPAddress == nil else { return }
+                if let host, let port {
+                    device.hostName = host
+                    device.port = Int(port)
+                    self.logger.info("Fallback resolved \(sender.name) to host: \(host) on port: \(port)")
+                    self.settleResolve(device, reason: "fallback host")
+                } else {
+                    self.logger.error("Fallback resolution failed for \(sender.name)")
+                    self.settleResolve(device, reason: "fallback failed")
+                }
+            }
+        }
+    }
+
+    /// TXT record values as UTF-8 strings, raw; entries that are not UTF-8 are left out.
+    private static func txtRecords(from data: Data?) -> [String: String]? {
+        guard let data else { return nil }
+        var records: [String: String] = [:]
+        for (key, value) in NetService.dictionary(fromTXTRecord: data) {
+            if let text = String(data: value, encoding: .utf8) { records[key] = text }
+        }
+        return records
+    }
+
+    /// True for an IPv4 or IPv6 literal (an optional "%zone" suffix is ignored), false for a DNS name.
+    static func isIPAddressLiteral(_ text: String) -> Bool {
+        let bare = text.split(separator: "%", maxSplits: 1).first.map(String.init) ?? text
+        var v4 = in_addr(), v6 = in6_addr()
+        return inet_pton(AF_INET, bare, &v4) == 1 || inet_pton(AF_INET6, bare, &v6) == 1
+    }
+
+    /// Picks the address a host is keyed by: a LAN IPv4 first, then a link-local IPv4, then a routable IPv6, then fe80, then a bare
+    /// host name from the fallback resolver. Ties break on the smallest address so the key never depends on which service resolved first.
     static func preferredAddress(from addresses: [String]) -> String? {
+        addresses.min(by: isAddressOrdered)
+    }
+
+    /// The ordering behind `preferredAddress`, also used to list a device's addresses: IPv4 before IPv6, and within a rank by value.
+    static func isAddressOrdered(_ a: String, before b: String) -> Bool {
         func rank(_ ip: String) -> Int {
-            if ip.contains(":") { return 2 }
-            guard ip.allSatisfy({ $0.isNumber || $0 == "." }) else { return 3 }
+            if ip.contains(":") { return ip.lowercased().hasPrefix("fe80") ? 3 : 2 }
+            guard ip.allSatisfy({ $0.isNumber || $0 == "." }) else { return 4 }
             return ip.hasPrefix("169.254.") ? 1 : 0
         }
-        var best: (ip: String, rank: Int)?
-        for ip in addresses {
-            let r = rank(ip)
-            if best == nil || r < best!.rank { best = (ip, r) }
-        }
-        return best?.ip
+        func octets(_ ip: String) -> [Int] { ip.split(separator: ".").map { Int($0) ?? 0 } }
+        let (ra, rb) = (rank(a), rank(b))
+        if ra != rb { return ra < rb }
+        if ra <= 1 { return octets(a).lexicographicallyPrecedes(octets(b)) }
+        return a < b
     }
 
     // Device is a class, so in-place field updates never fire $devices; reassign so the view model re-merges.
@@ -491,31 +550,19 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         devices = current
     }
 
-    func netService(_ sender: NetService, didNotResolve errorDict: [String : NSNumber]) {
-        activeNetServices.removeValue(forKey: ObjectIdentifier(sender))
-        logger.error("Failed to resolve \(sender.name) with error: \(errorDict)")
-    }
-    
-    private func ipAddressFromData(_ data: Data) -> String? {
+    /// The numeric host of a sockaddr as getnameinfo prints it: a plain IPv4, or an IPv6 that keeps its "%scope" when link-local.
+    static func ipAddress(fromSockaddr data: Data) -> String? {
+        guard data.count >= MemoryLayout<sockaddr>.size, data.count <= MemoryLayout<sockaddr_storage>.size else { return nil }
         var storage = sockaddr_storage()
-        (data as NSData).getBytes(&storage, length: MemoryLayout<sockaddr_storage>.size)
-        if Int32(storage.ss_family) == AF_INET {
-            let addr = withUnsafePointer(to: &storage) {
-                $0.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { $0.pointee.sin_addr }
+        withUnsafeMutableBytes(of: &storage) { _ = data.copyBytes(to: $0) }
+        var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+        let result = withUnsafePointer(to: &storage) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                getnameinfo($0, socklen_t(data.count), &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST)
             }
-            if let ipCStr = inet_ntoa(addr) {
-                return String(cString: ipCStr)
-            }
-        } else if Int32(storage.ss_family) == AF_INET6 {
-            let addr = withUnsafePointer(to: &storage) {
-                $0.withMemoryRebound(to: sockaddr_in6.self, capacity: 1) { $0.pointee.sin6_addr }
-            }
-            var buffer = [CChar](repeating: 0, count: Int(INET6_ADDRSTRLEN))
-            var addr6 = addr
-            inet_ntop(AF_INET6, &addr6, &buffer, socklen_t(INET6_ADDRSTRLEN))
-            return String(cString: buffer)
         }
-        return nil
+        guard result == 0 else { return nil }
+        return String(cString: host)
     }
 }
 

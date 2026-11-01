@@ -35,7 +35,7 @@ struct MDNSBurstTests {
             let d = MDNSDatagram(payload: payload, source: own ? [192, 168, 8, 123] : [192, 168, 8, 178],
                                  destination: [224, 0, 0, 251], sourcePort: 5353, destinationPort: 5353,
                                  ttl: 255, timestamp: start.addingTimeInterval(Double(i) * 0.0005))
-            let frame = MDNSFrameBuilder.ipv4Frame(d)
+            let frame = try #require(MDNSFrameBuilder.ipv4Frame(d))
             frameBytes = frame.count
             let packet = PacketParser.parse(frame, frameNumber: sequence.nextFrameNumber, timestamp: d.timestamp,
                                             direction: own ? .outbound : .inbound, isReconstructed: true, captureSource: .mdnsListener)

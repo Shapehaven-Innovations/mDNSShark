@@ -14,6 +14,7 @@ struct TopologyView: View {
     @State private var securityFilters: Set<SecurityStatus> = []
     @State private var typeFilters: Set<DeviceType> = []
     @State private var showingPicker = false
+    @State private var showingServices = false
     @AppStorage("pinnedDeviceIPs") private var pinnedIPsRaw: String = ""
 
     private var pinnedIPs: Set<String> {
@@ -34,18 +35,10 @@ struct TopologyView: View {
         let toShow    = pinned + auto
 
         let filtered = toShow.filter { device in
-            let worst = findings.filter { $0.deviceID == device.id }.worstDeviceSeverity
-            let secStatus: SecurityStatus
-            switch worst {
-            case .some(.critical):      secStatus = .critical
-            case .some(.warning):       secStatus = .warning
-            case .some(.informational): secStatus = .informational
-            default:                    secStatus = .secure
-            }
-            // Secure also covers informational-only devices, matching the header's "no warning or critical" definition.
-            let secOK  = securityFilters.isEmpty || securityFilters.contains(secStatus)
-                || (secStatus == .informational && securityFilters.contains(.secure))
-            let typeOK = typeFilters.isEmpty     || typeFilters.contains(device.deviceType)
+            let secStatus = TopologyNode.status(findings: findings.filter { $0.deviceID == device.id },
+                                                settled: device.probesSettled)
+            let secOK  = TopologyNode.matchesFilters(secStatus, securityFilters)
+            let typeOK = typeFilters.isEmpty || typeFilters.contains(device.deviceType)
             return secOK && typeOK
         }
 
@@ -56,22 +49,35 @@ struct TopologyView: View {
         var result    = [TopologyNode(device: enriched(gateway, findings), position: .zero)]
         guard !others.isEmpty else { return result }
 
-        let angleStep = 2 * Double.pi / Double(others.count)
+        // One slot is held back for the services node so it never overlaps a device.
+        let slots = others.count + (coordinator.networkScanViewModel.unattachedServices.isEmpty ? 0 : 1)
         for (i, d) in others.enumerated() {
-            let a = angleStep * Double(i) - Double.pi / 2
-            result.append(TopologyNode(device: enriched(d, findings),
-                                       position: CGPoint(x: cos(a), y: sin(a))))
+            result.append(TopologyNode(device: enriched(d, findings), position: unitPosition(index: i, of: slots)))
         }
         return result
+    }
+
+    private func unitPosition(index: Int, of total: Int) -> CGPoint {
+        let a = 2 * Double.pi / Double(total) * Double(index) - Double.pi / 2
+        return CGPoint(x: cos(a), y: sin(a))
+    }
+
+    /// Where the services node sits: the last ring slot, the centre when no device exists, or nil when filters hide every device.
+    private func servicesPosition(nodes: [TopologyNode]) -> CGPoint? {
+        guard !coordinator.networkScanViewModel.unattachedServices.isEmpty else { return nil }
+        if nodes.isEmpty { return coordinator.networkScanViewModel.devices.isEmpty ? .zero : nil }
+        return unitPosition(index: nodes.count - 1, of: nodes.count)
     }
 
     var body: some View {
         // Evaluate once per render pass - avoids triple-computation and cross-call drift
         let nodes = visibleNodes
+        let servicesPos = servicesPosition(nodes: nodes)
+        let services = coordinator.networkScanViewModel.unattachedServices
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    if coordinator.networkScanViewModel.devices.isEmpty {
+                    if coordinator.networkScanViewModel.devices.isEmpty && services.isEmpty {
                         emptyState
                     } else {
                         CardView {
@@ -97,7 +103,7 @@ struct TopologyView: View {
 
                                 // Canvas - nodes are strictly within this frame
                                 GeometryReader { geo in
-                                    let count     = max(1, nodes.count - 1)
+                                    let count     = max(1, nodes.count - 1 + (services.isEmpty || nodes.isEmpty ? 0 : 1))
                                     let radius    = CGFloat(max(110, min(180, count * 14)))
                                     let available = min(geo.size.width, geo.size.height) / 2 - 24
                                     let scale     = min(1.0, max(0.4, available / (radius + 40)))
@@ -109,9 +115,10 @@ struct TopologyView: View {
 
                                     ZStack {
                                         Canvas { ctx, _ in
-                                            guard nodes.count > 1 else { return }
-                                            for node in nodes.dropFirst() {
-                                                let nPos = pixelPos(node.position)
+                                            var targets: [CGPoint] = nodes.dropFirst().map { $0.position }
+                                            if let servicesPos, !nodes.isEmpty { targets.append(servicesPos) }
+                                            for target in targets {
+                                                let nPos = pixelPos(target)
                                                 var path = Path()
                                                 path.move(to: center)
                                                 path.addLine(to: nPos)
@@ -128,9 +135,18 @@ struct TopologyView: View {
                                                     selectedDeviceID = node.device.id
                                                     navigateToDetail = true
                                                 }
+                                                .accessibilityAddTraits(.isButton)
                                         }
 
-                                        if nodes.isEmpty {
+                                        if let servicesPos {
+                                            ServicesGroupNodeView(count: services.count)
+                                                .scaleEffect(scale)
+                                                .position(pixelPos(servicesPos))
+                                                .onTapGesture { showingServices = true }
+                                                .accessibilityAddTraits(.isButton)
+                                        }
+
+                                        if nodes.isEmpty && servicesPos == nil {
                                             Text("No devices match the current filter.")
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
@@ -141,7 +157,8 @@ struct TopologyView: View {
                                 .frame(height: 280)
 
                                 // Legend - never covered by nodes
-                                HStack(spacing: 20) {
+                                HStack(spacing: 14) {
+                                    legendDot(Color(.systemGray), "Pending")
                                     legendDot(AppColors.secure,   "Secure")
                                     legendDot(AppColors.info,     "Info")
                                     legendDot(AppColors.warning,  "Warning")
@@ -164,6 +181,12 @@ struct TopologyView: View {
                 .padding(.top, 8)
             }
             .navigationBarHidden(true)
+            .sheet(isPresented: $showingServices) {
+                ScrollView {
+                    UnattachedServicesSection(services: coordinator.networkScanViewModel.unattachedServices)
+                        .padding()
+                }
+            }
             .navigationDestination(isPresented: $navigateToDetail) {
                 // Looked up from the raw (unfiltered, uncapped) devices
                 // array, not `nodes`: `nodes` drops out-of-filter/beyond
@@ -186,6 +209,7 @@ struct TopologyView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     secChip(nil,             "All")
+                    secChip(.pending,        "Pending")
                     secChip(.secure,         "Secure")
                     secChip(.informational,  "Info")
                     secChip(.warning,        "Warning")
@@ -213,6 +237,7 @@ struct TopologyView: View {
         let color: Color = {
             switch status {
             case .none:             return AppColors.info
+            case .pending:          return Color(.systemGray)
             case .secure:           return AppColors.secure
             case .informational:    return AppColors.info
             case .warning:          return AppColors.warning

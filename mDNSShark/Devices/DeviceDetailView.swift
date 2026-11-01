@@ -3,6 +3,7 @@ import SwiftUI
 
 struct DeviceDetailView: View {
     @EnvironmentObject var coordinator: AppCoordinator
+    @Environment(\.dismiss) private var dismiss
     // Navigation-time snapshot. Only a fallback; see `device` below.
     private let snapshot: DiscoveredDevice
 
@@ -33,6 +34,11 @@ struct DeviceDetailView: View {
         let device = self.device
         ScrollView {
             VStack(spacing: 16) {
+                // Drawn in content, not as a system bar: the roots hide the bar, and a bar appearing on push shifts the layout.
+                HStack {
+                    Button { dismiss() } label: { Label("Back", systemImage: "chevron.left") }
+                    Spacer()
+                }
                 CardView {
                     HStack(spacing: 16) {
                         Image(systemName: device.deviceIcon).font(.system(size: 40)).foregroundColor(AppColors.info)
@@ -53,6 +59,19 @@ struct DeviceDetailView: View {
                         row("Manufacturer", device.manufacturer ?? "Unknown")
                         row("Inferred OS",  device.displayInferredOS  ?? "Unknown")
                         row("Open Ports",   device.openPorts.isEmpty ? "None" : device.openPorts.map { String($0) }.joined(separator: ", "))
+                    }
+                }
+
+                // Only when the device has more than its primary address; a single address is already shown above.
+                if device.addresses.count > 1 {
+                    CardView {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Addresses").font(.headline)
+                            Divider()
+                            ForEach(device.addresses, id: \.self) { address in
+                                row(address.contains(":") ? "IPv6" : "IPv4", address, selectable: true)
+                            }
+                        }
                     }
                 }
 
@@ -88,11 +107,10 @@ struct DeviceDetailView: View {
             }
             .padding(.horizontal).padding(.vertical, 8)
         }
-        .navigationTitle(device.hostname)
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
     }
 
-    private func row(_ label: String, _ value: String) -> some View {
+    private func row(_ label: String, _ value: String, selectable: Bool = false) -> some View {
         // .firstTextBaseline, not the default .center: MAC/OS values can now
         // be long enough to wrap (a real MAC via arpTableLookup is 17
         // characters), and a wrapped 2-line value under center alignment
@@ -101,7 +119,12 @@ struct DeviceDetailView: View {
         HStack(alignment: .firstTextBaseline) {
             Text(label).foregroundColor(.secondary).font(.subheadline)
             Spacer()
-            Text(value).font(.subheadline.weight(.medium)).multilineTextAlignment(.trailing)
+            if selectable {
+                Text(value).font(.subheadline.weight(.medium)).multilineTextAlignment(.trailing)
+                    .textSelection(.enabled)
+            } else {
+                Text(value).font(.subheadline.weight(.medium)).multilineTextAlignment(.trailing)
+            }
         }
     }
 }

@@ -11,9 +11,9 @@ struct MDNSFrameBuilderTests {
     private let v6Source: [UInt8] = [0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0x1c, 0x2d, 0x3e, 0x4f, 0x5a, 0x6b, 0x7c, 0x8d]
     private let v6Group: [UInt8] = [0xff, 0x02] + [UInt8](repeating: 0, count: 13) + [0xfb]
 
-    private func datagram(payload: [UInt8], source: [UInt8], destination: [UInt8], ttl: UInt8? = 255) -> MDNSDatagram {
+    private func datagram(payload: [UInt8], source: [UInt8], destination: [UInt8], ttl: UInt8? = 255, trafficClass: UInt8? = nil) -> MDNSDatagram {
         MDNSDatagram(payload: Data(payload), source: source, destination: destination,
-                     sourcePort: 5353, destinationPort: 5353, ttl: ttl, timestamp: Date(timeIntervalSince1970: 1_700_000_000))
+                     sourcePort: 5353, destinationPort: 5353, ttl: ttl, trafficClass: trafficClass, timestamp: Date(timeIntervalSince1970: 1_700_000_000))
     }
 
     private func be16(_ d: Data, _ offset: Int) -> Int { Int(d[offset]) << 8 | Int(d[offset + 1]) }
@@ -28,9 +28,9 @@ struct MDNSFrameBuilderTests {
         return Array(frame[8..<40]) + [UInt8(udpLen >> 24), UInt8(udpLen >> 16 & 0xFF), UInt8(udpLen >> 8 & 0xFF), UInt8(udpLen & 0xFF)] + [0, 0, 0, 17]
     }
 
-    @Test func ipv4FrameHasCorrectLengthsAndFields() {
+    @Test func ipv4FrameHasCorrectLengthsAndFields() throws {
         let payload = [UInt8](repeating: 0xAB, count: 12)
-        let frame = MDNSFrameBuilder.ipv4Frame(datagram(payload: payload, source: v4Source, destination: v4Group, ttl: 17))
+        let frame = try #require(MDNSFrameBuilder.ipv4Frame(datagram(payload: payload, source: v4Source, destination: v4Group, ttl: 17)))
         #expect(frame.count == 20 + 8 + 12)
         #expect(frame[0] == 0x45)
         #expect(be16(frame, 2) == 40)
@@ -45,36 +45,36 @@ struct MDNSFrameBuilderTests {
         #expect(Array(frame[28...]) == payload)
     }
 
-    @Test func ipv4HeaderChecksumValidates() {
-        let frame = MDNSFrameBuilder.ipv4Frame(datagram(payload: [1, 2, 3], source: v4Source, destination: v4Group))
+    @Test func ipv4HeaderChecksumValidates() throws {
+        let frame = try #require(MDNSFrameBuilder.ipv4Frame(datagram(payload: [1, 2, 3], source: v4Source, destination: v4Group)))
         #expect(be16(frame, 10) != 0)
         #expect(PacketChecksum.internetChecksum(frame[0..<20]) == 0)
     }
 
-    @Test func udpChecksumValidatesOverPseudoHeaderV4() {
-        let frame = MDNSFrameBuilder.ipv4Frame(datagram(payload: [UInt8](repeating: 0x5C, count: 13), source: v4Source, destination: v4Group))
+    @Test func udpChecksumValidatesOverPseudoHeaderV4() throws {
+        let frame = try #require(MDNSFrameBuilder.ipv4Frame(datagram(payload: [UInt8](repeating: 0x5C, count: 13), source: v4Source, destination: v4Group)))
         #expect(be16(frame, 26) != 0)
         #expect(PacketChecksum.internetChecksum(udpPseudoHeaderV4(frame) + Array(frame[20...])) == 0)
     }
 
-    @Test func udpChecksumValidatesOverPseudoHeaderV6() {
-        let frame = MDNSFrameBuilder.ipv6Frame(datagram(payload: [UInt8](repeating: 0x5C, count: 13), source: v6Source, destination: v6Group))
+    @Test func udpChecksumValidatesOverPseudoHeaderV6() throws {
+        let frame = try #require(MDNSFrameBuilder.ipv6Frame(datagram(payload: [UInt8](repeating: 0x5C, count: 13), source: v6Source, destination: v6Group)))
         #expect(be16(frame, 46) != 0)
         #expect(PacketChecksum.internetChecksum(udpPseudoHeaderV6(frame) + Array(frame[40...])) == 0)
     }
 
-    @Test func zeroChecksumBecomesFFFF() {
+    @Test func zeroChecksumBecomesFFFF() throws {
         // With a two-byte payload the checksum of an all-zero payload, used as the payload, drives the computed checksum to 0x0000.
-        let probe = MDNSFrameBuilder.ipv4Frame(datagram(payload: [0, 0], source: v4Source, destination: v4Group))
+        let probe = try #require(MDNSFrameBuilder.ipv4Frame(datagram(payload: [0, 0], source: v4Source, destination: v4Group)))
         let c = be16(probe, 26)
-        let frame = MDNSFrameBuilder.ipv4Frame(datagram(payload: [UInt8(c >> 8), UInt8(c & 0xFF)], source: v4Source, destination: v4Group))
+        let frame = try #require(MDNSFrameBuilder.ipv4Frame(datagram(payload: [UInt8(c >> 8), UInt8(c & 0xFF)], source: v4Source, destination: v4Group)))
         #expect(be16(frame, 26) == 0xFFFF)
         #expect(PacketChecksum.internetChecksum(udpPseudoHeaderV4(frame) + Array(frame[20...])) == 0)
     }
 
-    @Test func ipv6FrameHasCorrectPayloadLengthAndNextHeader() {
+    @Test func ipv6FrameHasCorrectPayloadLengthAndNextHeader() throws {
         let payload = [UInt8](repeating: 0xCD, count: 30)
-        let frame = MDNSFrameBuilder.ipv6Frame(datagram(payload: payload, source: v6Source, destination: v6Group, ttl: 64))
+        let frame = try #require(MDNSFrameBuilder.ipv6Frame(datagram(payload: payload, source: v6Source, destination: v6Group, ttl: 64)))
         #expect(frame.count == 40 + 8 + 30)
         #expect(frame[0] >> 4 == 6)
         #expect(be16(frame, 4) == 38)
@@ -88,9 +88,9 @@ struct MDNSFrameBuilderTests {
         #expect(Array(frame[48...]) == payload)
     }
 
-    @Test func fallbackTTLIs255WhenNotReceived() {
-        let v4 = MDNSFrameBuilder.ipv4Frame(datagram(payload: [0], source: v4Source, destination: v4Group, ttl: nil))
-        let v6 = MDNSFrameBuilder.ipv6Frame(datagram(payload: [0], source: v6Source, destination: v6Group, ttl: nil))
+    @Test func fallbackTTLIs255WhenNotReceived() throws {
+        let v4 = try #require(MDNSFrameBuilder.ipv4Frame(datagram(payload: [0], source: v4Source, destination: v4Group, ttl: nil)))
+        let v6 = try #require(MDNSFrameBuilder.ipv6Frame(datagram(payload: [0], source: v6Source, destination: v6Group, ttl: nil)))
         #expect(v4[8] == 255)
         #expect(v6[7] == 255)
     }
@@ -105,5 +105,74 @@ struct MDNSFrameBuilderTests {
     @Test func frameRejectsMismatchedAddressLengths() {
         #expect(MDNSFrameBuilder.frame(datagram(payload: [0], source: v4Source, destination: v6Group)) == nil)
         #expect(MDNSFrameBuilder.frame(datagram(payload: [0], source: [1, 2, 3], destination: [1, 2, 3])) == nil)
+    }
+
+    @Test func frameReturnsNilForOversizePayload() {
+        let v4 = [UInt8](repeating: 0, count: MDNSFrameBuilder.maxIPv4Payload + 1)
+        let v6 = [UInt8](repeating: 0, count: MDNSFrameBuilder.maxIPv6Payload + 1)
+        #expect(MDNSFrameBuilder.maxIPv4Payload == 65507)
+        #expect(MDNSFrameBuilder.maxIPv6Payload == 65527)
+        #expect(MDNSFrameBuilder.frame(datagram(payload: v4, source: v4Source, destination: v4Group)) == nil)
+        #expect(MDNSFrameBuilder.frame(datagram(payload: v6, source: v6Source, destination: v6Group)) == nil)
+    }
+
+    @Test func maxSizeIPv4FrameHasValidLengthsAndChecksums() throws {
+        let payload = [UInt8](repeating: 0x7E, count: MDNSFrameBuilder.maxIPv4Payload)
+        let frame = try #require(MDNSFrameBuilder.frame(datagram(payload: payload, source: v4Source, destination: v4Group)))
+        #expect(frame.count == 65535)
+        #expect(be16(frame, 2) == 65535)
+        #expect(be16(frame, 24) == 65515)
+        #expect(PacketChecksum.internetChecksum(frame[0..<20]) == 0)
+        #expect(PacketChecksum.internetChecksum(udpPseudoHeaderV4(frame) + Array(frame[20...])) == 0)
+        #expect(Array(frame[28...]) == payload)
+    }
+
+    @Test func maxSizeIPv6FrameHasValidLengthsAndChecksum() throws {
+        let payload = [UInt8](repeating: 0x7E, count: MDNSFrameBuilder.maxIPv6Payload)
+        let frame = try #require(MDNSFrameBuilder.frame(datagram(payload: payload, source: v6Source, destination: v6Group)))
+        #expect(frame.count == 40 + 65535)
+        #expect(be16(frame, 4) == 65535)
+        #expect(be16(frame, 44) == 65535)
+        #expect(PacketChecksum.internetChecksum(udpPseudoHeaderV6(frame) + Array(frame[40...])) == 0)
+        #expect(Array(frame[48...]) == payload)
+    }
+
+    @Test func ipv4TOSByteCarriesTheReceivedValueAndDefaultsToZero() throws {
+        let marked = try #require(MDNSFrameBuilder.ipv4Frame(datagram(payload: [1], source: v4Source, destination: v4Group, trafficClass: 0xC0)))
+        let plain = try #require(MDNSFrameBuilder.ipv4Frame(datagram(payload: [1], source: v4Source, destination: v4Group)))
+        #expect(marked[1] == 0xC0)
+        #expect(plain[1] == 0)
+        #expect(PacketChecksum.internetChecksum(marked[0..<20]) == 0)
+    }
+
+    @Test func ipv6TrafficClassSplitsAcrossFirstTwoBytesWithZeroFlowLabel() throws {
+        let frame = try #require(MDNSFrameBuilder.ipv6Frame(datagram(payload: [1], source: v6Source, destination: v6Group, trafficClass: 0xB8)))
+        #expect(frame[0] == 0x6B)
+        #expect(frame[1] == 0x80)
+        #expect(frame[2] == 0 && frame[3] == 0)
+        let plain = try #require(MDNSFrameBuilder.ipv6Frame(datagram(payload: [1], source: v6Source, destination: v6Group)))
+        #expect(Array(plain[0..<4]) == [0x60, 0, 0, 0])
+        #expect(PacketChecksum.internetChecksum(udpPseudoHeaderV6(frame) + Array(frame[40...])) == 0)
+    }
+
+    @Test func dispatcherWritesTheTrafficClassWhereAnalyzersReadIt() throws {
+        let v4 = try #require(MDNSFrameBuilder.frame(datagram(payload: [1], source: v4Source, destination: v4Group, trafficClass: 0x28)))
+        let v6 = try #require(MDNSFrameBuilder.frame(datagram(payload: [1], source: v6Source, destination: v6Group, trafficClass: 0x28)))
+        #expect(v4[1] == 0x28)
+        #expect(UInt8(v6[0] & 0x0F) << 4 | v6[1] >> 4 == 0x28)
+    }
+
+    @Test func familyBuildersRejectTheWrongAddressLengths() {
+        #expect(MDNSFrameBuilder.ipv4Frame(datagram(payload: [0], source: v6Source, destination: v6Group)) == nil)
+        #expect(MDNSFrameBuilder.ipv4Frame(datagram(payload: [0], source: v4Source, destination: v6Group)) == nil)
+        #expect(MDNSFrameBuilder.ipv6Frame(datagram(payload: [0], source: v4Source, destination: v4Group)) == nil)
+        #expect(MDNSFrameBuilder.ipv6Frame(datagram(payload: [0], source: v6Source, destination: v4Group)) == nil)
+    }
+
+    @Test func familyBuildersNeverClampAnOverflowingLength() {
+        let v4 = [UInt8](repeating: 0, count: MDNSFrameBuilder.maxIPv4Payload + 1)
+        let v6 = [UInt8](repeating: 0, count: MDNSFrameBuilder.maxIPv6Payload + 1)
+        #expect(MDNSFrameBuilder.ipv4Frame(datagram(payload: v4, source: v4Source, destination: v4Group)) == nil)
+        #expect(MDNSFrameBuilder.ipv6Frame(datagram(payload: v6, source: v6Source, destination: v6Group)) == nil)
     }
 }

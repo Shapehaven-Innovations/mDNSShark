@@ -23,7 +23,6 @@ enum ThreatRefreshFailure: Equatable {
 @MainActor
 final class SecurityViewModel: ObservableObject {
     @Published var findings:     [SecurityFinding] = []
-    @Published var isAssessing:  Bool = false
     @Published private(set) var isRefreshing: Bool = false
     @Published private(set) var threatDataStatus: ThreatDataStatus?
     @Published private(set) var refreshError: ThreatRefreshFailure?
@@ -35,19 +34,9 @@ final class SecurityViewModel: ObservableObject {
     private let isTunnelActive: @Sendable () async -> Bool
     private var refreshTask: Task<Void, Never>?
     private var lastAssessedDevices: [DiscoveredDevice] = []
+    /// Threat data copied off the actor; nil until the first load, so vendor lookups run synchronously once set.
+    private var snapshot: ThreatSnapshot?
     private let logger = Logger(subsystem: "com.mDNSShark", category: "SecurityViewModel")
-
-    /// Identifies the most recently STARTED `assess()` call. `$devices`
-    /// publishes constantly mid-scan (every enrichment result updates it),
-    /// and `AppCoordinator` spawns an independent, uncancelled `Task` per
-    /// publish. With no ordering guarantee between them, an early call
-    /// (snapshotted before a device's open ports were known) can finish
-    /// AFTER a later, fully-enriched call and silently overwrite `findings`
-    /// with a stale, incomplete result. `assess()` checks this token before
-    /// committing its result, discarding itself if a newer call has since
-    /// started rather than clobbering that newer call's (possibly
-    /// still-in-flight) result.
-    private var currentAssessmentID = UUID()
 
     // MARK: - Rules
 
@@ -96,32 +85,19 @@ final class SecurityViewModel: ObservableObject {
 
     // MARK: - Public API
 
-    /// `showProgress: false` is for refresh-triggered re-assessment, which updates findings in place without the "Assessing" bar.
-    func assess(devices: [DiscoveredDevice], showProgress: Bool = true) async {
+    /// Pure derivation of findings from the device rows and the current threat snapshot; safe to call from a `@Published` willSet sink.
+    func assess(devices: [DiscoveredDevice]) {
         lastAssessedDevices = devices
-        let assessmentID = UUID()
-        currentAssessmentID = assessmentID
-        if showProgress { isAssessing = true }
         var all: [SecurityFinding] = []
         for device in devices {
-            async let pf = portFindings(device: device)
-            async let bf = bonjourFindings(device: device)
-            async let tf = threatFindings(device: device)
-            all += await pf + bf + tf
+            all += portFindings(device: device) + bonjourFindings(device: device) + threatFindings(device: device)
         }
-        // A newer call already superseded this one while the awaits above
-        // were in flight - discard this stale result instead of
-        // overwriting whatever the newer call already committed (or is
-        // still computing).
-        guard currentAssessmentID == assessmentID else { return }
         var seen = Set<String>()
         let deduped = all.filter { f in seen.insert(findingKey(f)).inserted }
         // Reuse existing IDs so unchanged rows keep their identity, and skip publishing an identical result.
         let existingIDs = Dictionary(findings.map { (findingKey($0), $0.id) }, uniquingKeysWith: { first, _ in first })
         let updated = deduped.map { f in existingIDs[findingKey(f)].map { f.withID($0) } ?? f }
         if updated != findings { findings = updated }
-        // Also clears a superseded progress-showing call's bar, which returned early without resetting it.
-        if isAssessing { isAssessing = false }
     }
 
     private func findingKey(_ f: SecurityFinding) -> String { "\(f.deviceID)-\(f.title)" }
@@ -132,6 +108,13 @@ final class SecurityViewModel: ObservableObject {
     /// taps refresh.
     func loadThreatDataStatus() async {
         threatDataStatus = await threatDatabase.status()
+        await reloadSnapshot()
+    }
+
+    /// Copies the actor's data and re-derives findings for the last device list; `assess` skips publishing when nothing changed.
+    private func reloadSnapshot() async {
+        snapshot = await threatDatabase.snapshot()
+        assess(devices: lastAssessedDevices)
     }
 
     /// Starts a refresh if one isn't already running. Synchronous and
@@ -180,9 +163,7 @@ final class SecurityViewModel: ObservableObject {
             let status = try await threatDatabase.refresh()
             kevCompleted = true
             threatDataStatus = status
-            if !lastAssessedDevices.isEmpty {
-                await assess(devices: lastAssessedDevices, showProgress: false)
-            }
+            await reloadSnapshot()
         } catch let error as ThreatRefreshError {
             switch error {
             case .alreadyRefreshing:
@@ -205,9 +186,7 @@ final class SecurityViewModel: ObservableObject {
             try await threatDatabase.refreshNVDVendorData(priorityManufacturers: priorityManufacturers)
             nvdCompleted = true
             threatDataStatus = await threatDatabase.status()
-            if !lastAssessedDevices.isEmpty {
-                await assess(devices: lastAssessedDevices, showProgress: false)
-            }
+            await reloadSnapshot()
         } catch ThreatRefreshError.cancelled {
             if refreshError == nil { refreshError = .cancelledByCapture }
         } catch is CancellationError {
@@ -229,6 +208,11 @@ final class SecurityViewModel: ObservableObject {
     var vulnerableDeviceIDs: Set<UUID> { findings.vulnerableDeviceIDs }
 
     var vulnerableDeviceCount: Int { vulnerableDeviceIDs.count }
+
+    /// Devices whose probes have settled and that carry no finding of vulnerable severity.
+    func secureDeviceCount(among devices: [DiscoveredDevice]) -> Int {
+        devices.filter { $0.probesSettled && !vulnerableDeviceIDs.contains($0.id) }.count
+    }
 
     var allFindingsSorted: [SecurityFinding] {
         findings.sorted { $0.severity > $1.severity }
@@ -287,7 +271,7 @@ final class SecurityViewModel: ObservableObject {
 
     // MARK: - Private assessment layers
 
-    private func portFindings(device: DiscoveredDevice) async -> [SecurityFinding] {
+    private func portFindings(device: DiscoveredDevice) -> [SecurityFinding] {
         let name = "\(device.hostname) · \(device.ipAddress)"
         let icon = device.deviceIcon
         return device.openPorts.compactMap { port -> SecurityFinding? in
@@ -300,7 +284,7 @@ final class SecurityViewModel: ObservableObject {
         }
     }
 
-    private func bonjourFindings(device: DiscoveredDevice) async -> [SecurityFinding] {
+    private func bonjourFindings(device: DiscoveredDevice) -> [SecurityFinding] {
         let name = "\(device.hostname) · \(device.ipAddress)"
         let icon = device.deviceIcon
         return device.bonjourServices.compactMap { svc -> SecurityFinding? in
@@ -324,11 +308,11 @@ final class SecurityViewModel: ObservableObject {
     /// exposed" for the same device. Removed rather than fixed in place:
     /// nothing here can confirm which server software a device runs without
     /// the banner-capture work tracked as a separate follow-up.
-    private func threatFindings(device: DiscoveredDevice) async -> [SecurityFinding] {
+    private func threatFindings(device: DiscoveredDevice) -> [SecurityFinding] {
         let name = "\(device.hostname) · \(device.ipAddress)"
         let icon = device.deviceIcon
         var results: [SecurityFinding] = []
-        if let advisory = await vendorAdvisoryFinding(device: device, name: name, icon: icon) {
+        if let advisory = vendorAdvisoryFinding(device: device, name: name, icon: icon) {
             results.append(advisory)
         }
         return results
@@ -344,9 +328,8 @@ final class SecurityViewModel: ObservableObject {
     /// always excluded from `vulnerableDeviceCount` - the source-level
     /// tiering is otherwise invisible once grouped, so the description
     /// spells out the breakdown explicitly.
-    private func vendorAdvisoryFinding(device: DiscoveredDevice, name: String, icon: String) async -> SecurityFinding? {
-        let matches = await threatDatabase.vendorAdvisory(manufacturer: device.manufacturer)
-        guard !matches.isEmpty else { return nil }
+    private func vendorAdvisoryFinding(device: DiscoveredDevice, name: String, icon: String) -> SecurityFinding? {
+        guard let matches = snapshot?.vendorAdvisory(manufacturer: device.manufacturer), !matches.isEmpty else { return nil }
         let vendorName = matches[0].vendorDisplayName
 
         let kevMatches = matches.filter { $0.source == .kev }

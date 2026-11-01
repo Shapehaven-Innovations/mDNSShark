@@ -16,15 +16,21 @@ struct DiscoveredDevice: Identifiable, Equatable {
     var openPorts: [Int]
     var bonjourServices: [BonjourService]
     var securityFindings: [SecurityFinding]
+    /// True once this device's enrichment probe set has answered (or was refused), so `openPorts` is a known fact rather than pending.
+    var probesSettled: Bool = false
+    /// Every address seen for this device, raw as received: IPv4 first, then IPv6 (with its scope, if any).
+    var addresses: [String] = []
 
     init(id: UUID = UUID(), hostname: String, ipAddress: String,
          macAddress: String? = nil, manufacturer: String? = nil,
          inferredOS: String? = nil, openPorts: [Int] = [],
-         bonjourServices: [BonjourService] = [], securityFindings: [SecurityFinding] = []) {
+         bonjourServices: [BonjourService] = [], securityFindings: [SecurityFinding] = [],
+         probesSettled: Bool = false, addresses: [String] = []) {
         self.id = id; self.hostname = hostname; self.ipAddress = ipAddress
         self.macAddress = macAddress; self.manufacturer = manufacturer
         self.inferredOS = inferredOS; self.openPorts = openPorts
         self.bonjourServices = bonjourServices; self.securityFindings = securityFindings
+        self.probesSettled = probesSettled; self.addresses = addresses
     }
 
     // Compares the late-enriched fields too, so SwiftUI redraws a row when enrichment lands; securityFindings is left out.
@@ -33,6 +39,7 @@ struct DiscoveredDevice: Identifiable, Equatable {
             && l.macAddress == r.macAddress && l.manufacturer == r.manufacturer
             && l.inferredOS == r.inferredOS && l.openPorts == r.openPorts
             && l.bonjourServices == r.bonjourServices
+            && l.probesSettled == r.probesSettled && l.addresses == r.addresses
     }
 
     var isGateway: Bool { ipAddress.hasSuffix(".1") }

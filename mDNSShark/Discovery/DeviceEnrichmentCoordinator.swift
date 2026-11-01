@@ -28,7 +28,15 @@ import os
 /// main-actor-isolated.
 @MainActor
 final class DeviceEnrichmentCoordinator {
-    let results = PassthroughSubject<(ip: String, enrichments: [DeviceEnrichment]), Never>()
+    /// One probe delivery for an address. `completesProbeSet` is true only for `enrich()`'s full fan-out, so the view model
+    /// can tell a settled device from one that only has a partial description or Google Wifi answer so far.
+    struct Result {
+        let ip: String
+        let enrichments: [DeviceEnrichment]
+        let completesProbeSet: Bool
+    }
+
+    let results = PassthroughSubject<Result, Never>()
 
     private let limiter = ProbeConcurrencyLimiter(maxConcurrent: 32)
     private let udpPacer = UDPSendPacer(minimumSpacing: .milliseconds(15))
@@ -98,6 +106,7 @@ final class DeviceEnrichmentCoordinator {
         }
         let taskID = UUID()
         let task = Task {
+            defer { activeTasks.removeValue(forKey: taskID) }
             async let ubiquiti = limitedUbiquitiProbe(ip: ip)
             async let asus = asusEntitlementAvailable ? limitedASUSProbe(ip: ip) : nil
             async let jnapHnap = limitedJNAPHNAPProbe(ip: ip)
@@ -174,8 +183,9 @@ final class DeviceEnrichmentCoordinator {
                                                      openPorts: scannedPorts.map(\.port), source: .portBanner))
             }
 
-            results.send((ip: ip, enrichments: enrichments))
-            activeTasks.removeValue(forKey: taskID)
+            // A scan restart cancels this task; its late answer must not land in the new scan's state.
+            guard !Task.isCancelled else { return }
+            results.send(Result(ip: ip, enrichments: enrichments, completesProbeSet: true))
         }
         activeTasks[taskID] = task
     }
@@ -202,7 +212,8 @@ final class DeviceEnrichmentCoordinator {
             guard let info = await limitedSSDPFetch(locationURL: locationURL) else { return }
             let enrichment = DeviceEnrichment(mac: nil, manufacturer: info.manufacturer, inferredOS: nil,
                                                openPorts: Self.confirmedPorts(descriptionURL: locationURL), source: .ssdpDescription)
-            results.send((ip: ip, enrichments: [enrichment]))
+            guard !Task.isCancelled else { return }
+            results.send(Result(ip: ip, enrichments: [enrichment], completesProbeSet: false))
         }
         activeTasks[taskID] = task
     }
@@ -235,7 +246,8 @@ final class DeviceEnrichmentCoordinator {
             // mere presence confirms with confidence.
             let enrichment = DeviceEnrichment(mac: nil, manufacturer: "Google", inferredOS: nil,
                                                openPorts: [], source: .googleWifiDiscovery)
-            results.send((ip: ip, enrichments: [enrichment]))
+            guard !Task.isCancelled else { return }
+            results.send(Result(ip: ip, enrichments: [enrichment], completesProbeSet: false))
         }
         activeTasks[taskID] = task
     }

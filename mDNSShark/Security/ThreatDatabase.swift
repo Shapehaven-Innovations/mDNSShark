@@ -433,7 +433,8 @@ actor ThreatDatabase {
         // `presentKeys` (a Set, used for membership/lastSeen bookkeeping)
         // would silently lose that order if used for the priority list
         // directly.
-        let priorityKeysOrdered = priorityManufacturers.compactMap { resolveVendor(forManufacturer: $0)?.key }
+        let current = snapshot()
+        let priorityKeysOrdered = priorityManufacturers.compactMap { current.resolveVendor(forManufacturer: $0)?.key }
         let presentKeys = Set(priorityKeysOrdered).intersection(eligible.keys)
 
         var lastSeen = cache?.nvdVendorLastSeen ?? [:]
@@ -697,12 +698,28 @@ actor ThreatDatabase {
 
     // MARK: - Lookup
 
+    /// The loaded threat data as a value, so callers can run vendor lookups synchronously off the actor.
+    func snapshot() -> ThreatSnapshot {
+        ensureLoaded()
+        return ThreatSnapshot(vendorAdvisories: nistMap.vendorAdvisories, kev: kev, nvdByVendor: nvdByVendor)
+    }
+
+    func vendorAdvisory(manufacturer: String?) async -> [VendorFinding] {
+        snapshot().vendorAdvisory(manufacturer: manufacturer)
+    }
+}
+
+/// Immutable copy of the actor's loaded data; lookups on it are pure and need no await.
+struct ThreatSnapshot: Sendable {
+    let vendorAdvisories: [String: VendorAdvisoryConfig]
+    let kev: [String: CISAKEVEntry]
+    let nvdByVendor: [String: NVDVendorCache]
+
     /// Resolves `manufacturer` to a vendor and returns every KEV and/or NVD
     /// match for that vendor, newest first. A vendor with neither KEV nor
     /// NVD coverage yet, or a manufacturer that doesn't resolve to any
     /// vendor, returns `[]` - never a partial/ambiguous match.
-    func vendorAdvisory(manufacturer: String?) async -> [VendorFinding] {
-        ensureLoaded()
+    func vendorAdvisory(manufacturer: String?) -> [VendorFinding] {
         guard let manufacturer, let (key, config) = resolveVendor(forManufacturer: manufacturer) else {
             return []
         }
@@ -749,7 +766,7 @@ actor ThreatDatabase {
     /// by aliases of equal length) resolve deterministically by preferring
     /// the longer alias, then the alphabetically-first vendor key - never by
     /// dictionary iteration order.
-    private func resolveVendor(forManufacturer manufacturer: String) -> (key: String, config: VendorAdvisoryConfig)? {
+    func resolveVendor(forManufacturer manufacturer: String) -> (key: String, config: VendorAdvisoryConfig)? {
         let stripped = manufacturer.replacingOccurrences(of: "-", with: "")
         let tokens = Set(
             stripped.lowercased()
@@ -759,7 +776,7 @@ actor ThreatDatabase {
         guard !tokens.isEmpty else { return nil }
 
         var best: (key: String, config: VendorAdvisoryConfig, aliasLength: Int)?
-        for (key, config) in nistMap.vendorAdvisories {
+        for (key, config) in vendorAdvisories {
             for alias in config.manufacturerAliases where tokens.contains(alias.lowercased()) {
                 let length = alias.count
                 if best == nil || length > best!.aliasLength || (length == best!.aliasLength && key < best!.key) {
@@ -805,7 +822,7 @@ struct NistCPEMap: Decodable {
 /// vendor field, since a keyword hit alone (checked against the CVE
 /// description as a whole word) can still miss entries whose description
 /// never spells out the brand name but whose CPE data does.
-struct VendorAdvisoryConfig: Decodable {
+struct VendorAdvisoryConfig: Decodable, Sendable {
     let displayName: String
     let manufacturerAliases: [String]
     let kevVendorProjects: [String]

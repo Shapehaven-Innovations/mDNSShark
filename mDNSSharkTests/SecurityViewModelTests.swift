@@ -60,7 +60,9 @@ struct SecurityViewModelTests {
 
         vm.startThreatDataRefresh()
         vm.startThreatDataRefresh()
-        try await Task.sleep(nanoseconds: 20_000_000)
+        // Wait for the first fetch to reach the gate, then give a second call time to show up.
+        for _ in 0..<200 where await gate.callCount == 0 { try await Task.sleep(nanoseconds: 10_000_000) }
+        try await Task.sleep(nanoseconds: 50_000_000)
         #expect(await gate.callCount == 1)
 
         await gate.release()
@@ -77,9 +79,10 @@ struct SecurityViewModelTests {
             ("CVE-2026-4444", "ASUS New Bug", "new desc"),
         ], vendorProjects: ["ASUS", "ASUS"])
         let vm = makeViewModel(fetchFeed: immediateFetcher { (feed, Fixture.httpResponse()) })
+        await vm.loadThreatDataStatus()
 
         let device = makeDevice(manufacturer: "ASUS")
-        await vm.assess(devices: [device])
+        vm.assess(devices: [device])
         // Before refresh: only the bundled CVE is known.
         let before = vm.findings.first { $0.source == .vendorAdvisory }
         let beforeIDs = before?.cveTiers.flatMap(\.cveIDs) ?? []
@@ -134,6 +137,7 @@ struct SecurityViewModelTests {
     @Test("a vendor-matched manufacturer never produces a critical finding, even with a matching service")
     func manufacturerMatchNeverCritical() async throws {
         let vm = makeViewModel()
+        await vm.loadThreatDataStatus()
         let device = DiscoveredDevice(
             hostname: "asus-router",
             ipAddress: "192.168.1.1",
@@ -142,7 +146,7 @@ struct SecurityViewModelTests {
                 BonjourService(serviceType: "_ftp._tcp", serviceName: "asus-router", port: 21)
             ]
         )
-        await vm.assess(devices: [device])
+        vm.assess(devices: [device])
 
         let vendorFindings = vm.findings.filter { $0.source == .vendorAdvisory }
         #expect(vendorFindings.count == 1)
@@ -152,60 +156,60 @@ struct SecurityViewModelTests {
 
     // Issue #4: only cleartext-credential open ports are critical.
     @Test("an open VNC port is a warning, not critical")
-    func vncOpenPortIsWarning() async {
+    func vncOpenPortIsWarning() {
         let vm = makeViewModel()
         let device = DiscoveredDevice(hostname: "mac-mini", ipAddress: "192.168.1.60", openPorts: [5900])
-        await vm.assess(devices: [device])
+        vm.assess(devices: [device])
         let vnc = vm.findings.first { $0.source == .portRule && $0.title == "VNC Exposed" }
         #expect(vnc?.severity == .warning)
         #expect(vm.criticalFindings.isEmpty)
     }
 
     @Test("an open Telnet port is critical")
-    func telnetOpenPortIsCritical() async {
+    func telnetOpenPortIsCritical() {
         let vm = makeViewModel()
         let device = DiscoveredDevice(hostname: "old-switch", ipAddress: "192.168.1.61", openPorts: [23])
-        await vm.assess(devices: [device])
+        vm.assess(devices: [device])
         let telnet = vm.findings.first { $0.source == .portRule && $0.title == "Telnet Exposed" }
         #expect(telnet?.severity == .critical)
     }
 
     // Issue #13: a port a device only advertises is not an open port.
     @Test("a Bonjour-advertised port produces no port finding")
-    func advertisedPortProducesNoPortFinding() async {
+    func advertisedPortProducesNoPortFinding() {
         let vm = makeViewModel()
         let camera = DiscoveredDevice(
             hostname: "amcrest-camera", ipAddress: "10.10.10.87",
             bonjourServices: [BonjourService(serviceType: "_http._tcp", serviceName: "AMC060E7AF0A5BCE81", port: 80)]
         )
-        await vm.assess(devices: [camera])
+        vm.assess(devices: [camera])
         #expect(!vm.findings.contains { $0.source == .portRule })
         #expect(vm.findings.contains { $0.source == .bonjourRule && $0.title == "HTTP Service Advertised" })
     }
 
     @Test("a confirmed open port 80 produces the HTTP Service finding")
-    func confirmedPortProducesPortFinding() async {
+    func confirmedPortProducesPortFinding() {
         let vm = makeViewModel()
         let device = DiscoveredDevice(hostname: "web-host", ipAddress: "192.168.1.64", openPorts: [80])
-        await vm.assess(devices: [device])
+        vm.assess(devices: [device])
         let http = vm.findings.first { $0.source == .portRule && $0.title == "HTTP Service" }
         #expect(http?.severity == .informational)
     }
 
     @Test("a _rfb._tcp advertisement is informational")
-    func rfbAdvertIsInformational() async {
+    func rfbAdvertIsInformational() {
         let vm = makeViewModel()
         let device = DiscoveredDevice(
             hostname: "mac-mini", ipAddress: "192.168.1.62",
             bonjourServices: [BonjourService(serviceType: "_rfb._tcp", serviceName: "mac-mini", port: 5900)]
         )
-        await vm.assess(devices: [device])
+        vm.assess(devices: [device])
         let rfb = vm.findings.first { $0.source == .bonjourRule }
         #expect(rfb?.severity == .informational)
     }
 
     @Test("a device with only Bonjour advertisements is not counted vulnerable")
-    func bonjourOnlyDeviceNotVulnerable() async {
+    func bonjourOnlyDeviceNotVulnerable() {
         let vm = makeViewModel()
         let device = DiscoveredDevice(
             hostname: "nas", ipAddress: "192.168.1.63",
@@ -216,45 +220,36 @@ struct SecurityViewModelTests {
                 BonjourService(serviceType: "_smb._tcp", serviceName: "nas", port: 445)
             ]
         )
-        await vm.assess(devices: [device])
+        vm.assess(devices: [device])
         #expect(!vm.findings.isEmpty)
         #expect(vm.vulnerableDeviceCount == 0)
     }
 
-    @Test("refresh-triggered re-assessment never shows the Assessing progress bar")
-    func refreshAssessDoesNotShowProgress() async throws {
-        let feed = Fixture.liveFeedJSON(catalogVersion: "2026.03.01", matching: [
-            ("CVE-2026-4444", "ASUS New Bug", "new desc"),
-        ], vendorProjects: ["ASUS"])
-        let vm = makeViewModel(fetchFeed: immediateFetcher { (feed, Fixture.httpResponse()) })
-        await vm.assess(devices: [makeDevice(manufacturer: "ASUS")])
+    @Test("a device assessed before the threat data loads gains its vendor advisory once it arrives")
+    func snapshotArrivalReassesses() async {
+        let vm = makeViewModel()
+        vm.assess(devices: [makeDevice(manufacturer: "ASUS")])
+        #expect(!vm.findings.contains { $0.source == .vendorAdvisory })
 
-        var sawAssessing = false
-        let cancellable = vm.$isAssessing.sink { if $0 { sawAssessing = true } }
-        vm.startThreatDataRefresh()
-        try await waitUntil { !vm.isRefreshing }
-        cancellable.cancel()
-
-        #expect(!sawAssessing)
-        #expect(vm.findings.contains { $0.cveTiers.flatMap(\.cveIDs).contains("CVE-2026-4444") })
+        await vm.loadThreatDataStatus()
+        #expect(vm.findings.contains { $0.source == .vendorAdvisory })
     }
 
     @Test("re-assessing unchanged devices keeps finding IDs and does not republish")
-    func identicalAssessDoesNotRepublish() async {
+    func identicalAssessDoesNotRepublish() {
         let vm = makeViewModel()
         let device = makeDevice()
-        await vm.assess(devices: [device])
+        vm.assess(devices: [device])
         let firstIDs = vm.findings.map(\.id)
         #expect(!firstIDs.isEmpty)
 
         var publishCount = 0
         let cancellable = vm.$findings.dropFirst().sink { _ in publishCount += 1 }
-        await vm.assess(devices: [device], showProgress: false)
+        vm.assess(devices: [device])
         cancellable.cancel()
 
         #expect(publishCount == 0)
         #expect(vm.findings.map(\.id) == firstIDs)
-        #expect(!vm.isAssessing)
     }
 }
 

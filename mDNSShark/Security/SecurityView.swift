@@ -16,11 +16,10 @@ struct SecurityView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     overviewCard
-                    if vm.isAssessing { ProgressView("Assessing…") }
                     if !vm.findings.isEmpty {
                         groupPicker
                         findingsContent
-                    } else if !vm.isAssessing {
+                    } else {
                         emptyState
                     }
                     footerButtons

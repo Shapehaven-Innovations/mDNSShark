@@ -14,8 +14,8 @@ struct PacketParserTests {
                      sourcePort: 5353, destinationPort: 5353, ttl: 255, timestamp: Date(timeIntervalSince1970: 1_700_000_000))
     }
 
-    @Test func ipv4FrameFromBuilderParsesAsMDNS() {
-        let frame = MDNSFrameBuilder.ipv4Frame(mdnsDatagram(source: [192, 168, 8, 178], destination: [224, 0, 0, 251]))
+    @Test func ipv4FrameFromBuilderParsesAsMDNS() throws {
+        let frame = try #require(MDNSFrameBuilder.ipv4Frame(mdnsDatagram(source: [192, 168, 8, 178], destination: [224, 0, 0, 251])))
         let packet = PacketParser.parse(frame, frameNumber: 7, timestamp: Date(timeIntervalSince1970: 1_700_000_000),
                                         direction: .inbound, isReconstructed: true, captureSource: .mdnsListener)
         #expect(packet.protocolName == "mDNS")
@@ -32,10 +32,10 @@ struct PacketParserTests {
         #expect(packet.direction == .inbound)
     }
 
-    @Test func ipv6FrameFromBuilderParsesAsMDNS() {
+    @Test func ipv6FrameFromBuilderParsesAsMDNS() throws {
         let source: [UInt8] = [0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0x1c, 0x2d, 0x3e, 0x4f, 0x5a, 0x6b, 0x7c, 0x8d]
         let group: [UInt8] = [0xff, 0x02] + [UInt8](repeating: 0, count: 13) + [0xfb]
-        let frame = MDNSFrameBuilder.ipv6Frame(mdnsDatagram(source: source, destination: group))
+        let frame = try #require(MDNSFrameBuilder.ipv6Frame(mdnsDatagram(source: source, destination: group)))
         let packet = PacketParser.parse(frame, frameNumber: 8, direction: .outbound, isReconstructed: true, captureSource: .mdnsListener)
         #expect(packet.protocolName == "mDNS")
         #expect(packet.sourceIP == "fe80::1c2d:3e4f:5a6b:7c8d")
@@ -73,8 +73,8 @@ struct PacketParserTests {
         #expect(packet.info == "Query: example.com")
     }
 
-    @Test func reconstructedSuffixIsNotDoubled() {
-        let frame = MDNSFrameBuilder.ipv4Frame(mdnsDatagram(source: [192, 168, 8, 123], destination: [224, 0, 0, 251]))
+    @Test func reconstructedSuffixIsNotDoubled() throws {
+        let frame = try #require(MDNSFrameBuilder.ipv4Frame(mdnsDatagram(source: [192, 168, 8, 123], destination: [224, 0, 0, 251])))
         let packet = PacketParser.parse(frame, frameNumber: 9, direction: .outbound, isReconstructed: true)
         #expect(packet.info.components(separatedBy: "[reconstructed]").count == 2)
     }

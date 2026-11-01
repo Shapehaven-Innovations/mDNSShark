@@ -27,7 +27,7 @@ Every scan runs on your phone, with **no external servers**. The one exception i
 
 ## Core Features
 
-- **Bonjour/mDNS (DNS-SD)**: Finds AirPlay receivers, printers, file sharing, and more.
+- **Bonjour/mDNS (DNS-SD)**: Finds AirPlay receivers, printers, file sharing, and more. Every service is listed under the host that advertises it, keyed by that host's LAN address, so one device is one row even when it advertises many services or answers from a link-local or IPv6 address.
 - **SSDP**: Finds UPnP devices such as smart TVs and internet gateways.
 - **Local Subnet Scans**: Always sweeps the /24 subnet on TCP port 80; other ports are probed only on hosts already found.
 - **OUI Lookups**: Matches a device's MAC-like address to its manufacturer.

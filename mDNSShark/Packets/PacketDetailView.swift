@@ -34,7 +34,7 @@ struct PacketDetailView: View {
                                     Label("Headers Reconstructed", systemImage: "info.circle")
                                         .font(.caption.weight(.semibold))
                                         .foregroundColor(.orange)
-                                    Text("Received by the mDNS listener in the capture extension. IP and UDP headers are rebuilt from socket metadata; the payload is verbatim.")
+                                    Text("Received by the mDNS listener in the capture extension. " + MDNSListenerMeta.disclaimerSentence)
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 } else {

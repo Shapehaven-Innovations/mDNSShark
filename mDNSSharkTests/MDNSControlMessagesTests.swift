@@ -78,4 +78,22 @@ struct MDNSControlMessagesTests {
         let bytes = withUnsafeBytes(of: &header) { Array($0) } + [255, 0, 0, 0]
         #expect(parse(bytes).ttl == nil)
     }
+
+    @Test func readsIPv4TOSByte() {
+        #expect(parse(cmsg(level: IPPROTO_IP, type: IPv4SocketOption.recvTOS, data: [0xB8])).trafficClass == 0xB8)
+    }
+
+    @Test func readsIPv6TrafficClassInt() {
+        var tc: Int32 = 0x28
+        let parsed = parse(cmsg(level: IPPROTO_IPV6, type: IPv6SocketOption.trafficClass, data: withUnsafeBytes(of: &tc) { Array($0) }))
+        #expect(parsed.trafficClass == 0x28)
+        var bad: Int32 = 300
+        #expect(parse(cmsg(level: IPPROTO_IPV6, type: IPv6SocketOption.trafficClass, data: withUnsafeBytes(of: &bad) { Array($0) })).trafficClass == nil)
+    }
+
+    @Test func tosAndTrafficClassOptionNumbersMatchTheSDK() {
+        #expect(IPv4SocketOption.recvTOS == 27)
+        #expect(IPv6SocketOption.recvTrafficClass == 35)
+        #expect(IPv6SocketOption.trafficClass == 36)
+    }
 }

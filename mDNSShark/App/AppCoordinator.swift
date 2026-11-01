@@ -74,12 +74,9 @@ final class AppCoordinator: ObservableObject {
             .sink { [weak self] in self?.objectWillChange.send() }
             .store(in: &cancellables)
 
+        // Runs inside `devices`' willSet, so the sink parameter is the new list and `networkScanViewModel.devices` is still the old one.
         networkScanViewModel.$devices
-            .filter { !$0.isEmpty }
-            .sink { [weak self] devices in
-                guard let self else { return }
-                Task { await self.securityViewModel.assess(devices: devices) }
-            }
+            .sink { [weak self] in self?.securityViewModel.assess(devices: $0) }
             .store(in: &cancellables)
 
         packetCaptureManager.objectWillChange
