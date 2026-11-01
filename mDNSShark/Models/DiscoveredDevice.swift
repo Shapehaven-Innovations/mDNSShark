@@ -3,7 +3,21 @@ import Foundation
 import DeviceFingerprint
 
 enum DeviceType: Hashable, CaseIterable {
-    case router, apple, computer, printer, tv, camera, unknown
+    case router, apple, computer, printer, tv, camera, audio, smartHome, nas, unknown
+
+    /// The chip for a catalog kind; `network` has no chip yet, so it returns nil.
+    init?(kind: DeviceKind) {
+        switch kind {
+        case .camera:    self = .camera
+        case .audio:     self = .audio
+        case .tv:        self = .tv
+        case .smartHome: self = .smartHome
+        case .nas:       self = .nas
+        case .printer:   self = .printer
+        case .computer:  self = .computer
+        case .network:   return nil
+        }
+    }
 
     /// The one label every surface shows (Topology chips, pin picker, Devices card).
     var label: String {
@@ -14,6 +28,9 @@ enum DeviceType: Hashable, CaseIterable {
         case .printer:  return "Printer"
         case .tv:       return "TV"
         case .camera:   return "Camera"
+        case .audio:    return "Audio"
+        case .smartHome: return "Smart Home"
+        case .nas:      return "NAS"
         case .unknown:  return "Unknown"
         }
     }
@@ -95,8 +112,10 @@ struct DiscoveredDevice: Identifiable, Equatable {
     var httpRedirectByPort: [Int: String] = [:]
     /// Set when the payment-vendor gate kept this host passive, so its open ports are unknown rather than none.
     var paymentVendorSkip: PaymentVendorSkip?
-    /// False for a host that got no active probes (vendor gate or off-subnet), so an empty findings list means unchecked, not clean.
-    var wasProbed: Bool { paymentVendorSkip == nil && isOnLocalSubnet != false }
+    /// True when probing was refused for this host's addresses (no IPv4 address, or none the coordinator accepts), so its open ports are unknown.
+    var probeRefused: Bool = false
+    /// False for a host that got no active probes (vendor gate, off-subnet or refused), so an empty findings list means unchecked, not clean.
+    var wasProbed: Bool { paymentVendorSkip == nil && isOnLocalSubnet != false && !probeRefused }
 
     init(id: UUID = UUID(), hostname: String, ipAddress: String,
          macAddress: String? = nil, manufacturer: String? = nil,
@@ -118,7 +137,7 @@ struct DiscoveredDevice: Identifiable, Equatable {
             && l.bonjourServices == r.bonjourServices
             && l.probesSettled == r.probesSettled && l.addresses == r.addresses && l.ssdpServer == r.ssdpServer
             && l.isOnLocalSubnet == r.isOnLocalSubnet && l.isDefaultGateway == r.isDefaultGateway && l.httpRedirectByPort == r.httpRedirectByPort
-            && l.paymentVendorSkip == r.paymentVendorSkip
+            && l.paymentVendorSkip == r.paymentVendorSkip && l.probeRefused == r.probeRefused
     }
 
     /// Whether the system's default gateway is one of this device's addresses; nil when the gateway is unknown.
@@ -170,31 +189,62 @@ struct DiscoveredDevice: Identifiable, Equatable {
         }
     }
 
+    /// Types that mark a speaker, so a non-Apple AirPlay receiver carrying one is audio and not a TV.
+    private static let speakerTypes: Set<String> = [
+        "_sonos._tcp", "_heos-audio._tcp", "_soundtouch._tcp", "_bangolufsen._tcp",
+        "_musc._tcp", "_linkplay._tcp", "_netaudio-arc._udp", "_netaudio-cmc._udp",
+    ]
+
+    /// The first catalog kind over the services, ordered by type then name so the answer does not depend on arrival order.
+    private var catalogKind: DeviceKind? {
+        let ordered = bonjourServices.sorted { ($0.serviceType, $0.serviceName) < ($1.serviceType, $1.serviceName) }
+        for service in ordered {
+            if let kind = BonjourTypeCatalog.kind(serviceType: service.serviceType, instanceName: service.serviceName, txt: service.txtRecords),
+               DeviceType(kind: kind) != nil { return kind }
+        }
+        return nil
+    }
+
     var deviceType: DeviceType {
         if isGateway { return .router }
         let types = bonjourServices.map { $0.serviceType }
         let models = advertisedModels
         if types.contains("_airplay._tcp") || types.contains("_raop._tcp") {
-            guard manufacturer?.contains("Apple") == true else { return .tv }
+            var airplayTXT = bonjourServices.first { $0.serviceType == "_airplay._tcp" }?.txtRecords ?? [:]
+            // A RAOP-only receiver carries the same feature bitmap under `ft`.
+            if airplayTXT["features"] == nil, let ft = bonjourServices.first(where: { $0.serviceType == "_raop._tcp" })?.txtRecords["ft"] { airplayTXT["features"] = ft }
+            guard manufacturer?.contains("Apple") == true else {
+                if types.contains(where: Self.speakerTypes.contains) || BonjourTypeCatalog.isAudioOnlyAirPlay(txt: airplayTXT) { return .audio }
+                return .tv
+            }
+            if models.contains(where: { $0.hasPrefix("AudioAccessory") || $0.hasPrefix("AirPort") }) { return .audio }
             if models.contains(where: { $0.hasPrefix("Mac") || $0.hasPrefix("iMac") }) { return .computer }
             // An AirPlay row with no usable model must not hide a file-sharing service that marks a Mac.
             if models.isEmpty, types.contains("_smb._tcp") || types.contains("_afpovertcp._tcp") { return .computer }
             return .apple
         }
         if hasCameraEvidence { return .camera }
+        if let kind = catalogKind, let type = DeviceType(kind: kind) { return type }
         if types.contains("_ipp._tcp") || types.contains("_printer._tcp") { return .printer }
         // _rdlink._tcp is advertised only by iPhone and iPad, so it marks an Apple device without saying which.
         if types.contains("_apple-mobdev2._tcp") || types.contains("_airdrop._tcp") || types.contains("_rdlink._tcp") { return .apple }
         if types.contains("_afpovertcp._tcp") || types.contains("_smb._tcp") { return .computer }
         if manufacturer?.contains("Apple") == true { return .apple }
+        if isApplianceMaker { return .smartHome }
         return .unknown
     }
+
+    /// True only when the MAC vendor is exactly on the appliance list; a vendor fact, not proof of the device type.
+    var isApplianceMaker: Bool { manufacturer.map(ApplianceVendorHint.isApplianceVendor) ?? false }
 
     var deviceIcon: String {
         switch deviceType {
         case .router:   return "wifi.router"
         case .tv:       return "tv"
         case .camera:   return "video"
+        case .audio:    return "hifispeaker"
+        case .smartHome: return "lightbulb"
+        case .nas:      return "externaldrive.connected.to.line.below"
         case .printer:  return "printer"
         case .apple:    return appleModelIcon ?? "laptopcomputer.and.iphone"
         case .computer: return "laptopcomputer"

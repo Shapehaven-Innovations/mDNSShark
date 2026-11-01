@@ -23,7 +23,7 @@ struct DevicePickerSheet: View {
         case .tv:       return 4
         case .printer:  return 5
         case .camera:   return 6
-        case .computer: return 6
+        case .computer, .audio, .smartHome, .nas: return 6
         default:        return 7
         }
     }

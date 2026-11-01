@@ -108,4 +108,88 @@ struct ProbeGateTests {
         #expect(log.ips == ["10.10.30.87"])
         #expect(devices.map(\.probesSettled) == [false])
     }
+
+    @Test("a host first seen IPv6-only and then given an on-subnet IPv4 is probed at the IPv4 and reads as probed")
+    func ipv6ThenIPv4Probes() {
+        let log = Log()
+        let vm = viewModel(log: log)
+        let v6 = bonjourRow(type: "_matter._tcp", name: "A", ip: "fd12::1", host: "h.local.")
+        let v4 = bonjourRow(name: "B", ip: "10.10.30.87", host: "h.local.")
+
+        let first = vm.merge(raw: [v6])
+        #expect(first.map(\.probeRefused) == [true])
+
+        let devices = vm.merge(raw: [v6, v4])
+
+        #expect(devices.count == 1)
+        #expect(log.ips == ["10.10.30.87"])
+        #expect(devices.map(\.probesSettled) == [false])
+        #expect(devices.map(\.probeRefused) == [false])
+        #expect(devices.map(\.wasProbed) == [true])
+    }
+
+    @Test("an off-subnet first IPv4 that sorts above a later on-subnet one is still un-skipped")
+    func laterLowerOnSubnetAddressProbes() {
+        let log = Log()
+        let vm = viewModel(log: log)
+        let a = bonjourRow(name: "A", ip: "10.10.50.5", host: "h.local.")
+        let b = bonjourRow(name: "B", ip: "10.10.30.9", host: "h.local.")
+
+        _ = vm.merge(raw: [a])
+        #expect(log.ips.isEmpty)
+
+        let devices = vm.merge(raw: [a, b])
+
+        #expect(log.ips == ["10.10.30.9"])
+        #expect(devices.map(\.probesSettled) == [false])
+        #expect(devices.map(\.probeRefused) == [false])
+    }
+
+    @Test("an IPv6-only group (Thread, Matter) is never probed, is settled, and reads Not probed")
+    func ipv6OnlyNotProbed() {
+        let log = Log()
+        let vm = viewModel(log: log)
+        let row = bonjourRow(type: "_matter._tcp", name: "Sensor", ip: "fd12:3456:789a::1", host: "sensor.local.")
+
+        let devices = vm.merge(raw: [row])
+        _ = vm.merge(raw: [row])
+
+        #expect(log.ips.isEmpty)
+        #expect(devices.map(\.probesSettled) == [true])
+        #expect(devices.map(\.wasProbed) == [false])
+        #expect(devices.map(\.noOpenPortsText) == ["Not probed"])
+    }
+
+    @Test("a non-LAN address with no known subnet is refused, settled, and reads Not probed")
+    func nonLANRefused() {
+        let log = Log()
+        let own = LocalInterfaces.OwnAddresses(primary: [phone], all: [phone])
+        let vm = NetworkScanViewModel(ownAddresses: { own }, probe: { ip, _ in log.ips.append(ip) })
+
+        let devices = vm.merge(raw: [bonjourRow(name: "Far", ip: "8.8.8.8", host: "far.local.")])
+
+        #expect(log.ips.isEmpty)
+        #expect(devices.map(\.probesSettled) == [true])
+        #expect(devices.map(\.wasProbed) == [false])
+        #expect(devices.map(\.noOpenPortsText) == ["Not probed"])
+    }
+
+    @Test("an IPv4 group is still probed and reads None until ports are found")
+    func ipv4GroupProbed() {
+        let log = Log()
+        let vm = viewModel(log: log)
+
+        let devices = vm.merge(raw: [bonjourRow(name: "Printer", ip: "10.10.30.41", host: "p.local.")])
+
+        #expect(log.ips == ["10.10.30.41"])
+        #expect(devices.map(\.wasProbed) == [true])
+        #expect(devices.map(\.noOpenPortsText) == ["None"])
+    }
+
+    @Test("a Hue row without a TXT vendor leaves the manufacturer nil so the OUI lookup can fill it")
+    func hueLeavesManufacturerNil() {
+        let vm = viewModel(log: Log())
+        let devices = vm.merge(raw: [bonjourRow(type: "_hue._tcp", name: "Bridge", ip: "10.10.30.50", host: "hue.local.")])
+        #expect(devices.first?.manufacturer == nil)
+    }
 }

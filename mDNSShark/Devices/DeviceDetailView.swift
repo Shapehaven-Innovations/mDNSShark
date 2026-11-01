@@ -1,5 +1,6 @@
 // mDNSShark/Devices/DeviceDetailView.swift
 import SwiftUI
+import DeviceFingerprint
 
 struct DeviceDetailView: View {
     @EnvironmentObject var scanVM: NetworkScanViewModel
@@ -71,6 +72,7 @@ struct DeviceDetailView: View {
                             Text(note).font(.caption).foregroundColor(.secondary)
                         }
                         row("Manufacturer", device.manufacturer ?? "Unknown")
+                        if device.isApplianceMaker { AppBadge(text: "Appliance maker (vendor name is on the appliance list)", color: AppColors.pending) }
                         row("Inferred OS",  device.displayInferredOS  ?? "Unknown")
                         if let server = device.ssdpServer { row("Server header", server, selectable: true) }
                         row("Open Ports",   device.openPorts.isEmpty ? device.noOpenPortsText : device.openPorts.map { String($0) }.joined(separator: ", "))
@@ -104,6 +106,12 @@ struct DeviceDetailView: View {
                                     Text(svc.serviceType).font(.subheadline.weight(.semibold))
                                     Text(svc.serviceName).font(.caption).foregroundColor(.secondary)
                                     if svc.port > 0 { Text("Advertised port \(String(svc.port))").font(.caption2).foregroundColor(.secondary) }
+                                    if svc.serviceType == "_matterc._udp", let dt = svc.txtRecords["DT"], let name = BonjourTypeCatalog.matterDeviceTypeName(dt) {
+                                        Text(verbatim: "Matter device type: \(name) (DT \(dt))").font(.caption2).foregroundColor(.secondary)
+                                    }
+                                    ForEach(svc.txtRecords.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
+                                        Text(verbatim: "\(key): \(value)").font(.caption2).foregroundColor(.secondary)
+                                    }
                                 }
                                 if svc.id != device.bonjourServices.last?.id { Divider() }
                             }

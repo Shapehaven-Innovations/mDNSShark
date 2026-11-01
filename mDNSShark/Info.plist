@@ -59,6 +59,77 @@
 		<!-- Used only by LocalNetworkPermissionGate.swift's Bonjour preflight
 		     check (never advertised/browsed for any real device). -->
 		<string>_mdnssharklnp._tcp</string>
+		<string>_axis-video._tcp</string>
+		<string>_axis-nvr._tcp</string>
+		<string>_axis-nvr._udp</string>
+		<string>_acsp-server._tcp</string>
+		<string>_rtsp._tcp</string>
+		<string>_psia._tcp</string>
+		<string>_cctv._tcp</string>
+		<string>_amba-cam._udp</string>
+		<string>_matter._tcp</string>
+		<string>_matterc._udp</string>
+		<string>_matterd._udp</string>
+		<string>_hap._udp</string>
+		<string>_meshcop._udp</string>
+		<string>_hue._tcp</string>
+		<string>_sonos._tcp</string>
+		<string>_esphomelib._tcp</string>
+		<string>_shelly._tcp</string>
+		<string>_wled._tcp</string>
+		<string>_lutron._tcp</string>
+		<string>_ecobee._tcp</string>
+		<string>_homekit._tcp</string>
+		<string>_miio._udp</string>
+		<string>_lifx._udp</string>
+		<string>_nanoleafapi._tcp</string>
+		<string>_elg._tcp</string>
+		<string>_home-assistant._tcp</string>
+		<string>_homeconnect._tcp</string>
+		<string>_amzn-alexa._tcp</string>
+		<string>_bond._tcp</string>
+		<string>_powerview._tcp</string>
+		<string>_enphase-envoy._tcp</string>
+		<string>_arduino._tcp</string>
+		<string>_dyson_mqtt._tcp</string>
+		<string>_androidtvremote2._tcp</string>
+		<string>_viziocast._tcp</string>
+		<string>_philipstv_rpc._tcp</string>
+		<string>_mediaremotetv._tcp</string>
+		<string>_appletv-v2._tcp</string>
+		<string>_hscp._tcp</string>
+		<string>_home-sharing._tcp</string>
+		<string>_heos-audio._tcp</string>
+		<string>_soundtouch._tcp</string>
+		<string>_amzn-wplay._tcp</string>
+		<string>_linkplay._tcp</string>
+		<string>_musc._tcp</string>
+		<string>_bangolufsen._tcp</string>
+		<string>_uscan._tcp</string>
+		<string>_uscans._tcp</string>
+		<string>_qdiscover._tcp</string>
+		<string>_wd-2go._tcp</string>
+		<string>_nut._tcp</string>
+		<string>_net-assistant._udp</string>
+		<string>_FC9F5ED42C8A._tcp</string>
+		<string>_adb-tls-connect._tcp</string>
+		<string>_remotepairing._tcp</string>
+		<string>_netaudio-arc._udp</string>
+		<string>_netaudio-cmc._udp</string>
+		<string>_ndi._tcp</string>
+		<string>_qlab._tcp</string>
+		<string>_apple-midi._udp</string>
+		<string>_mieleathome._tcp</string>
+		<string>_dkapi._tcp</string>
+		<string>_openevse._tcp</string>
+		<string>_rabbitair._udp</string>
+		<string>_hwenergy._tcp</string>
+		<string>_homewizard._tcp</string>
+		<string>_sideplay._tcp</string>
+		<string>_360eye_mqtt._tcp</string>
+		<string>_aicu-http._tcp</string>
+		<string>_moonraker._tcp</string>
+		<string>_prusalink._tcp</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>

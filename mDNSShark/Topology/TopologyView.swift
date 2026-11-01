@@ -221,7 +221,7 @@ struct TopologyView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     typeChip(nil,       "All")
-                    ForEach(DeviceType.allCases, id: \.self) { typeChip($0, $0.label) }
+                    ForEach(Self.visibleTypeChips(devices: scanVM.devices, active: typeFilters), id: \.self) { typeChip($0, $0.label) }
                 }
                 .padding(.horizontal, 2)
             }
@@ -247,6 +247,12 @@ struct TopologyView: View {
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+    }
+
+    /// Chips for the types present among the devices or currently filtered on, in declaration order.
+    static func visibleTypeChips(devices: [DiscoveredDevice], active: Set<DeviceType>) -> [DeviceType] {
+        let present = Set(devices.map(\.deviceType))
+        return DeviceType.allCases.filter { present.contains($0) || active.contains($0) }
     }
 
     private func typeChip(_ type: DeviceType?, _ label: String) -> some View {
@@ -282,7 +288,7 @@ struct TopologyView: View {
             case .tv:       return 4
             case .printer:  return 5
             case .camera:   return 6
-            case .computer: return 6
+            case .computer, .audio, .smartHome, .nas: return 6
             default:        return 7
             }
         }

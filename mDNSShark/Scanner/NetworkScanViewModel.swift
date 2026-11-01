@@ -64,6 +64,8 @@ final class NetworkScanViewModel: ObservableObject {
     private var enrichedIPsThisScan = Set<String>()
     // Addresses refused as off-subnet, not marked enriched, so a later merge that adds an on-subnet address can still probe them.
     private var skippedOffSubnetIPs = Set<String>()
+    // Addresses whose probes were refused (no IPv4 address in the group, or not LAN-local), so the row says Not probed instead of None.
+    private var refusedProbeIPs = Set<String>()
     // The payment-vendor gate per probed address this scan: ARP is read and the vendor decided before any probe, fetch or Google Wifi send.
     private enum VendorGateState { case waiting, passed, skipped }
     private var vendorGateByIP: [String: VendorGateState] = [:]
@@ -180,6 +182,7 @@ final class NetworkScanViewModel: ObservableObject {
         enrichmentCoordinator.cancelAll()
         enrichedIPsThisScan.removeAll()
         skippedOffSubnetIPs.removeAll()
+        refusedProbeIPs.removeAll()
         for task in vendorGateTasks.values { task.cancel() }
         vendorGateTasks.removeAll()
         vendorGateByIP.removeAll()
@@ -214,17 +217,30 @@ final class NetworkScanViewModel: ObservableObject {
     /// Fires the probe set for an address once per scan. A host known to be off this phone's networks (reflected from another VLAN)
     /// and an address the coordinator would refuse (not LAN-local) get no probes and count as settled instead of pending forever.
     /// `ip` is the row's effective address; probes go to `probeIP`, the group's first address on a connected subnet.
-    private func dispatchProbesIfNeeded(ip: String, probeIP: String, locationURL: URL?, onLocalSubnet: Bool?) {
+    private func dispatchProbesIfNeeded(ip: String, group: Set<String>, probeIP: String, locationURL: URL?, onLocalSubnet: Bool?, hasIPv4: Bool) {
+        // The effective address can change as a group gains an address, so lift every earlier skip or refusal for the group first.
+        for address in group where skippedOffSubnetIPs.remove(address) != nil {
+            settledIPsThisScan.remove(address)
+            refusedProbeIPs.remove(address)
+        }
+        if SSDPDescriptionFetcher.isLANLocalAddress(probeIP) { refusedProbeIPs.remove(probeIP) }
         if onLocalSubnet == false {
             skippedOffSubnetIPs.insert(ip)
             settledIPsThisScan.insert(ip)
             return
         }
-        if skippedOffSubnetIPs.remove(ip) != nil { settledIPsThisScan.remove(ip) }
+        // An IPv6-only group (Thread, Matter, SRP proxies) is never probed: IPv6 scopes are not compared, and those devices are fragile.
+        if !hasIPv4 {
+            skippedOffSubnetIPs.insert(ip)
+            refusedProbeIPs.insert(ip)
+            settledIPsThisScan.insert(ip)
+            return
+        }
         probeTargetByIP[ip] = probeIP
         guard !enrichedIPsThisScan.contains(probeIP) else { return }
         enrichedIPsThisScan.insert(probeIP)
         guard SSDPDescriptionFetcher.isLANLocalAddress(probeIP) else {
+            refusedProbeIPs.insert(probeIP)
             settledIPsThisScan.insert(probeIP)
             return
         }
@@ -593,6 +609,7 @@ final class NetworkScanViewModel: ObservableObject {
                 if let server = device.ssdpServer { existing.ssdpServer = min(existing.ssdpServer ?? server, server) }
                 if existing.manufacturer == nil {
                     existing.manufacturer = appleManufacturer(serviceType: device.serviceType, txtRecords: device.txtRecords)
+                        ?? Self.catalogVendor(serviceType: device.serviceType, txtRecords: device.txtRecords)
                 }
                 byIP[ip] = existing
                 dispatchDescriptionFetchIfNeeded(ip: ip, locationURL: device.locationURL, onLocalSubnet: existing.isOnLocalSubnet)
@@ -609,13 +626,15 @@ final class NetworkScanViewModel: ObservableObject {
                     mfr = "eero"
                 }
                 if mfr == nil { mfr = appleManufacturer(serviceType: device.serviceType, txtRecords: device.txtRecords) }
+                if mfr == nil { mfr = Self.catalogVendor(serviceType: device.serviceType, txtRecords: device.txtRecords) }
                 let os = inferOS(serviceType: device.serviceType, manufacturer: mfr, txtRecords: device.txtRecords)
                 let identity = identityByEffectiveIP[ip] ?? ip
                 let group = addressesByEffectiveIP[ip] ?? [ip]
                 let onLocalSubnet = LocalInterfaces.isOnLocalSubnet(addresses: Array(group), subnets: own.ipv4Subnets)
                 let probeIP = group.sorted(by: NetworkScanner.isAddressOrdered)
                     .first { LocalInterfaces.isOnLocalSubnet(addresses: [$0], subnets: own.ipv4Subnets) == true } ?? ip
-                dispatchProbesIfNeeded(ip: ip, probeIP: probeIP, locationURL: device.locationURL, onLocalSubnet: onLocalSubnet)
+                dispatchProbesIfNeeded(ip: ip, group: group, probeIP: probeIP, locationURL: device.locationURL, onLocalSubnet: onLocalSubnet,
+                                       hasIPv4: group.contains { LocalInterfaces.ipv4Value($0) != nil })
                 var newDevice = DiscoveredDevice(
                     id:              stableID(forIdentity: identity, ip: ip),
                     hostname:        hostNameByIP[ip] ?? fallbackNameByIP[ip] ?? ip,
@@ -630,6 +649,7 @@ final class NetworkScanViewModel: ObservableObject {
                 newDevice.ssdpServer = device.ssdpServer
                 newDevice.isDefaultGateway = own.gatewaysIPv4.isEmpty ? nil : !own.gatewaysIPv4.filter(group.contains).isEmpty
                 newDevice.isOnLocalSubnet = onLocalSubnet
+                newDevice.probeRefused = group.contains { refusedProbeIPs.contains($0) }
                 newDevice.paymentVendorSkip = group.sorted().lazy.compactMap { self.paymentSkipByIP[$0] }.first
                 // Re-merge stored raw enrichments against the fresh baseline, not a stale merged snapshot.
                 let stored = enrichments(forAddresses: group)
@@ -719,6 +739,13 @@ final class NetworkScanViewModel: ObservableObject {
 
     private func sendGoogleWifi(ip: String) {
         if let googleWifiOverride { googleWifiOverride(ip) } else { enrichmentCoordinator.enrichGoogleWifi(ip: ip) }
+    }
+
+    /// A vendor read from a service's own non-empty TXT claim when the catalog names a key for the type; nil otherwise, so the OUI lookup can still fill it.
+    nonisolated static func catalogVendor(serviceType: String, txtRecords: [String: String]?) -> String? {
+        let type = serviceType.hasSuffix(".") ? String(serviceType.dropLast()) : serviceType
+        guard let key = BonjourTypeCatalog.vendorTXTKeys[type], let value = txtRecords?[key], !value.isEmpty else { return nil }
+        return value
     }
 
     /// AirPlay/RAOP advertise the hardware model ("model" / "am", e.g. "MacBookPro16,2"). Only those rows are

@@ -15,14 +15,15 @@ struct CameraTypeTests {
         #expect(device(manufacturer: "Amcrest Technologies", services: [BonjourService(serviceType: "_http._tcp", serviceName: "Cam", port: 80)]).deviceType == .camera)
     }
 
-    @Test("a HomeKit IP camera or video doorbell is a camera, an alarm panel is not")
+    @Test("a HomeKit IP camera or video doorbell is a camera, an alarm panel is smart home")
     func hapCategory() {
         func hap(_ ci: String) -> DiscoveredDevice {
             device(services: [BonjourService(serviceType: "_hap._tcp", serviceName: "Acc", port: 1, txtRecords: ["ci": ci])])
         }
         #expect(hap("17").deviceType == .camera)
         #expect(hap("18").deviceType == .camera)
-        #expect(hap("11").deviceType == .unknown)
+        #expect(hap("11").deviceType == .smartHome)
+        #expect(hap("99").deviceType == .unknown)
     }
 
     @Test("a camera service type or a Matter camera device type makes a camera")

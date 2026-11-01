@@ -6,6 +6,7 @@ import Combine
 import CoreFoundation
 import os
 import Darwin
+import DeviceFingerprint
 
 // MARK: - NetworkScanner
 class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
@@ -23,7 +24,9 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
     private var scanStartedAt: Date?
 
     // List of service types to search for
-    private let serviceTypes: [String] = [
+    static let serviceTypes: [String] = baseServiceTypes + BonjourTypeCatalog.browseTypes.filter { !baseServiceTypes.contains($0) }
+
+    private static let baseServiceTypes: [String] = [
         // MARK: - Common Services
         "_http._tcp",
         "_https._tcp",
@@ -177,10 +180,10 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         devices.removeAll()
         isScanning = true
         stopActiveResolves()
-        logger.info("Starting network scan for service types: \(self.serviceTypes)")
+        logger.info("Starting network scan for service types: \(Self.serviceTypes)")
         
         // Start Bonjour scanning.
-        for type in self.serviceTypes {
+        for type in Self.serviceTypes {
             createAndStartBrowser(for: type)
         }
         

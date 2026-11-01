@@ -179,7 +179,7 @@ struct PaymentVendorGateTests {
         #expect(rec.probes == ["10.10.30.45"])
     }
 
-    @Test("an IPv6-only effective address is never gated: no ARP read, the probe set is sent")
+    @Test("an IPv6-only effective address is never gated or probed: no ARP read, no probe set, and the row reads Not probed")
     func ipv6OnlyPassesUngated() {
         let rec = Recorder()
         let vm = viewModel(rec) { _ in .resolved(paxMAC) }
@@ -187,8 +187,9 @@ struct PaymentVendorGateTests {
         let devices = vm.merge(raw: castRow(ip: "fd00::40", host: "v6.local."))
 
         #expect(rec.lookups.isEmpty)
-        #expect(rec.probes == ["fd00::40"])
+        #expect(rec.probes.isEmpty)
         #expect(devices.first?.paymentVendorSkip == nil)
+        #expect(devices.first?.wasProbed == false)
     }
 
     @Test("an inferred vendor is badged with a question mark, a direct one is not")
