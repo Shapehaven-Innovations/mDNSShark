@@ -11,6 +11,8 @@ struct TopologyView: View {
     // in, instead of getting stuck on "Unknown" if tapped before it lands.
     @State private var selectedDeviceID: UUID? = nil
     @State private var navigateToDetail = false
+    // Fallback while a rescan has not re-found the tapped device, so the pushed screen never goes blank.
+    @State private var selectedDevice: DiscoveredDevice? = nil
     @State private var securityFilters: Set<SecurityStatus> = []
     @State private var typeFilters: Set<DeviceType> = []
     @State private var showingPicker = false
@@ -133,6 +135,7 @@ struct TopologyView: View {
                                                 .position(pixelPos(node.position))
                                                 .onTapGesture {
                                                     selectedDeviceID = node.device.id
+                                                    selectedDevice = node.device
                                                     navigateToDetail = true
                                                 }
                                                 .accessibilityAddTraits(.isButton)
@@ -195,7 +198,7 @@ struct TopologyView: View {
                 // No findings overlay here: DeviceDetailView re-reads the
                 // live row and findings from the coordinator itself.
                 if let id = selectedDeviceID,
-                   let device = coordinator.networkScanViewModel.devices.first(where: { $0.id == id }) {
+                   let device = coordinator.networkScanViewModel.devices.first(where: { $0.id == id }) ?? selectedDevice {
                     DeviceDetailView(device: device)
                 }
             }

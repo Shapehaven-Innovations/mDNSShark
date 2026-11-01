@@ -42,8 +42,12 @@ final class NetworkScanViewModel: ObservableObject {
     private var carriedEnrichmentsByIP: [String: Stamped<[DeviceEnrichment]>] = [:]
     // The scanner rows last applied, so an enrichment result rebuilds the same rows instead of patching one device in place.
     private var lastRaw: [NetworkScanner.Device] = []
-    // True from scan start until its first non-empty raw result, so the previous list is held instead of blanked.
+    // True from scan start until the scanner publishes its first rows, so a result landing meanwhile does not rebuild last scan's rows.
     private var holdingUntilFirstResult = false
+    // Last scan's rows and unattached services, overlaid on this scan's results until each is re-resolved or the scan ends, so a rescan
+    // repopulates in place instead of collapsing the list and regrowing it.
+    private var heldDevicesByID: [UUID: DiscoveredDevice] = [:]
+    private var heldServices: [DiscoveredService] = []
     // The three sets below stay per IP on purpose: each probe targets one address, and a host's new address deserves its own probe.
     // One SSDP description fetch per IP per scan.
     private var fetchedDescriptionIPs = Set<String>()
@@ -79,9 +83,11 @@ final class NetworkScanViewModel: ObservableObject {
             .sink { [weak self] scanning in
                 guard let self else { return }
                 self.isScanning = scanning
-                // A scan that ended having found nothing releases the held list; a restart has already set the scanner scanning again.
-                if !scanning, !self.scanner.isScanning, self.holdingUntilFirstResult {
+                // The scan ending drops whatever it did not re-find; a restart has already set the scanner scanning again.
+                if !scanning, !self.scanner.isScanning, self.holdingUntilFirstResult || !self.heldDevicesByID.isEmpty || !self.heldServices.isEmpty {
                     self.holdingUntilFirstResult = false
+                    self.heldDevicesByID = [:]
+                    self.heldServices = []
                     self.apply(raw: self.scanner.devices)
                 }
             }
@@ -134,6 +140,8 @@ final class NetworkScanViewModel: ObservableObject {
         ownAddressesThisScan = nil
         networkCIDRThisScan = nil
         holdingUntilFirstResult = true
+        heldDevicesByID = Dictionary(devices.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        heldServices = unattachedServices
     }
 
     private func currentOwnAddresses() -> LocalInterfaces.OwnAddresses {
@@ -192,16 +200,39 @@ final class NetworkScanViewModel: ObservableObject {
     }
 
     /// Merges and publishes, assigning only when the result changed so SwiftUI and the assess pipeline see real changes only.
-    private func apply(raw: [NetworkScanner.Device]) {
+    func apply(raw: [NetworkScanner.Device]) {
         lastRaw = raw
-        let merged = mergeScan(raw: raw)
-        // The last scan's rows stay on screen until this scan resolves its first device or service, so a rescan never flashes the empty state.
-        if holdingUntilFirstResult {
-            guard !merged.devices.isEmpty || !merged.services.isEmpty else { return }
-            holdingUntilFirstResult = false
-        }
+        holdingUntilFirstResult = false
+        let merged = overlayingHeld(mergeScan(raw: raw), raw: raw)
         if merged.devices != devices { devices = merged.devices }
         if merged.services != unattachedServices { unattachedServices = merged.services }
+    }
+
+    /// Adds last scan's rows and services that this scan has not re-resolved yet. A service whose resolve settled this scan is final
+    /// (live wins, even when it failed); an unsettled one is carried. A held row this scan has not found stays whole.
+    private func overlayingHeld(_ merged: ScanMerge, raw: [NetworkScanner.Device]) -> ScanMerge {
+        guard !heldDevicesByID.isEmpty || !heldServices.isEmpty else { return merged }
+        let settledKeys = Set(raw.filter { $0.resolveSettled && $0.serviceType.hasPrefix("_") }.map { "\($0.serviceType)|\($0.serviceName)" })
+        var devices = merged.devices
+        for held in heldDevicesByID.values.sorted(by: { $0.ipAddress < $1.ipAddress }) {
+            if let i = devices.firstIndex(where: { $0.id == held.id || $0.ipAddress == held.ipAddress }) {
+                for service in held.bonjourServices where !settledKeys.contains(service.id) && !devices[i].bonjourServices.contains(where: { $0.id == service.id }) {
+                    devices[i].bonjourServices.append(service)
+                }
+                devices[i].addresses = Self.orderedAddresses(Set(devices[i].addresses).union(held.addresses))
+            } else {
+                devices.append(held)
+            }
+        }
+        devices.sort { $0.ipAddress < $1.ipAddress }
+        var services = merged.services
+        let attachedKeys = Set(devices.flatMap(\.bonjourServices).map(\.id))
+        let liveServiceIDs = Set(services.map(\.id))
+        for held in heldServices where !liveServiceIDs.contains(held.id) && !attachedKeys.contains("\(held.serviceType)|\(held.name)") {
+            services.append(held)
+        }
+        services.sort { ($0.name, $0.typeLabel, $0.id) < ($1.name, $1.typeLabel, $1.id) }
+        return ScanMerge(devices: devices, services: services)
     }
 
     /// The device rows and the advertisements that resolved to no device.
@@ -244,7 +275,7 @@ final class NetworkScanViewModel: ObservableObject {
         var rawAddressesByHostIP: [String: Set<String>] = [:]
         for (device, hostIP) in zip(raw, hostIPs) {
             guard let hostIP else { continue }
-            rawAddressesByHostIP[hostIP, default: [hostIP]].insert(device.resolvedIPAddress ?? hostIP)
+            rawAddressesByHostIP[hostIP, default: [hostIP]].formUnion(device.resolvedAddresses.union([device.resolvedIPAddress ?? hostIP]))
         }
         let ownKeys = Set(own.all.map(LocalInterfaces.addressMatchKey))
         let ownGroupIPs = Set(rawAddressesByHostIP.filter { !ownKeys.isDisjoint(with: $0.value.map(LocalInterfaces.addressMatchKey)) }.keys)
@@ -286,7 +317,7 @@ final class NetworkScanViewModel: ObservableObject {
         var addressesByEffectiveIP: [String: Set<String>] = [:]
         for (device, ip) in zip(raw, effectiveIPByRow) {
             guard let ip else { continue }
-            addressesByEffectiveIP[ip, default: [ip]].insert(device.resolvedIPAddress ?? ip)
+            addressesByEffectiveIP[ip, default: [ip]].formUnion(device.resolvedAddresses.union([device.resolvedIPAddress ?? ip]))
             if let address = device.resolvedIPAddress, identityByEffectiveIP[address] == nil, hostIdentityByAddress[address] == nil,
                let identity = identityByEffectiveIP[ip], identity != ip {
                 hostIdentityByAddress[address] = identity

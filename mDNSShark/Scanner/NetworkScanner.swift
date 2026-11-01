@@ -129,6 +129,8 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         let serviceTypeKey: String
 
         @Published var resolvedIPAddress: String? = nil
+        /// Every address a resolve has reported for this row, so the device lists all of them whatever order the callbacks arrive in.
+        var resolvedAddresses: Set<String> = []
         @Published var friendlyName: String? = nil
         @Published var model: String? = nil
         @Published var port: Int? = nil
@@ -442,6 +444,7 @@ class NetworkScanner: NSObject, ObservableObject, NetServiceDelegate {
         let port = sender.port
         DispatchQueue.main.async {
             device.resolvedIPAddress = foundIP
+            device.resolvedAddresses.formUnion(parsed)
             if let hostName { device.hostName = hostName }
             if port > 0 { device.port = port }
             if let txt, !txt.isEmpty {

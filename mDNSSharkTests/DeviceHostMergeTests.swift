@@ -549,6 +549,40 @@ struct DeviceHostMergeTests {
         #expect(devices[0].bonjourServices.count == 1)
     }
 
+    // MARK: - Rescan carry
+
+    @Test("a device lists every address its resolves reported, whatever order they arrived in")
+    func everyResolvedAddressIsListed() {
+        let vm = viewModel()
+        let row = bonjourRow(type: "_airplay._tcp", name: "Mac", ip: "203.0.113.10", host: "Mac.local.", port: 7000)
+        row.resolvedAddresses = ["169.254.46.247", "203.0.113.10"]
+
+        let devices = vm.merge(raw: [row])
+
+        #expect(devices.count == 1)
+        #expect(Set(devices[0].addresses) == ["203.0.113.10", "169.254.46.247"])
+    }
+
+    @Test("a rescan keeps last scan's rows and unresolved services until they are re-resolved or the scan ends")
+    func rescanCarriesRowsAndServices() {
+        let vm = viewModel()
+        let test = bonjourRow(type: "_http._tcp", name: "Test Service", ip: "203.0.113.10", host: "Mac.local.", port: 8080)
+        let air = bonjourRow(type: "_airplay._tcp", name: "Mac", ip: "203.0.113.10", host: "Mac.local.", port: 7000)
+        vm.apply(raw: [test, air])
+        #expect(Set(vm.devices[0].bonjourServices.map(\.serviceName)) == ["Test Service", "Mac"])
+
+        vm.resetForNewScan()
+        // Only the airplay row is back so far; the held row and its other service stay.
+        let air2 = bonjourRow(type: "_airplay._tcp", name: "Mac", ip: "203.0.113.10", host: "Mac.local.", port: 7000)
+        vm.apply(raw: [air2])
+        #expect(vm.devices.count == 1)
+        #expect(Set(vm.devices[0].bonjourServices.map(\.serviceName)) == ["Test Service", "Mac"])
+
+        // An empty first publish keeps the whole previous list.
+        vm.apply(raw: [])
+        #expect(vm.devices.count == 1)
+    }
+
     // MARK: - Services without a device
 
     @Test("a Bonjour row whose resolve has not answered yet is neither a device nor a service")
