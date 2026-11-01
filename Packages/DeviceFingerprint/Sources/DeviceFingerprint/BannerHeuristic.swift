@@ -40,6 +40,17 @@ public func guessFromBanner(_ banner: String) -> BannerGuess {
         manufacturer = "GL.iNet"
     } else if lower.contains("netgear") {
         manufacturer = "Netgear"
+    } else if lower.contains("hikvision") || lower.contains("dnvrs-webs") || lower.contains("dvrdvs-webs") || lower.contains("app-webs") {
+        manufacturer = "Hikvision"
+    } else if lower.contains("dahua") {
+        manufacturer = "Dahua"
+    } else if lower.contains("amcrest") {
+        manufacturer = "Amcrest"
+    } else if lower.contains("reolink") {
+        manufacturer = "Reolink"
+    } else if lower.contains("uc-httpd") || lower.contains("netsurveillance") {
+        // Xiongmai white-label DVRs and cameras sell under many brand names.
+        manufacturer = "Xiongmai"
     } else if lower.contains("asus") {
         // Specific-before-generic: "asus" alone can false-positive on words
         // like "pegasus" (same accepted risk class as "unifi"/"unified"

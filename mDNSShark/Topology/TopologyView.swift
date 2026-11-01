@@ -281,6 +281,7 @@ struct TopologyView: View {
             case .apple:    return 3
             case .tv:       return 4
             case .printer:  return 5
+            case .camera:   return 6
             case .computer: return 6
             default:        return 7
             }

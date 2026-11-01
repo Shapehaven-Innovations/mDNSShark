@@ -45,23 +45,7 @@ final class AppCoordinator: ObservableObject {
         wire()
         UserDefaults.standard.removeObject(forKey: "preferredColorScheme") // retired theme override
         Task { await securityViewModel.loadThreatDataStatus() }
-        // Waits out iOS's Local Network Privacy decision before the very
-        // first scan fires. Starting immediately here raced the system
-        // permission alert on every fresh install (confirmed via a live
-        // device log: `errno=65 EHOSTUNREACH` / `Local network prohibited`
-        // on probes that fired before the user could possibly have
-        // answered it, since the alert itself only renders in response to
-        // this same traffic). See LocalNetworkPermissionGate.swift.
-        Task {
-            let decision = await LocalNetworkPermissionGate.waitForDecision()
-            networkScanViewModel.apply(permissionDecision: decision)
-            // If the user already ran a manual scan (the header Scan
-            // button isn't disabled during the gate wait) while this was
-            // still resolving, don't silently replace it with a second,
-            // unrequested scan.
-            guard !networkScanViewModel.hasScannedAtLeastOnce else { return }
-            networkScanViewModel.startScan()
-        }
+        // The Local Network check and first scan start from ContentView once the splash is gone: `NetworkScanViewModel.startLaunchGateIfNeeded`.
         packetCaptureManager.healStaleVPNConfigIfNeeded()
     }
 

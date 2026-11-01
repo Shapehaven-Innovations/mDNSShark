@@ -61,6 +61,6 @@
 		<string>_mdnssharklnp._tcp</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
-	<string>Launch Screen</string>
+	<string>LaunchScreen</string>
 </dict>
 </plist>

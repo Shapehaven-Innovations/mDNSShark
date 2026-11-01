@@ -3,7 +3,7 @@ import Foundation
 import DeviceFingerprint
 
 enum DeviceType: Hashable, CaseIterable {
-    case router, apple, computer, printer, tv, unknown
+    case router, apple, computer, printer, tv, camera, unknown
 
     /// The one label every surface shows (Topology chips, pin picker, Devices card).
     var label: String {
@@ -13,6 +13,7 @@ enum DeviceType: Hashable, CaseIterable {
         case .computer: return "Computer"
         case .printer:  return "Printer"
         case .tv:       return "TV"
+        case .camera:   return "Camera"
         case .unknown:  return "Unknown"
         }
     }
@@ -116,6 +117,17 @@ struct DiscoveredDevice: Identifiable, Equatable {
     /// Every model string the services advertise, so the type is a function of all the evidence and not of which service arrived first.
     private var advertisedModels: [String] { bonjourServices.compactMap { $0.txtRecords["model"] ?? $0.txtRecords["am"] } }
 
+    /// Any one camera signal counts: a camera-only vendor, a camera service type or instance name, a HomeKit camera category, or a Matter camera device type.
+    private var hasCameraEvidence: Bool {
+        if let manufacturer, CameraHint.isCameraVendor(manufacturer) { return true }
+        return bonjourServices.contains { service in
+            CameraHint.isCameraServiceType(service.serviceType)
+                || CameraHint.isCameraInstanceName(service.serviceName)
+                || (service.serviceType == "_hap._tcp" && service.txtRecords["ci"].map(CameraHint.isCameraHAPCategory) == true)
+                || (service.serviceType == "_matterc._udp" && service.txtRecords["DT"].map(CameraHint.isCameraMatterDeviceType) == true)
+        }
+    }
+
     var deviceType: DeviceType {
         if isGateway { return .router }
         let types = bonjourServices.map { $0.serviceType }
@@ -127,6 +139,7 @@ struct DiscoveredDevice: Identifiable, Equatable {
             if models.isEmpty, types.contains("_smb._tcp") || types.contains("_afpovertcp._tcp") { return .computer }
             return .apple
         }
+        if hasCameraEvidence { return .camera }
         if types.contains("_ipp._tcp") || types.contains("_printer._tcp") { return .printer }
         // _rdlink._tcp is advertised only by iPhone and iPad, so it marks an Apple device without saying which.
         if types.contains("_apple-mobdev2._tcp") || types.contains("_airdrop._tcp") || types.contains("_rdlink._tcp") { return .apple }
@@ -139,6 +152,7 @@ struct DiscoveredDevice: Identifiable, Equatable {
         switch deviceType {
         case .router:   return "wifi.router"
         case .tv:       return "tv"
+        case .camera:   return "video"
         case .printer:  return "printer"
         case .apple:    return appleModelIcon ?? "laptopcomputer.and.iphone"
         case .computer: return "laptopcomputer"

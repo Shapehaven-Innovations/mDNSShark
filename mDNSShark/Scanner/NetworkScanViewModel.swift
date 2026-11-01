@@ -10,10 +10,15 @@ final class NetworkScanViewModel: ObservableObject {
     /// Advertisements with no resolved device (no IP, or a host name no device carries); shown as services, never counted as devices.
     @Published var unattachedServices: [DiscoveredService] = []
     @Published var isScanning: Bool = false
-    /// Lets `AppCoordinator` skip its automatic first scan if the user already started one manually.
+    /// Lets the launch gate skip its automatic first scan if the user already started one manually.
     private(set) var hasScannedAtLeastOnce = false
     /// True once the Local Network permission resolved as denied; drives the "Open Settings" banner in ContentView.
     @Published private(set) var isLocalNetworkDenied = false
+    /// True once the launch Local Network check was granted; until then every foreground retries it so the system alert can never be lost.
+    private(set) var launchGateSettled = false
+    private var launchGateInFlight = false
+    /// Set when the first scan ran before permission was granted, so granting later restarts it instead of leaving it near empty.
+    private var autoScanNeedsRedo = false
 
     private let scanner     = NetworkScanner()
     private let localUtil   = LocalDeviceScanner()
@@ -177,6 +182,47 @@ final class NetworkScanViewModel: ObservableObject {
     /// A device's addresses in display order: LAN IPv4, link-local IPv4, routable IPv6, then fe80, each raw as received.
     nonisolated static func orderedAddresses(_ addresses: Set<String>) -> [String] {
         addresses.sorted(by: NetworkScanner.isAddressOrdered)
+    }
+
+    enum LaunchGateAction: Equatable { case none, scan, restart }
+
+    struct LaunchGatePlan: Equatable {
+        var settles: Bool
+        var action: LaunchGateAction
+        var autoScanNeedsRedo: Bool
+    }
+
+    /// What to do with a launch gate result: only a grant settles it, the first scan runs once, and a grant after an unpermitted scan restarts it.
+    nonisolated static func launchGatePlan(decision: LocalNetworkPermissionGate.Decision, hasScanned: Bool, autoScanNeedsRedo: Bool) -> LaunchGatePlan {
+        if decision == .granted {
+            let action: LaunchGateAction = autoScanNeedsRedo ? .restart : (hasScanned ? .none : .scan)
+            return LaunchGatePlan(settles: true, action: action, autoScanNeedsRedo: false)
+        }
+        return LaunchGatePlan(settles: false, action: hasScanned ? .none : .scan, autoScanNeedsRedo: hasScanned ? autoScanNeedsRedo : true)
+    }
+
+    /// Never starts in the background, where iOS denies the operation without showing or recording the alert (TN3179).
+    nonisolated static func shouldStartLaunchGate(settled: Bool, inFlight: Bool, isActive: Bool) -> Bool {
+        !settled && !inFlight && isActive
+    }
+
+    /// Runs the Local Network check and the first scan once the splash is gone and the app is active; safe to call on every foreground.
+    func startLaunchGateIfNeeded(isActive: Bool) {
+        guard Self.shouldStartLaunchGate(settled: launchGateSettled, inFlight: launchGateInFlight, isActive: isActive) else { return }
+        launchGateInFlight = true
+        Task {
+            let decision = await LocalNetworkPermissionGate.waitForDecision()
+            launchGateInFlight = false
+            apply(permissionDecision: decision)
+            let plan = Self.launchGatePlan(decision: decision, hasScanned: hasScannedAtLeastOnce, autoScanNeedsRedo: autoScanNeedsRedo)
+            launchGateSettled = plan.settles
+            autoScanNeedsRedo = plan.autoScanNeedsRedo
+            switch plan.action {
+            case .scan:    startScan()
+            case .restart: restartScan()
+            case .none:    break
+            }
+        }
     }
 
     func apply(permissionDecision decision: LocalNetworkPermissionGate.Decision) {
