@@ -18,6 +18,7 @@ struct TopologyView: View {
     @State private var typeFilters: Set<DeviceType> = []
     @State private var showingPicker = false
     @State private var showingServices = false
+    @State private var showingNetworks = false
     @AppStorage("pinnedDeviceIPs") private var pinnedIPsRaw: String = ""
 
     private var pinnedIPs: Set<String> {
@@ -40,8 +41,8 @@ struct TopologyView: View {
         // The layout comes from every shown device, so toggling a chip never moves a node; chips only hide nodes (see `matchingIDs`).
         let filtered = toShow
 
-        let gateway   = filtered.first { $0.isGateway } ?? filtered[0]
-        let others    = filtered.filter { $0.id != gateway.id }
+        let (hub, others) = Self.layout(filtered)
+        guard let gateway = hub else { return [] }
         var result    = [TopologyNode(device: enriched(gateway, findings), position: .zero)]
         guard !others.isEmpty else { return result }
 
@@ -51,6 +52,15 @@ struct TopologyView: View {
             result.append(TopologyNode(device: enriched(d, findings), position: unitPosition(index: i, of: slots)))
         }
         return result
+    }
+
+    /// The hub is the gateway if shown, else the first device not known to be off-network, else the first device. The rest keep their order
+    /// with off-network devices last, so they cluster on the final arc of the ring.
+    static func layout(_ devices: [DiscoveredDevice]) -> (hub: DiscoveredDevice?, others: [DiscoveredDevice]) {
+        let hub = devices.first { $0.isGateway && $0.isOnLocalSubnet != false } ?? devices.first { $0.isOnLocalSubnet != false }
+            ?? devices.first { $0.isGateway } ?? devices.first
+        let rest = devices.filter { $0.id != hub?.id }
+        return (hub, rest.filter { $0.isOnLocalSubnet != false } + rest.filter { $0.isOnLocalSubnet == false })
     }
 
     /// The nodes the active chips let through; the rest keep their slot but are not drawn.
@@ -92,6 +102,15 @@ struct TopologyView: View {
                                     Label { Text("Network Topology") } icon: { WifiGlyph().frame(width: 20, height: 20) }
                                         .font(.headline)
                                     Spacer()
+                                    Button { showingNetworks = true } label: {
+                                        Image(systemName: "info.circle")
+                                            .font(.title3)
+                                            .foregroundColor(AppColors.info)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .frame(minWidth: 44, minHeight: 44)
+                                    .accessibilityLabel("Networks")
+                                    .accessibilityHint("Shows this phone's networks and the devices outside them")
                                     Button { showingPicker = true } label: {
                                         Image(systemName: "pin.circle")
                                             .font(.title3)
@@ -120,15 +139,18 @@ struct TopologyView: View {
 
                                     ZStack {
                                         Canvas { ctx, _ in
-                                            var targets: [CGPoint] = nodes.dropFirst().filter { shown.contains($0.id) }.map { $0.position }
-                                            if let servicesPos, !nodes.isEmpty { targets.append(servicesPos) }
+                                            // Off-network devices get a lighter dotted line; the rest keep the dashed one.
+                                            var targets: [(point: CGPoint, offNetwork: Bool)] = nodes.dropFirst().filter { shown.contains($0.id) }
+                                                .map { ($0.position, $0.device.isOnLocalSubnet == false) }
+                                            if let servicesPos, !nodes.isEmpty { targets.append((servicesPos, false)) }
                                             for target in targets {
-                                                let nPos = pixelPos(target)
+                                                let nPos = pixelPos(target.point)
                                                 var path = Path()
                                                 path.move(to: center)
                                                 path.addLine(to: nPos)
-                                                ctx.stroke(path, with: .color(.secondary.opacity(0.4)),
-                                                           style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                                                ctx.stroke(path, with: .color(.secondary.opacity(target.offNetwork ? 0.25 : 0.4)),
+                                                           style: target.offNetwork ? StrokeStyle(lineWidth: 1, lineCap: .round, dash: [1, 5])
+                                                                                    : StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
                                             }
                                         }
 
@@ -189,6 +211,9 @@ struct TopologyView: View {
                 .padding(.top, 8)
             }
             .navigationBarHidden(true)
+            .sheet(isPresented: $showingNetworks) {
+                NetworksSheet()
+            }
             .sheet(isPresented: $showingServices) {
                 ScrollView {
                     UnattachedServicesSection(services: scanVM.unattachedServices)

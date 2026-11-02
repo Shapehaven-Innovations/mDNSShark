@@ -299,11 +299,13 @@ struct PaymentVendorGateTests {
 
     @Test("infrastructure label and note text, with the conditional clauses")
     func infrastructureLabelAndNote() {
-        let plain = PaymentVendorSkip(category: .infrastructure, vendor: econolite, inferred: false, sentARPTrigger: false).note
+        let plain = PaymentVendorSkip(category: .infrastructure, vendor: econolite, inferred: false, sentARPTrigger: false).note()
         #expect(plain == "Vendor makes traffic-control, roadside or licence plate equipment, so mDNSShark skipped its device probes for this address. The subnet sweep's single connection attempt to port 80 runs before any vendor is known, so it is not skipped.")
-        let both = PaymentVendorSkip(category: .infrastructure, vendor: econolite, inferred: true, sentARPTrigger: true).note
+        let both = PaymentVendorSkip(category: .infrastructure, vendor: econolite, inferred: true, sentARPTrigger: true).note()
         #expect(both.contains("One NetBIOS name query was sent before the vendor was known"))
         #expect(both.contains("inferred"))
+        let off = PaymentVendorSkip(category: .infrastructure, vendor: econolite, inferred: false, sentARPTrigger: false).note(offNetwork: true)
+        #expect(!off.contains("port 80"))
         #expect(PaymentVendorSkip.detail == "identified from MAC vendor only, not probed")
     }
 
@@ -316,14 +318,14 @@ struct PaymentVendorGateTests {
         #expect(device.noOpenPortsText == "None")
 
         device.paymentVendorSkip = PaymentVendorSkip(vendor: pax, inferred: false, sentARPTrigger: false)
-        let note = device.paymentVendorSkip?.note ?? ""
+        let note = device.paymentVendorSkip?.note() ?? ""
         #expect(note.hasPrefix("\(pax) makes payment or point-of-sale equipment, so mDNSShark skipped its device probes for this address."))
         #expect(note.contains(pax))
         #expect(note.contains("port 80 runs before any vendor is known"))
         #expect(!note.contains("NetBIOS") && !note.contains("inferred"))
         #expect(device.noOpenPortsText == "Not probed")
 
-        let both = PaymentVendorSkip(vendor: pax, inferred: true, sentARPTrigger: true).note
+        let both = PaymentVendorSkip(vendor: pax, inferred: true, sentARPTrigger: true).note()
         #expect(both.contains("One NetBIOS name query was sent before the vendor was known"))
         #expect(both.contains("inferred"))
     }

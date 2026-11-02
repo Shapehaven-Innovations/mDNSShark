@@ -75,7 +75,7 @@ struct PaymentVendorSkip: Equatable {
     var badgeText: String { (category == .payment ? Self.label : Self.infrastructureLabel) + (inferred ? "?" : "") }
 
     /// The detail view's note: what was skipped, and what still reached the device before its vendor was known.
-    var note: String {
+    func note(offNetwork: Bool = false) -> String {
         var text: String
         switch category {
         case .payment:
@@ -83,7 +83,7 @@ struct PaymentVendorSkip: Equatable {
         case .infrastructure:
             text = "Vendor makes traffic-control, roadside or licence plate equipment, so mDNSShark skipped its device probes for this address."
         }
-        text += " The subnet sweep's single connection attempt to port 80 runs before any vendor is known, so it is not skipped."
+        if !offNetwork { text += " The subnet sweep's single connection attempt to port 80 runs before any vendor is known, so it is not skipped." }
         if sentARPTrigger { text += " One NetBIOS name query was sent before the vendor was known, so the address would appear in the ARP table." }
         if inferred { text += " The vendor is inferred from a private MAC address with its locally administered bit cleared, not confirmed." }
         return text
@@ -114,8 +114,11 @@ struct DiscoveredDevice: Identifiable, Equatable {
     var paymentVendorSkip: PaymentVendorSkip?
     /// True when probing was refused for this host's addresses (no IPv4 address, or none the coordinator accepts), so its open ports are unknown.
     var probeRefused: Bool = false
+    /// True when the user asked for probes on this off-network host in the current scan only.
+    var probeRequested = false
     /// False for a host that got no active probes (vendor gate, off-subnet or refused), so an empty findings list means unchecked, not clean.
-    var wasProbed: Bool { paymentVendorSkip == nil && isOnLocalSubnet != false && !probeRefused }
+    /// An off-network host counts as probed only after an explicit request, and a payment or roadside skip always wins.
+    var wasProbed: Bool { paymentVendorSkip == nil && (isOnLocalSubnet != false || probeRequested) && !probeRefused }
 
     init(id: UUID = UUID(), hostname: String, ipAddress: String,
          macAddress: String? = nil, manufacturer: String? = nil,
@@ -137,7 +140,7 @@ struct DiscoveredDevice: Identifiable, Equatable {
             && l.bonjourServices == r.bonjourServices
             && l.probesSettled == r.probesSettled && l.addresses == r.addresses && l.ssdpServer == r.ssdpServer
             && l.isOnLocalSubnet == r.isOnLocalSubnet && l.isDefaultGateway == r.isDefaultGateway && l.httpRedirectByPort == r.httpRedirectByPort
-            && l.paymentVendorSkip == r.paymentVendorSkip && l.probeRefused == r.probeRefused
+            && l.paymentVendorSkip == r.paymentVendorSkip && l.probeRefused == r.probeRefused && l.probeRequested == r.probeRequested
     }
 
     /// Whether the system's default gateway is one of this device's addresses; nil when the gateway is unknown.
@@ -148,6 +151,31 @@ struct DiscoveredDevice: Identifiable, Equatable {
 
     /// What to show when no open port is known: "Not probed" for a host that was never probed (payment skip, off-subnet or refused), since "None" would claim a fact.
     var noOpenPortsText: String { wasProbed ? "None" : "Not probed" }
+
+    /// Literal lines about where this device sits and how it was learned. The remote network's prefix length is unknowable, so none is claimed.
+    func networkNote(ownCIDRs: [String]) -> [String] {
+        var lines: [String] = []
+        let phone = ownCIDRs.joined(separator: ", ")
+        switch isOnLocalSubnet {
+        case true:  lines.append("Same network as this phone (\(phone))")
+        case false: lines.append("Outside this phone's network (device \(ipAddress), outside: \(phone))")
+        case nil:   lines.append("Network not known")
+        }
+        let types = bonjourServices.map(\.serviceType)
+        let viaBonjour = !types.isEmpty
+        if viaBonjour { lines.append("Bonjour advertisement (\(Array(Set(types)).sorted().joined(separator: ", ")))") }
+        if ssdpServer != nil { lines.append("SSDP reply") }
+        if isOnLocalSubnet == false, viaBonjour, ssdpServer == nil {
+            lines.append("Your router may be repeating this advertisement from another network (not confirmed).")
+        }
+        if paymentVendorSkip != nil { lines.append("Not probed: payment or roadside vendor") }
+        else if probeRefused { lines.append("Not probed: IPv6 only or non-local address") }
+        else if isOnLocalSubnet == false {
+            lines.append(!probeRequested ? "Not probed: on another network" : (probesSettled ? "Probed on request" : "Probes pending"))
+        }
+        else { lines.append("Probed") }
+        return lines
+    }
 
     /// True when the MAC is private or derived, so the vendor cannot be read from it.
     var hasLocallyAdministeredMAC: Bool { macAddress.map(MACAddressFacts.isLocallyAdministered) ?? false }

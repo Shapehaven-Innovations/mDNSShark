@@ -64,6 +64,8 @@ final class NetworkScanViewModel: ObservableObject {
     private var enrichedIPsThisScan = Set<String>()
     // Addresses refused as off-subnet, not marked enriched, so a later merge that adds an on-subnet address can still probe them.
     private var skippedOffSubnetIPs = Set<String>()
+    // Off-network addresses the user asked to probe, this scan only; cleared at every new scan.
+    private var probeRequestedIPs = Set<String>()
     // Addresses whose probes were refused (no IPv4 address in the group, or not LAN-local), so the row says Not probed instead of None.
     private var refusedProbeIPs = Set<String>()
     // The payment-vendor gate per probed address this scan: ARP is read and the vendor decided before any probe, fetch or Google Wifi send.
@@ -183,6 +185,7 @@ final class NetworkScanViewModel: ObservableObject {
         enrichedIPsThisScan.removeAll()
         skippedOffSubnetIPs.removeAll()
         refusedProbeIPs.removeAll()
+        probeRequestedIPs.removeAll()
         for task in vendorGateTasks.values { task.cancel() }
         vendorGateTasks.removeAll()
         vendorGateByIP.removeAll()
@@ -217,14 +220,14 @@ final class NetworkScanViewModel: ObservableObject {
     /// Fires the probe set for an address once per scan. A host known to be off this phone's networks (reflected from another VLAN)
     /// and an address the coordinator would refuse (not LAN-local) get no probes and count as settled instead of pending forever.
     /// `ip` is the row's effective address; probes go to `probeIP`, the group's first address on a connected subnet.
-    private func dispatchProbesIfNeeded(ip: String, group: Set<String>, probeIP: String, locationURL: URL?, onLocalSubnet: Bool?, hasIPv4: Bool) {
+    private func dispatchProbesIfNeeded(ip: String, group: Set<String>, probeIP: String, locationURL: URL?, onLocalSubnet: Bool?, hasIPv4: Bool, requested: Bool = false) {
         // The effective address can change as a group gains an address, so lift every earlier skip or refusal for the group first.
         for address in group where skippedOffSubnetIPs.remove(address) != nil {
             settledIPsThisScan.remove(address)
             refusedProbeIPs.remove(address)
         }
         if SSDPDescriptionFetcher.isLANLocalAddress(probeIP) { refusedProbeIPs.remove(probeIP) }
-        if onLocalSubnet == false {
+        if onLocalSubnet == false, !requested {
             skippedOffSubnetIPs.insert(ip)
             settledIPsThisScan.insert(ip)
             return
@@ -244,8 +247,36 @@ final class NetworkScanViewModel: ObservableObject {
             settledIPsThisScan.insert(probeIP)
             return
         }
-        startVendorGate(ip: probeIP, locationURL: locationURL)
+        // A routed host has no ARP entry, so a requested probe skips the vendor gate and its NBSTAT trigger.
+        if requested { passVendorGate(ip: probeIP, locationURL: locationURL, arpMAC: nil) } else { startVendorGate(ip: probeIP, locationURL: locationURL) }
     }
+
+    /// Asks for the standard probes on one off-network IPv4 address for this scan only. Refused (false) for a non-IPv4 or non-private
+    /// address, and for a host whose MAC vendor is already known to make payment or roadside equipment.
+    @discardableResult
+    func probeAnyway(ip: String) -> Bool {
+        guard LocalInterfaces.ipv4Value(ip) != nil, SSDPDescriptionFetcher.isLANLocalAddress(ip),
+              !ip.hasPrefix("169.254."), !ip.hasPrefix("127.") else { return false }
+        let row = devices.first { $0.ipAddress == ip || $0.addresses.contains(ip) }
+        let group = Set((row?.addresses ?? []) + [ip])
+        if row?.paymentVendorSkip != nil || group.contains(where: { paymentSkipByIP[$0] != nil }) { return false }
+        if let mac = row?.macAddress,
+           let skip = PaymentVendorGate.vendorSkip(forMAC: mac, sentTrigger: false, vendorLookup: ouiDB.manufacturer(for:)) {
+            paymentSkipByIP[ip] = skip
+            apply(raw: lastRaw)
+            return false
+        }
+        probeRequestedIPs.insert(ip)
+        // During the scan-start hold the request waits for the scanner's first publish instead of re-merging last scan's rows.
+        if !holdingUntilFirstResult { apply(raw: lastRaw) }
+        return true
+    }
+
+    /// This phone's connected IPv4 networks as CIDRs, literal from the interface netmasks.
+    var ownSubnetCIDRs: [String] { currentOwnAddresses().ipv4Subnets.map(\.cidr) }
+
+    /// The default gateways' IPv4 addresses as the system reports them.
+    var gatewaysIPv4: [String] { currentOwnAddresses().gatewaysIPv4 }
 
     /// Reads ARP before anything is sent. An entry already present decides at once, a missing one waits (bounded) on a task, and the
     /// phone's own row and IPv6 addresses (no ARP) are never gated.
@@ -612,8 +643,9 @@ final class NetworkScanViewModel: ObservableObject {
                         ?? Self.catalogVendor(serviceType: device.serviceType, txtRecords: device.txtRecords)
                 }
                 byIP[ip] = existing
-                dispatchDescriptionFetchIfNeeded(ip: ip, locationURL: device.locationURL, onLocalSubnet: existing.isOnLocalSubnet)
-                dispatchGoogleWifiIfNeeded(ip: ip, serviceType: device.serviceType, onLocalSubnet: existing.isOnLocalSubnet)
+                let allowed = existing.isOnLocalSubnet != false || existing.probeRequested
+                dispatchDescriptionFetchIfNeeded(ip: ip, locationURL: device.locationURL, allowed: allowed, pinHost: existing.isOnLocalSubnet == false)
+                dispatchGoogleWifiIfNeeded(ip: ip, serviceType: device.serviceType, allowed: allowed)
             } else {
                 let mac = device.txtRecords?["mac"]
                 var mfr = mac.flatMap { ouiDB.manufacturer(for: String($0.prefix(8))) }
@@ -631,10 +663,14 @@ final class NetworkScanViewModel: ObservableObject {
                 let identity = identityByEffectiveIP[ip] ?? ip
                 let group = addressesByEffectiveIP[ip] ?? [ip]
                 let onLocalSubnet = LocalInterfaces.isOnLocalSubnet(addresses: Array(group), subnets: own.ipv4Subnets)
-                let probeIP = group.sorted(by: NetworkScanner.isAddressOrdered)
-                    .first { LocalInterfaces.isOnLocalSubnet(addresses: [$0], subnets: own.ipv4Subnets) == true } ?? ip
+                let ordered = group.sorted(by: NetworkScanner.isAddressOrdered)
+                let onSubnetIP = ordered.first { LocalInterfaces.isOnLocalSubnet(addresses: [$0], subnets: own.ipv4Subnets) == true }
+                // Only the address the user named is probed, even if the group's effective address changes later.
+                let requestedIP = ordered.first { probeRequestedIPs.contains($0) }
+                let requested = onLocalSubnet == false && requestedIP != nil
+                let probeIP = onSubnetIP ?? requestedIP ?? ip
                 dispatchProbesIfNeeded(ip: ip, group: group, probeIP: probeIP, locationURL: device.locationURL, onLocalSubnet: onLocalSubnet,
-                                       hasIPv4: group.contains { LocalInterfaces.ipv4Value($0) != nil })
+                                       hasIPv4: group.contains { LocalInterfaces.ipv4Value($0) != nil }, requested: requested)
                 var newDevice = DiscoveredDevice(
                     id:              stableID(forIdentity: identity, ip: ip),
                     hostname:        hostNameByIP[ip] ?? fallbackNameByIP[ip] ?? ip,
@@ -649,6 +685,7 @@ final class NetworkScanViewModel: ObservableObject {
                 newDevice.ssdpServer = device.ssdpServer
                 newDevice.isDefaultGateway = own.gatewaysIPv4.isEmpty ? nil : !own.gatewaysIPv4.filter(group.contains).isEmpty
                 newDevice.isOnLocalSubnet = onLocalSubnet
+                newDevice.probeRequested = requested
                 newDevice.probeRefused = group.contains { refusedProbeIPs.contains($0) }
                 newDevice.paymentVendorSkip = group.sorted().lazy.compactMap { self.paymentSkipByIP[$0] }.first
                 // Re-merge stored raw enrichments against the fresh baseline, not a stale merged snapshot.
@@ -664,8 +701,8 @@ final class NetworkScanViewModel: ObservableObject {
                     newDevice.httpRedirectByPort = merged.httpRedirectByPort
                 }
                 byIP[ip] = newDevice
-                dispatchDescriptionFetchIfNeeded(ip: ip, locationURL: device.locationURL, onLocalSubnet: onLocalSubnet)
-                dispatchGoogleWifiIfNeeded(ip: ip, serviceType: device.serviceType, onLocalSubnet: onLocalSubnet)
+                dispatchDescriptionFetchIfNeeded(ip: ip, locationURL: device.locationURL, allowed: onLocalSubnet != false || requested, pinHost: onLocalSubnet == false)
+                dispatchGoogleWifiIfNeeded(ip: ip, serviceType: device.serviceType, allowed: onLocalSubnet != false || requested)
             }
         }
         services.sort { ($0.name, $0.typeLabel, $0.id) < ($1.name, $1.typeLabel, $1.id) }
@@ -710,8 +747,10 @@ final class NetworkScanViewModel: ObservableObject {
     }
 
     /// Fires the SSDP description fetch the first time any row for this IP reveals a `locationURL`, once the vendor gate allows it.
-    private func dispatchDescriptionFetchIfNeeded(ip: String, locationURL: URL?, onLocalSubnet: Bool?) {
-        guard onLocalSubnet != false, let locationURL, !fetchedDescriptionIPs.contains(ip) else { return }
+    /// With `pinHost` (a requested off-network host) the description must come from the one probed address.
+    private func dispatchDescriptionFetchIfNeeded(ip: String, locationURL: URL?, allowed: Bool, pinHost: Bool = false) {
+        guard allowed, let locationURL, !fetchedDescriptionIPs.contains(ip) else { return }
+        if pinHost, locationURL.host != (probeTargetByIP[ip] ?? ip) { return }
         fetchedDescriptionIPs.insert(ip)
         let target = probeTargetByIP[ip] ?? ip
         switch vendorGateByIP[target] {
@@ -726,8 +765,8 @@ final class NetworkScanViewModel: ObservableObject {
     }
 
     /// Fires the Google Wifi probe only for hosts that advertise `_googlecast._tcp`, never blindly, and only once the vendor gate allows it.
-    private func dispatchGoogleWifiIfNeeded(ip: String, serviceType: String, onLocalSubnet: Bool?) {
-        guard onLocalSubnet != false, serviceType == "_googlecast._tcp", !fetchedGoogleWifiIPs.contains(ip) else { return }
+    private func dispatchGoogleWifiIfNeeded(ip: String, serviceType: String, allowed: Bool) {
+        guard allowed, serviceType == "_googlecast._tcp", !fetchedGoogleWifiIPs.contains(ip) else { return }
         fetchedGoogleWifiIPs.insert(ip)
         let target = probeTargetByIP[ip] ?? ip
         switch vendorGateByIP[target] {

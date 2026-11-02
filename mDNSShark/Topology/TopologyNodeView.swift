@@ -57,6 +57,16 @@ struct TopologyNodeView: View {
                         .offset(x: 8, y: -8)
                 }
             }
+            .overlay(alignment: .bottomLeading) {
+                if node.device.isOnLocalSubnet == false {
+                    Image(systemName: "arrow.triangle.branch")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(3)
+                        .background(Circle().fill(AppColors.pending))
+                        .offset(x: -6, y: 6)
+                }
+            }
             Text(node.device.hostname)
                 .font(.system(size: 9, weight: .medium))
                 .lineLimit(1).frame(maxWidth: 72)

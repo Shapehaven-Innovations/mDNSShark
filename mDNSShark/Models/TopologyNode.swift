@@ -49,10 +49,11 @@ struct TopologyNode: Identifiable {
         filters.isEmpty || filters.contains(status)
     }
 
-    /// VoiceOver text for the node: "<hostname>, <ip>, <status>[, vendor advisory]".
+    /// VoiceOver text for the node: "<hostname>, <ip>, <status>[, vendor advisory][, on another network]".
     var accessibilityLabel: String {
         var text = "\(device.hostname), \(device.ipAddress), \(securityStatus.accessibilityName)"
         if device.securityFindings.hasVendorAdvisory { text += ", vendor advisory" }
+        if device.isOnLocalSubnet == false { text += ", on another network" }
         return text
     }
 }

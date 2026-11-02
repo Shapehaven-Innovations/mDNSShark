@@ -8,6 +8,7 @@ struct DeviceDetailView: View {
     @Environment(\.dismiss) private var dismiss
     // Navigation-time snapshot. Only a fallback; see `device` below.
     private let snapshot: DiscoveredDevice
+    @State private var confirmingProbe = false
 
     init(device: DiscoveredDevice) { snapshot = device }
 
@@ -77,9 +78,33 @@ struct DeviceDetailView: View {
                         if let server = device.ssdpServer { row("Server header", server, selectable: true) }
                         row("Open Ports",   device.openPorts.isEmpty ? device.noOpenPortsText : device.openPorts.map { String($0) }.joined(separator: ", "))
                         if let skip = device.paymentVendorSkip {
-                            Text(skip.note).font(.caption).foregroundColor(.secondary)
+                            Text(skip.note(offNetwork: device.isOnLocalSubnet == false)).font(.caption).foregroundColor(.secondary)
                         }
                     }
+                }
+
+                CardView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Network").font(.headline)
+                        Divider()
+                        ForEach(device.networkNote(ownCIDRs: scanVM.ownSubnetCIDRs), id: \.self) { line in
+                            Text(verbatim: line).font(.subheadline).textSelection(.enabled)
+                        }
+                        if device.isOnLocalSubnet == false, !device.probeRequested, device.paymentVendorSkip == nil {
+                            if let skip = txtMACSkip {
+                                Text("Probe request not available: \(skip.vendor) makes payment or roadside equipment (from the MAC in its TXT record)")
+                                    .font(.caption).foregroundColor(.secondary)
+                            } else {
+                                Button("Probe this device") { confirmingProbe = true }
+                                    .buttonStyle(.bordered)
+                            }
+                        }
+                    }
+                }
+                .confirmationDialog(Self.probeConfirmation(ip: device.ipAddress, phoneCIDRs: scanVM.ownSubnetCIDRs),
+                                    isPresented: $confirmingProbe, titleVisibility: .visible) {
+                    Button("Probe") { scanVM.probeAnyway(ip: device.ipAddress) }
+                    Button("Cancel", role: .cancel) {}
                 }
 
                 // Never empty: a device with no resolved list still lists the address shown in its header.
@@ -135,6 +160,16 @@ struct DeviceDetailView: View {
             .padding(.horizontal).padding(.vertical, 8)
         }
         .toolbar(.hidden, for: .navigationBar)
+    }
+
+    /// The payment or roadside skip implied by the MAC in the device's TXT record, if any.
+    private var txtMACSkip: PaymentVendorSkip? {
+        device.macAddress.flatMap { PaymentVendorGate.vendorSkip(forMAC: $0, sentTrigger: false, vendorLookup: OUIDatabase.shared.manufacturer(for:)) }
+    }
+
+    /// The confirmation text, with the literal address and this phone's CIDRs.
+    static func probeConfirmation(ip: String, phoneCIDRs: [String]) -> String {
+        "\(ip) is outside \(phoneCIDRs.joined(separator: ", ")). mDNSShark will send its standard probes (about 50 packets) to this one address through your router. The payment-terminal check cannot run across a router. Only probe networks you are allowed to test."
     }
 
     private func row(_ label: String, _ value: String, selectable: Bool = false) -> some View {
