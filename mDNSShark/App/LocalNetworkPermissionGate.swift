@@ -9,7 +9,7 @@ import os
 /// Apple gives no API to directly query this permission's state: the
 /// system alert only appears in response to real local-network traffic,
 /// and any local-network operation that races ahead of the user's answer
-/// gets an instant, non-retried denial (`EHOSTUNREACH` on a raw BSD
+/// gets a non-retried denial, usually but not guaranteed to be quick (`EHOSTUNREACH` on a raw BSD
 /// socket, `NWPathKey=unsatisfied (Local network prohibited)` on
 /// NWConnection/URLSession) rather than being queued, so a probe caught
 /// in that window fails for good, not just until the user taps Allow.

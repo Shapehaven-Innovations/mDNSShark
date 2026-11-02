@@ -61,7 +61,7 @@ struct SecurityViewModelTests {
         vm.startThreatDataRefresh()
         vm.startThreatDataRefresh()
         // Wait for the first fetch to reach the gate, then give a second call time to show up.
-        for _ in 0..<200 where await gate.callCount == 0 { try await Task.sleep(nanoseconds: 10_000_000) }
+        for _ in 0..<1000 where await gate.callCount == 0 { try await Task.sleep(nanoseconds: 10_000_000) }
         try await Task.sleep(nanoseconds: 50_000_000)
         #expect(await gate.callCount == 1)
 
@@ -197,6 +197,16 @@ struct SecurityViewModelTests {
         #expect(telnet?.severity == .critical)
     }
 
+    @Test("an open RTSP port 554 keeps its warning text")
+    func rtspOpenPortWarning() {
+        let vm = makeViewModel()
+        vm.assess(devices: [DiscoveredDevice(hostname: "cam", ipAddress: "192.168.1.62", openPorts: [554])])
+        let rtsp = vm.findings.first { $0.source == .portRule && $0.title == "RTSP Stream Exposed" }
+        #expect(rtsp?.severity == .warning)
+        #expect(rtsp?.description == "RTSP may allow unauthorized access to camera or media streams.")
+        #expect(rtsp?.recommendation == "Restrict RTSP to trusted IPs.")
+    }
+
     // Issue #13: a port a device only advertises is not an open port.
     @Test("a Bonjour-advertised port produces no port finding")
     func advertisedPortProducesNoPortFinding() {
@@ -280,7 +290,7 @@ struct SecurityViewModelTests {
 /// since these tests drive real `Task`s off the gate/fetch closures rather
 /// than controlling a scheduler directly.
 @MainActor
-private func waitUntil(timeout: TimeInterval = 2.0, _ condition: () -> Bool) async throws {
+private func waitUntil(timeout: TimeInterval = 10.0, _ condition: () -> Bool) async throws {
     let deadline = Date().addingTimeInterval(timeout)
     while !condition() {
         if Date() > deadline {

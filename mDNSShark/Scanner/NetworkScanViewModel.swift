@@ -10,6 +10,8 @@ final class NetworkScanViewModel: ObservableObject {
     /// Advertisements with no resolved device (no IP, or a host name no device carries); shown as services, never counted as devices.
     @Published var unattachedServices: [DiscoveredService] = []
     @Published var isScanning: Bool = false
+    /// Sent after the final rows are applied when a scan really ends, so listeners read the finished list.
+    let scanFinished = PassthroughSubject<Void, Never>()
     /// Lets the launch gate skip its automatic first scan if the user already started one manually.
     private(set) var hasScannedAtLeastOnce = false
     /// True once the Local Network permission resolved as denied; drives the "Open Settings" banner in ContentView.
@@ -19,8 +21,10 @@ final class NetworkScanViewModel: ObservableObject {
     private var launchGateInFlight = false
     /// Set when the first scan ran before permission was granted, so granting later restarts it instead of leaving it near empty.
     private var autoScanNeedsRedo = false
+    /// The current scan's own Local Network check, nil until it resolves; the widget writer reads it to keep a denied result out.
+    private(set) var scanPermissionDecision: LocalNetworkPermissionGate.Decision?
 
-    private let scanner     = NetworkScanner()
+    let scanner     = NetworkScanner()   // internal so tests can drive its isScanning edge
     private let localUtil   = LocalDeviceScanner()
     private let ouiDB       = OUIDatabase.shared
     private let enrichmentCoordinator = DeviceEnrichmentCoordinator()
@@ -50,7 +54,7 @@ final class NetworkScanViewModel: ObservableObject {
     // The scanner rows last applied, so an enrichment result rebuilds the same rows instead of patching one device in place.
     private var lastRaw: [NetworkScanner.Device] = []
     // True from scan start until the scanner publishes its first rows, so a result landing meanwhile does not rebuild last scan's rows.
-    private var holdingUntilFirstResult = false
+    var holdingUntilFirstResult = false   // internal so tests can seed the held state
     // Last scan's rows and unattached services, overlaid on this scan's results until each is re-resolved or the scan ends, so a rescan
     // repopulates in place instead of collapsing the list and regrowing it.
     private var heldDevicesByID: [UUID: DiscoveredDevice] = [:]
@@ -62,6 +66,8 @@ final class NetworkScanViewModel: ObservableObject {
     private var fetchedGoogleWifiIPs = Set<String>()
     // Separate from `knownIDs` so a re-scan gives every device a fresh enrichment pass.
     private var enrichedIPsThisScan = Set<String>()
+    // Addresses whose first row already shows camera evidence; only these get the connect-only camera ports scanned.
+    private var cameraHintIPs = Set<String>()
     // Addresses refused as off-subnet, not marked enriched, so a later merge that adds an on-subnet address can still probe them.
     private var skippedOffSubnetIPs = Set<String>()
     // Off-network addresses the user asked to probe, this scan only; cleared at every new scan.
@@ -137,6 +143,7 @@ final class NetworkScanViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] scanning in
                 guard let self else { return }
+                let wasScanning = self.isScanning
                 self.isScanning = scanning
                 // The scan ending drops whatever it did not re-find; a restart has already set the scanner scanning again.
                 if !scanning, !self.scanner.isScanning, self.holdingUntilFirstResult || !self.heldDevicesByID.isEmpty || !self.heldServices.isEmpty {
@@ -144,6 +151,9 @@ final class NetworkScanViewModel: ObservableObject {
                     self.heldDevicesByID = [:]
                     self.heldServices = []
                     self.apply(raw: self.scanner.devices)
+                }
+                if Self.isScanEndEdge(wasScanning: wasScanning, scanning: scanning, scannerScanning: self.scanner.isScanning) {
+                    self.scanFinished.send()
                 }
             }
             .store(in: &cancellables)
@@ -170,11 +180,14 @@ final class NetworkScanViewModel: ObservableObject {
     private func beginScan(duration: Double) {
         hasScannedAtLeastOnce = true
         resetForNewScan()
+        scanPermissionDecision = nil
+        let generation = scanGeneration
         scanner.scanNetwork(duration: duration)
         // Runs alongside the scan, never ahead of it, so a denied permission can explain the near-empty result.
         Task {
             let decision = await LocalNetworkPermissionGate.waitForDecision(timeout: 10)
             apply(permissionDecision: decision)
+            if scanGeneration == generation { scanPermissionDecision = decision }
         }
     }
 
@@ -183,6 +196,7 @@ final class NetworkScanViewModel: ObservableObject {
     func resetForNewScan() {
         enrichmentCoordinator.cancelAll()
         enrichedIPsThisScan.removeAll()
+        cameraHintIPs.removeAll()
         skippedOffSubnetIPs.removeAll()
         refusedProbeIPs.removeAll()
         probeRequestedIPs.removeAll()
@@ -272,6 +286,14 @@ final class NetworkScanViewModel: ObservableObject {
         return true
     }
 
+    /// True only for a real true to false transition with the scanner idle, not the initial seed or a restart.
+    nonisolated static func isScanEndEdge(wasScanning: Bool, scanning: Bool, scannerScanning: Bool) -> Bool {
+        wasScanning && !scanning && !scannerScanning
+    }
+
+    /// Match keys of this phone's own addresses, used to find its own row.
+    var ownAddressMatchKeys: Set<String> { Set(currentOwnAddresses().all.map(LocalInterfaces.addressMatchKey)) }
+
     /// This phone's connected IPv4 networks as CIDRs, literal from the interface netmasks.
     var ownSubnetCIDRs: [String] { currentOwnAddresses().ipv4Subnets.map(\.cidr) }
 
@@ -330,9 +352,17 @@ final class NetworkScanViewModel: ObservableObject {
         if applyNow { ingestEnrichment(ip: ip, enrichments: [passive]) } else { store(ip: ip, enrichments: [passive], completesProbeSet: true) }
     }
 
+    /// True when existing evidence says the host is a camera: its first row, a camera device type on the merged row, or its ARP MAC vendor.
+    /// Hosts without it are never scanned on the connect-only camera ports.
+    func cameraHint(forProbeIP ip: String, arpMAC: String?) -> Bool {
+        if cameraHintIPs.contains(ip) { return true }
+        if let arpMAC, let vendor = ouiDB.manufacturer(for: arpMAC), CameraHint.isCameraVendor(vendor) { return true }
+        return devices.contains { ($0.ipAddress == ip || $0.addresses.contains(ip)) && $0.deviceType == .camera }
+    }
+
     private func passVendorGate(ip: String, locationURL: URL?, arpMAC: String?) {
         vendorGateByIP[ip] = .passed
-        if let probeOverride { probeOverride(ip, locationURL) } else { enrichmentCoordinator.enrich(ip: ip, locationURL: locationURL, arpMAC: arpMAC) }
+        if let probeOverride { probeOverride(ip, locationURL) } else { enrichmentCoordinator.enrich(ip: ip, locationURL: locationURL, arpMAC: arpMAC, cameraHint: cameraHint(forProbeIP: ip, arpMAC: arpMAC)) }
         if let url = heldDescriptionURLByIP.removeValue(forKey: ip) { sendDescriptionFetch(ip: ip, locationURL: url) }
         if heldGoogleWifiIPs.remove(ip) != nil { sendGoogleWifi(ip: ip) }
     }
@@ -380,6 +410,7 @@ final class NetworkScanViewModel: ObservableObject {
             apply(permissionDecision: decision)
             let plan = Self.launchGatePlan(decision: decision, hasScanned: hasScannedAtLeastOnce, autoScanNeedsRedo: autoScanNeedsRedo)
             launchGateSettled = plan.settles
+            if plan.settles { UserDefaults.standard.set(true, forKey: Self.grantedBeforeKey) }
             autoScanNeedsRedo = plan.autoScanNeedsRedo
             switch plan.action {
             case .scan:    startScan()
@@ -387,6 +418,17 @@ final class NetworkScanViewModel: ObservableObject {
             case .none:    break
             }
         }
+    }
+
+    /// Set once a foreground launch gate saw a grant, so a widget scan in the background never probes for a permission never given.
+    static let grantedBeforeKey = "localNetworkGrantedBefore"
+    var localNetworkGrantedBefore: Bool { UserDefaults.standard.bool(forKey: Self.grantedBeforeKey) }
+
+    /// Settles the launch gate from a background widget scan whose own check came back granted, so the next foreground does not redo it.
+    func settleLaunchGateAfterBackgroundGrant() {
+        launchGateSettled = true
+        autoScanNeedsRedo = false
+        apply(permissionDecision: .granted)
     }
 
     func apply(permissionDecision decision: LocalNetworkPermissionGate.Decision) {
@@ -669,6 +711,9 @@ final class NetworkScanViewModel: ObservableObject {
                 let requestedIP = ordered.first { probeRequestedIPs.contains($0) }
                 let requested = onLocalSubnet == false && requestedIP != nil
                 let probeIP = onSubnetIP ?? requestedIP ?? ip
+                if CameraHint.rowLooksLikeCamera(manufacturer: mfr, serviceType: device.serviceType, serviceName: device.serviceName, txtRecords: device.txtRecords) {
+                    cameraHintIPs.insert(probeIP)
+                }
                 dispatchProbesIfNeeded(ip: ip, group: group, probeIP: probeIP, locationURL: device.locationURL, onLocalSubnet: onLocalSubnet,
                                        hasIPv4: group.contains { LocalInterfaces.ipv4Value($0) != nil }, requested: requested)
                 var newDevice = DiscoveredDevice(

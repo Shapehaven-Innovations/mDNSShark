@@ -51,6 +51,13 @@ public func guessFromBanner(_ banner: String) -> BannerGuess {
     } else if lower.contains("uc-httpd") || lower.contains("netsurveillance") {
         // Xiongmai white-label DVRs and cameras sell under many brand names.
         manufacturer = "Xiongmai"
+    } else if lower.contains("realm=\"login to ") {
+        // Dahua-platform OEMs (Lorex and others) use the serial as the Digest realm.
+        manufacturer = "Dahua"
+    } else if lower.contains("avigilononvifnvt") {
+        manufacturer = "Avigilon"
+    } else if lower.contains("h264dvr") {
+        manufacturer = "Xiongmai"
     } else if lower.contains("cradlepoint") {
         manufacturer = "Cradlepoint"
     } else if lower.contains("sierra wireless inc, embedded server") || lower.contains("modem@airlink.com") || lower.contains("aleos") {

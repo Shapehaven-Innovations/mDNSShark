@@ -1,6 +1,8 @@
 // mDNSShark/App/AppCoordinator.swift
 import Foundation
 import Combine
+import UIKit
+import WidgetSnapshot
 
 enum AppTab: String, CaseIterable {
     case topology = "Topology"
@@ -31,6 +33,9 @@ final class AppCoordinator: ObservableObject {
     let packetCaptureManager: PacketCaptureManager
     let analysisViewModel: AnalysisViewModel
 
+    let deepLinkRouter = DeepLinkRouter()
+    let widgetWriter = WidgetSnapshotWriter(store: SnapshotStore.appGroup())
+
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -49,10 +54,63 @@ final class AppCoordinator: ObservableObject {
         packetCaptureManager.healStaleVPNConfigIfNeeded()
     }
 
+    func widgetInput() -> WidgetSnapshotWriter.Input {
+        let cidr = networkScanViewModel.networkCIDR
+        return WidgetSnapshotWriter.Input(
+            devices: networkScanViewModel.devices,
+            status: { [securityViewModel] in securityViewModel.status(of: $0) },
+            ownAddressKeys: networkScanViewModel.ownAddressMatchKeys,
+            subnet: cidr == "Unknown" ? nil : cidr,
+            localNetwork: networkScanViewModel.scanPermissionDecision,
+            localNetworkDeniedBanner: networkScanViewModel.isLocalNetworkDenied,
+            // A scan ending with the app not active (a widget run) may replace the snapshot only after a confirmed grant.
+            requiresConfirmedGrant: UIApplication.shared.applicationState != .active)
+    }
+
+    func open(_ url: URL) {
+        if let tab = deepLinkRouter.open(url, devices: networkScanViewModel.devices, isScanning: networkScanViewModel.isScanning) {
+            selectedTab = tab
+        }
+    }
+
+    /// A request older than 120 s is dropped so a stale flag never starts a surprise scan.
+    func consumeWidgetScanRequest() {
+        Self.consumeScanRequest(from: SharedSettings.suite, now: Date(), gateSettled: networkScanViewModel.launchGateSettled) {
+            networkScanViewModel.restartScan()
+        }
+    }
+
+    /// Always clears the flag; an unsettled launch gate runs the first scan itself, so restarting then would skip its permission redo.
+    static func consumeScanRequest(from defaults: UserDefaults, now: Date, gateSettled: Bool, restart: () -> Void) {
+        if ScanRequestFlag.consume(from: defaults, now: now), gateSettled { restart() }
+    }
+
     private func wire() {
+        networkScanViewModel.scanFinished
+            .sink { [weak self] in
+                guard let self else { return }
+                self.widgetWriter.scanDidFinish(self.widgetInput())
+                self.deepLinkRouter.scanFinished()
+            }
+            .store(in: &cancellables)
+
+        // The closure runs after the debounce, so it reads settled rows and findings, not the willSet value.
+        networkScanViewModel.$devices
+            .dropFirst()
+            .sink { [weak self] _ in
+                self?.widgetWriter.scheduleRewrite { [weak self] in
+                    guard let self, !self.networkScanViewModel.isScanning else { return nil }
+                    return self.widgetInput()
+                }
+            }
+            .store(in: &cancellables)
+
         // Runs inside `devices`' willSet, so the sink parameter is the new list and `networkScanViewModel.devices` is still the old one.
         networkScanViewModel.$devices
-            .sink { [weak self] in self?.securityViewModel.assess(devices: $0) }
+            .sink { [weak self] in
+                self?.securityViewModel.assess(devices: $0)
+                self?.deepLinkRouter.devicesChanged($0)
+            }
             .store(in: &cancellables)
 
         packetCaptureManager.$packets

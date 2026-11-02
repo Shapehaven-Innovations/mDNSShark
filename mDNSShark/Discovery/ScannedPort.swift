@@ -12,7 +12,7 @@
 //
 //  Created by user on 4/5/25.
 //  Updated for configurable timeout and banner retrieval per port.
-//  Feature: TCP Port Scanner for Penetration Testing
+//  Feature: TCP port scanner that identifies devices on the user's own network
 //
 
 import SwiftUI
@@ -71,6 +71,40 @@ class PortScanner {
     /// UniFi speed test, 7442/7447 UniFi Protect, and 53 DNS, which nearly
     /// every router and hotspot answers even when it filters everything else.
     static let uniFiRelevantPorts = [22, 80, 443, 8080, 8443, 23, 6789, 7442, 7447, 53]
+
+    /// Camera ports scanned on every on-subnet host: 554 RTSP gets one OPTIONS request, and 8000 is only listened on.
+    static let cameraProbePorts = [554, 8000]
+
+    /// The ports for one host: the always set, plus the connect-only camera ports (no bytes written) only when the host already
+    /// looks like a camera. Every other host is never scanned on those ports.
+    static func ports(cameraHint: Bool) -> [Int] {
+        uniFiRelevantPorts + cameraProbePorts + (cameraHint ? CameraPortBanner.connectOnlyPorts : [])
+    }
+
+    private let rtspPort: Int
+    private let hikvisionControlPort: Int
+    private let connectOnlyPorts: Set<Int>
+
+    /// The defaults are the production ports; tests pass loopback ports so no fixed port is ever bound.
+    init(rtspPort: Int = 554, hikvisionControlPort: Int = 8000, connectOnlyPorts: Set<Int> = Set(CameraPortBanner.connectOnlyPorts)) {
+        self.rtspPort = rtspPort
+        self.hikvisionControlPort = hikvisionControlPort
+        self.connectOnlyPorts = connectOnlyPorts
+    }
+
+    /// Banner for a port that speaks first. The control port is matched on the raw bytes before any String conversion.
+    func listenBanner(port: Int, data: Data?) -> String? {
+        guard let data, !data.isEmpty else { return nil }
+        if port == hikvisionControlPort, let label = CameraPortBanner.label(port8000: data) { return label }
+        return String(data: data, encoding: .utf8)
+    }
+
+    /// The RTSP reply as literal banner text; a reply that is not RTSP falls back to its decoded bytes.
+    static func rtspBanner(from data: Data?) -> String? {
+        guard let data, !data.isEmpty else { return nil }
+        if let reply = RTSPReply.parse(data) { return reply.bannerText }
+        return String(data: data.prefix(RTSPReply.maxParsedBytes), encoding: .utf8)
+    }
 
     /// Plaintext-HTTP-shaped ports: we speak the request, plaintext TCP.
     private static let httpPlainPorts: Set<Int> = [80, 8080]
@@ -183,6 +217,8 @@ class PortScanner {
             let flag = Flag()
             let readyTracker = ReadyTracker()
             let isHTTPShaped = PortScanner.httpShapedPorts.contains(port)
+            let isConnectOnly = connectOnlyPorts.contains(port)
+            let isRTSP = port == rtspPort
 
             connection.stateUpdateHandler = { state in
                 switch state {
@@ -198,7 +234,24 @@ class PortScanner {
                     // port.
                     readyTracker.markReady()
 
-                    if isHTTPShaped {
+                    if isConnectOnly {
+                        // Presence only: nothing is written or read, so the open port is recorded and the connection closed.
+                        guard flag.setCompleted() else { return }
+                        resultsQueue.sync { results.append(ScannedPort(port: port, banner: nil)) }
+                        connection.cancel()
+                        group.leave()
+                    } else if isRTSP {
+                        // The only bytes ever sent to an RTSP port: one OPTIONS request, then a bounded read.
+                        connection.send(content: RTSPReply.optionsRequest(ip: ip, port: port), completion: .contentProcessed { _ in
+                            connection.receive(minimumIncompleteLength: 1, maximumLength: RTSPReply.maxParsedBytes) { data, _, _, _ in
+                                guard flag.setCompleted() else { return }
+                                let banner = PortScanner.rtspBanner(from: data)
+                                resultsQueue.sync { results.append(ScannedPort(port: port, banner: banner)) }
+                                connection.cancel()
+                                group.leave()
+                            }
+                        })
+                    } else if isHTTPShaped {
                         // HTTP servers wait for the client to speak first;
                         // unlike SSH/telnet below, nothing arrives here
                         // unprompted, so send a minimal GET before reading.
@@ -221,7 +274,7 @@ class PortScanner {
                     } else {
                         connection.receive(minimumIncompleteLength: 1, maximumLength: 256) { data, _, _, _ in
                             guard flag.setCompleted() else { return }
-                            let banner = data.flatMap { $0.isEmpty ? nil : String(data: $0, encoding: .utf8) }
+                            let banner = self.listenBanner(port: port, data: data)
                             resultsQueue.sync { results.append(ScannedPort(port: port, banner: banner)) }
                             connection.cancel()
                             group.leave()

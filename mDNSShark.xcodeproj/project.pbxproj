@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		3173238BF83DA8A145886A53 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F0ABF2194E516D286205B0E3 /* NetworkExtension.framework */; };
+		6F66EB2AE45E51C94930BC24 /* WidgetSnapshot in Frameworks */ = {isa = PBXBuildFile; productRef = B355E033E63FAB8144FFE3DB /* WidgetSnapshot */; };
 		9A40CE772D5EC623000379E7 /* MIT.license in Resources */ = {isa = PBXBuildFile; fileRef = 9A40CE762D5EC61A000379E7 /* MIT.license */; };
 		9A5CC49930609B7900425B38 /* DeviceFingerprint in Frameworks */ = {isa = PBXBuildFile; productRef = 2C183D20A8B0785BAA01DD06 /* DeviceFingerprint */; };
 		9A8F66FF2D4F069100A033B5 /* ScanX-Bridging-Header.m in Sources */ = {isa = PBXBuildFile; fileRef = 9A8F66FE2D4F069100A033B5 /* ScanX-Bridging-Header.m */; };
@@ -16,9 +17,18 @@
 		9AEA1A2D2FABF80F00D8F38C /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F0ABF2194E516D286205B0E3 /* NetworkExtension.framework */; };
 		9AEA1A352FABF80F00D8F38C /* PacketTunnel.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9AEA1A2C2FABF80F00D8F38C /* PacketTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		9AFD8F6F2D5E89C80034B804 /* readme.md in Resources */ = {isa = PBXBuildFile; fileRef = 9AFD8F6A2D5E89C80034B804 /* readme.md */; };
+		B1A72B4A26E223DB29248F76 /* WidgetSnapshot in Frameworks */ = {isa = PBXBuildFile; productRef = 02936A3AE353D5BDA6CBE266 /* WidgetSnapshot */; };
+		BDABF736161EC66633BF1758 /* mDNSSharkWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B119F12C6A01DE00228C5992 /* mDNSSharkWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		637AFC05F65C37CB0894FD66 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9A1C9E812D443D5300643122 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D7DC618CAFD80147DD3540A5;
+			remoteInfo = mDNSSharkWidgets;
+		};
 		9A87858B3069EB2300082E7A /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 9A1C9E812D443D5300643122 /* Project object */;
@@ -43,6 +53,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				9AEA1A352FABF80F00D8F38C /* PacketTunnel.appex in Embed Foundation Extensions */,
+				BDABF736161EC66633BF1758 /* mDNSSharkWidgets.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -61,10 +72,18 @@
 		9AC2AB7E2D4F2024004A9F66 /* CFNetwork.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CFNetwork.framework; path = System/Library/Frameworks/CFNetwork.framework; sourceTree = SDKROOT; };
 		9AEA1A2C2FABF80F00D8F38C /* PacketTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PacketTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9AFD8F6A2D5E89C80034B804 /* readme.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = readme.md; sourceTree = "<group>"; };
+		B119F12C6A01DE00228C5992 /* mDNSSharkWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = mDNSSharkWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		F0ABF2194E516D286205B0E3 /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		95250ADAEA3EDEA323F824A8 /* Exceptions for "mDNSShark" folder in "mDNSSharkWidgets" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Header/WifiGlyph.swift,
+			);
+			target = D7DC618CAFD80147DD3540A5 /* mDNSSharkWidgets */;
+		};
 		9A048D9A2D45B35D000B42BF /* Exceptions for "mDNSShark" folder in "mDNSShark" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -101,14 +120,38 @@
 			);
 			target = 9AEA1A2B2FABF80F00D8F38C /* PacketTunnel */;
 		};
+		B043DF1C33C0994EA193403B /* Exceptions for "mDNSSharkWidgets" folder in "mDNSSharkWidgets" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = D7DC618CAFD80147DD3540A5 /* mDNSSharkWidgets */;
+		};
+		D0C9D4BFEF8E20086279ECA3 /* Exceptions for "mDNSSharkWidgets" folder in "mDNSShark" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Shared/ScanIntents.swift,
+			);
+			target = 9A1C9E882D443D5300643122 /* mDNSShark */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		85CFF6F6A14F818EF480636C /* mDNSSharkWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D0C9D4BFEF8E20086279ECA3 /* Exceptions for "mDNSSharkWidgets" folder in "mDNSShark" target */,
+				B043DF1C33C0994EA193403B /* Exceptions for "mDNSSharkWidgets" folder in "mDNSSharkWidgets" target */,
+			);
+			path = mDNSSharkWidgets;
+			sourceTree = "<group>";
+		};
 		9A1C9E8B2D443D5300643122 /* mDNSShark */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				9A048D9A2D45B35D000B42BF /* Exceptions for "mDNSShark" folder in "mDNSShark" target */,
 				9AEA1A3C2FABF86600D8F38C /* Exceptions for "mDNSShark" folder in "PacketTunnel" target */,
+				95250ADAEA3EDEA323F824A8 /* Exceptions for "mDNSShark" folder in "mDNSSharkWidgets" target */,
 			);
 			path = mDNSShark;
 			sourceTree = "<group>";
@@ -138,6 +181,7 @@
 				9AC2AB802D4F2285004A9F66 /* CFNetwork.framework in Frameworks */,
 				9AC2AB6C2D4F1F3B004A9F66 /* libmdns.tbd in Frameworks */,
 				3173238BF83DA8A145886A53 /* NetworkExtension.framework in Frameworks */,
+				6F66EB2AE45E51C94930BC24 /* WidgetSnapshot in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -156,6 +200,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B237ED79E794EC2F97424EC4 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B1A72B4A26E223DB29248F76 /* WidgetSnapshot in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -170,6 +222,7 @@
 				9A1C9E8A2D443D5300643122 /* Products */,
 				9A8F66CD2D4EEED100A033B5 /* Frameworks */,
 				9AFD8F6A2D5E89C80034B804 /* readme.md */,
+				85CFF6F6A14F818EF480636C /* mDNSSharkWidgets */,
 			);
 			sourceTree = "<group>";
 		};
@@ -179,6 +232,7 @@
 				9A1C9E892D443D5300643122 /* mDNSShark.app */,
 				9AEA1A2C2FABF80F00D8F38C /* PacketTunnel.appex */,
 				9A8785873069EB2300082E7A /* mDNSSharkTests.xctest */,
+				B119F12C6A01DE00228C5992 /* mDNSSharkWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -212,6 +266,7 @@
 			);
 			dependencies = (
 				9AEA1A342FABF80F00D8F38C /* PBXTargetDependency */,
+				7B435AF8923A8D49D3F02F0F /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				9A1C9E8B2D443D5300643122 /* mDNSShark */,
@@ -219,6 +274,7 @@
 			name = mDNSShark;
 			packageProductDependencies = (
 				2C183D20A8B0785BAA01DD06 /* DeviceFingerprint */,
+				B355E033E63FAB8144FFE3DB /* WidgetSnapshot */,
 			);
 			productName = ScanX;
 			productReference = 9A1C9E892D443D5300643122 /* mDNSShark.app */;
@@ -241,8 +297,6 @@
 				F2C49336196DFE6B549C2F75 /* mDNSSharkTests */,
 			);
 			name = mDNSSharkTests;
-			packageProductDependencies = (
-			);
 			productName = mDNSSharkTests;
 			productReference = 9A8785873069EB2300082E7A /* mDNSSharkTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -263,10 +317,31 @@
 				9AEA1A2E2FABF80F00D8F38C /* PacketTunnel */,
 			);
 			name = PacketTunnel;
-			packageProductDependencies = (
-			);
 			productName = PacketTunnel;
 			productReference = 9AEA1A2C2FABF80F00D8F38C /* PacketTunnel.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		D7DC618CAFD80147DD3540A5 /* mDNSSharkWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EB3DB8A76A2D675D8FD8DDE9 /* Build configuration list for PBXNativeTarget "mDNSSharkWidgets" */;
+			buildPhases = (
+				2C162FC24256A172DBD6ACBA /* Sources */,
+				B237ED79E794EC2F97424EC4 /* Frameworks */,
+				01885DFB19E6B365990FE472 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				85CFF6F6A14F818EF480636C /* mDNSSharkWidgets */,
+			);
+			name = mDNSSharkWidgets;
+			packageProductDependencies = (
+				02936A3AE353D5BDA6CBE266 /* WidgetSnapshot */,
+			);
+			productName = mDNSSharkWidgets;
+			productReference = B119F12C6A01DE00228C5992 /* mDNSSharkWidgets.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -303,6 +378,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				CA37C4E49D3D42CAACBB3CA9 /* XCLocalSwiftPackageReference "Packages/DeviceFingerprint" */,
+				0C02829CC03C294249120026 /* XCLocalSwiftPackageReference "Packages/WidgetSnapshot" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9A1C9E8A2D443D5300643122 /* Products */;
@@ -312,11 +388,19 @@
 				9A1C9E882D443D5300643122 /* mDNSShark */,
 				9AEA1A2B2FABF80F00D8F38C /* PacketTunnel */,
 				9A8785863069EB2300082E7A /* mDNSSharkTests */,
+				D7DC618CAFD80147DD3540A5 /* mDNSSharkWidgets */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		01885DFB19E6B365990FE472 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9A1C9E872D443D5300643122 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -343,6 +427,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		2C162FC24256A172DBD6ACBA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9A1C9E852D443D5300643122 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -368,6 +459,12 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		7B435AF8923A8D49D3F02F0F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = mDNSSharkWidgets;
+			target = D7DC618CAFD80147DD3540A5 /* mDNSSharkWidgets */;
+			targetProxy = 637AFC05F65C37CB0894FD66 /* PBXContainerItemProxy */;
+		};
 		9A87858C3069EB2300082E7A /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 9A1C9E882D443D5300643122 /* mDNSShark */;
@@ -381,6 +478,73 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		3DCAD790A0AD3A6621326229 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = mDNSSharkWidgets/mDNSSharkWidgets.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = mDNSSharkWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = mDNSShark;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.10;
+				PRODUCT_BUNDLE_IDENTIFIER = beta.mDNSShark.Widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		63B1E954BF51F62D8287A67A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = mDNSSharkWidgets/mDNSSharkWidgets.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = mDNSSharkWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = mDNSShark;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.10;
+				PRODUCT_BUNDLE_IDENTIFIER = beta.mDNSShark.Widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		9A1C9E952D443D5400643122 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -513,14 +677,14 @@
 				CODE_SIGN_ENTITLEMENTS = mDNSShark/mDNSSharkDebug.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 0;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"mDNSShark/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = mDNSShark/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = mDNSShark;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "mDNSShark uses your local network to discover Bonjour and SSDP devices and, while Packet Capture is on, to capture local Bonjour (mDNS) traffic and relay captured traffic to hosts on your LAN.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "mDNSShark uses your local network to find and identify the devices on your own network, including cameras, by browsing for Bonjour and SSDP announcements and sending short read-only requests to common ports. It does not log in to or change any device. While Packet Capture is on, it also records local Bonjour (mDNS) traffic and relays your captured traffic to devices on your network.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -554,14 +718,14 @@
 				CODE_SIGN_ENTITLEMENTS = mDNSShark/mDNSShark.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 0;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"mDNSShark/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = mDNSShark/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = mDNSShark;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "mDNSShark uses your local network to discover Bonjour and SSDP devices and, while Packet Capture is on, to capture local Bonjour (mDNS) traffic and relay captured traffic to hosts on your LAN.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "mDNSShark uses your local network to find and identify the devices on your own network, including cameras, by browsing for Bonjour and SSDP announcements and sending short read-only requests to common ports. It does not log in to or change any device. While Packet Capture is on, it also records local Bonjour (mDNS) traffic and relays your captured traffic to devices on your network.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -646,7 +810,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.8;
+				MARKETING_VERSION = 1.10;
 				PRODUCT_BUNDLE_IDENTIFIER = beta.mDNSShark.PacketTunnel;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -677,7 +841,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.8;
+				MARKETING_VERSION = 1.10;
 				PRODUCT_BUNDLE_IDENTIFIER = beta.mDNSShark.PacketTunnel;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -730,9 +894,22 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		EB3DB8A76A2D675D8FD8DDE9 /* Build configuration list for PBXNativeTarget "mDNSSharkWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				63B1E954BF51F62D8287A67A /* Release */,
+				3DCAD790A0AD3A6621326229 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		0C02829CC03C294249120026 /* XCLocalSwiftPackageReference "Packages/WidgetSnapshot" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/WidgetSnapshot;
+		};
 		CA37C4E49D3D42CAACBB3CA9 /* XCLocalSwiftPackageReference "Packages/DeviceFingerprint" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/DeviceFingerprint;
@@ -740,9 +917,17 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		02936A3AE353D5BDA6CBE266 /* WidgetSnapshot */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = WidgetSnapshot;
+		};
 		2C183D20A8B0785BAA01DD06 /* DeviceFingerprint */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = DeviceFingerprint;
+		};
+		B355E033E63FAB8144FFE3DB /* WidgetSnapshot */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = WidgetSnapshot;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

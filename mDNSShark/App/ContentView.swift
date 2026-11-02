@@ -1,5 +1,6 @@
 // mDNSShark/App/ContentView.swift
 import SwiftUI
+import WidgetSnapshot
 
 struct ContentView: View {
     @EnvironmentObject var coordinator: AppCoordinator
@@ -40,8 +41,16 @@ struct ContentView: View {
         }
         // The one trigger for the Local Network alert: splash gone and app active. It re-fires on every return to the foreground until granted, so the alert is never lost.
         .onChange(of: scenePhase == .active && !showSplash, initial: true) { _, ready in
-            if ready { scanVM.startLaunchGateIfNeeded(isActive: true) }
+            if ready {
+                scanVM.startLaunchGateIfNeeded(isActive: true)
+                coordinator.consumeWidgetScanRequest()
+            }
         }
+        // Covers the widget intent running after the app is already active.
+        .onReceive(NotificationCenter.default.publisher(for: ScanRequestFlag.didStamp).receive(on: DispatchQueue.main)) { _ in
+            if scenePhase == .active && !showSplash { coordinator.consumeWidgetScanRequest() }
+        }
+        .onOpenURL { coordinator.open($0) }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 Task { await PurchaseManager.shared.refreshEntitlements() }

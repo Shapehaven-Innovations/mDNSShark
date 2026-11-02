@@ -4,6 +4,7 @@ import SwiftUI
 struct DevicesView: View {
     @EnvironmentObject var scanVM: NetworkScanViewModel
     @EnvironmentObject var securityVM: SecurityViewModel
+    @EnvironmentObject var deepLinks: DeepLinkRouter
 
     var body: some View {
         NavigationStack {
@@ -32,6 +33,9 @@ struct DevicesView: View {
                 }
                 .padding(.horizontal).padding(.top, 8)
                 .animation(.default, value: scanVM.devices.map(\.id))
+            }
+            .navigationDestination(item: $deepLinks.deviceLinkID) { id in
+                if let device = scanVM.devices.first(where: { $0.id == id }) { DeviceDetailView(device: device) }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .navigationBar)

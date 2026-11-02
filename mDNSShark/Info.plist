@@ -131,6 +131,17 @@
 		<string>_moonraker._tcp</string>
 		<string>_prusalink._tcp</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>beta.mDNSShark</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>mdnsshark</string>
+			</array>
+		</dict>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 </dict>

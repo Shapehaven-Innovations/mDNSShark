@@ -14,6 +14,12 @@ final class CameraHintTests: XCTestCase {
         for name in ["Genetec Inc.", "Tattile SRL", "Not Flock Safety", "Recognition Adaptive"] { XCTAssertFalse(CameraHint.isCameraVendor(name), name) }
     }
 
+    func test_avigilon_matchesAnchored() {
+        XCTAssertTrue(CameraHint.isCameraVendor("Avigilon Corporation"))
+        for name in ["Not Avigilon", "Avigil", "Vigilon Corp"] { XCTAssertFalse(CameraHint.isCameraVendor(name), name) }
+        XCTAssertTrue(CameraHint.rowLooksLikeCamera(manufacturer: "Avigilon Corporation", serviceType: "_http._tcp", serviceName: "x", txtRecords: nil))
+    }
+
     func test_unrelatedVendorsContainingShortWords_doNotMatch() {
         for name in ["Carlo Gavazzi Controls SpA", "enblink Technology", "Align Engineering LLC", "TP-Link Technologies", "Ubiquiti Inc", "Apple, Inc."] {
             XCTAssertFalse(CameraHint.isCameraVendor(name), name)

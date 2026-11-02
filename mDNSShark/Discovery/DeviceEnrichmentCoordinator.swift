@@ -102,7 +102,7 @@ final class DeviceEnrichmentCoordinator {
     /// every enrichment path goes through. `JNAPHNAPProbe` applies the same
     /// guard again internally since it targets `ip` directly rather than
     /// going through this call site.
-    func enrich(ip: String, locationURL: URL?, arpMAC: String?) {
+    func enrich(ip: String, locationURL: URL?, arpMAC: String?, cameraHint: Bool = false) {
         guard SSDPDescriptionFetcher.isLANLocalAddress(ip) else {
             logger.debug("enrich: refusing non-LAN-local ip \(ip, privacy: .public)")
             return
@@ -116,7 +116,7 @@ final class DeviceEnrichmentCoordinator {
             async let netbios = limitedNetBIOSProbe(ip: ip)
             async let ttl = limitedTTLProbe(ip: ip)
             async let ssdp = limitedSSDPFetch(locationURL: locationURL)
-            async let ports = limitedPortScan(ip: ip)
+            async let ports = limitedPortScan(ip: ip, cameraHint: cameraHint)
 
             var enrichments: [DeviceEnrichment] = []
             if let r = await ubiquiti {
@@ -319,11 +319,11 @@ final class DeviceEnrichmentCoordinator {
         return await ssdpFetcher.fetch(locationURL: locationURL, timeout: fetchTimeout)
     }
 
-    private func limitedPortScan(ip: String) async -> [ScannedPort] {
+    private func limitedPortScan(ip: String, cameraHint: Bool) async -> [ScannedPort] {
         await limiter.acquire()
         defer { Task { await limiter.release() } }
         return await withCheckedContinuation { continuation in
-            PortScanner().scan(ip: ip, ports: PortScanner.uniFiRelevantPorts, timeout: portScanTimeout) { scanned in
+            PortScanner().scan(ip: ip, ports: PortScanner.ports(cameraHint: cameraHint), timeout: portScanTimeout) { scanned in
                 continuation.resume(returning: scanned)
             }
         }

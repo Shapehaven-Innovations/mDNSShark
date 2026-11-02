@@ -10,7 +10,7 @@ public enum CameraHint {
         "tvt co", "zhuhai raysharp", "lorex", "swann communications", "vivotek", "mobotix",
         "geovision", "hanwha vision", "samsung techwin", "verkada", "ring llc",
         "blink by amazon", "wyze labs", "arlo technology", "nest labs", "xiongmai",
-        "flock safety", "adaptive recognition",
+        "flock safety", "adaptive recognition", "avigilon",
     ]
 
     /// True for a manufacturer name that belongs to a camera-only vendor. TP-Link, Ubiquiti and Anker also make cameras but mostly other gear, so they are left out.
@@ -46,5 +46,13 @@ public enum CameraHint {
     public static func isCameraMatterDeviceType(_ dt: String) -> Bool {
         guard let value = Int(dt) else { return false }
         return (0x142...0x145).contains(value)
+    }
+
+    /// One discovery row's evidence: a camera-only vendor, a camera service type or instance name, a HomeKit camera category, or a Matter camera device type.
+    public static func rowLooksLikeCamera(manufacturer: String?, serviceType: String, serviceName: String, txtRecords: [String: String]?) -> Bool {
+        if let manufacturer, isCameraVendor(manufacturer) { return true }
+        return isCameraServiceType(serviceType) || isCameraInstanceName(serviceName)
+            || (serviceType == "_hap._tcp" && txtRecords?["ci"].map(isCameraHAPCategory) == true)
+            || (serviceType == "_matterc._udp" && txtRecords?["DT"].map(isCameraMatterDeviceType) == true)
     }
 }
