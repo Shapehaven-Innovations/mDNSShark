@@ -20,6 +20,7 @@ public enum WidgetKind {
 public enum WidgetLink {
     /// Parsed by the app's DeepLinkRouter, which owns the URL scheme.
     public static let devicesTab = URL(string: "mdnsshark://tab/devices")!
+    public static let securityTab = URL(string: "mdnsshark://tab/security")!
 }
 
 public struct StatusCounts: Codable, Equatable, Sendable {

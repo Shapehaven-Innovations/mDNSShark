@@ -4,8 +4,8 @@ extension StatusCounts {
     /// Warning plus critical.
     public var issues: Int { warning + critical }
 
-    /// Not-probed devices do not block this, but pending ones do.
-    public var isAllClear: Bool { issues == 0 && pending == 0 && total > 0 }
+    /// Needs at least one secure device; not probed devices do not block it, but pending ones do.
+    public var isAllClear: Bool { issues == 0 && pending == 0 && secure > 0 }
 }
 
 public enum SnapshotFormatting {
@@ -16,6 +16,38 @@ public enum SnapshotFormatting {
         if seconds < 3600 { return unit(seconds / 60, "minute") }
         if seconds < 86_400 { return unit(seconds / 3600, "hour") }
         return unit(seconds / 86_400, "day")
+    }
+
+    /// Abbreviated age for tight captions, such as "2 min ago".
+    public static func shortAge(since: Date, now: Date) -> String {
+        let seconds = max(0, Int(now.timeIntervalSince(since)))
+        if seconds < 60 { return "just now" }
+        if seconds < 3600 { return "\(seconds / 60) min ago" }
+        if seconds < 86_400 { return "\(seconds / 3600) hr ago" }
+        return "\(seconds / 86_400) d ago"
+    }
+
+    public static func issuePhrase(_ n: Int) -> String { "\(n) issue\(n == 1 ? "" : "s")" }
+
+    /// The one VoiceOver label every Security widget shape uses.
+    public static func securityAccessibilityLabel(counts: StatusCounts, scannedAt: Date, now: Date,
+                                                  isStale: Bool, isScanRunning: Bool) -> String {
+        let scanned = "scanned " + age(since: scannedAt, now: now)
+        var body: String
+        switch counts.securityVerdict {
+        case .noDevices: body = "No devices found"
+        case .issues(let n): body = "\(issuePhrase(n)): \(counts.critical) critical, \(counts.warning) warning"
+        case .checking(let p): body = "0 issues, \(p) still being checked"
+        case .allClear: body = WidgetCopy.allClear
+        case .nothingProbed: body = "No device probed yet"
+        }
+        if counts.total > 0 {
+            body += ". \(counts.secure) secure, \(counts.notProbed) not probed"
+            if counts.pending > 0 { body += ", \(counts.pending) pending" }
+        }
+        body += ", " + scanned
+        if isStale { body = WidgetCopy.outOfDate + ". " + body }
+        return body + (isScanRunning ? WidgetCopy.scanRunningSuffix : "")
     }
 
     /// Compact age for the freshness ring center: minutes (0 while age reads "just now"), then hours, then days.

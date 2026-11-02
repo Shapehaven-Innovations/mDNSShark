@@ -95,8 +95,8 @@ final class AppCoordinator: ObservableObject {
             .store(in: &cancellables)
 
         // The closure runs after the debounce, so it reads settled rows and findings, not the willSet value.
-        networkScanViewModel.$devices
-            .dropFirst()
+        // A threat-data refresh changes findings without changing devices, so both sources schedule the debounced rewrite.
+        WidgetSnapshotWriter.rewriteTriggers(devices: networkScanViewModel.$devices, findings: securityViewModel.$findings)
             .sink { [weak self] _ in
                 self?.widgetWriter.scheduleRewrite { [weak self] in
                     guard let self, !self.networkScanViewModel.isScanning else { return nil }

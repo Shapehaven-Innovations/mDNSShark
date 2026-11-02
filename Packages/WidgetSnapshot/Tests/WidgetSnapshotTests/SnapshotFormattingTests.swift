@@ -40,6 +40,7 @@ struct SnapshotFormattingTests {
         #expect(!StatusCounts(total: 5, secure: 4, warning: 0, critical: 0, notProbed: 0, pending: 1).isAllClear)
         #expect(!StatusCounts(total: 5, secure: 4, warning: 1, critical: 0, notProbed: 0, pending: 0).isAllClear)
         #expect(!StatusCounts.zero.isAllClear)
+        #expect(!StatusCounts(total: 3, secure: 0, warning: 0, critical: 0, notProbed: 3, pending: 0).isAllClear)
         #expect(StatusCounts(total: 5, secure: 0, warning: 2, critical: 1, notProbed: 2, pending: 0).issues == 3)
     }
     @Test("VoiceOver label") func label() {

@@ -1,4 +1,5 @@
 // mDNSShark/Widgets/WidgetSnapshotWriter.swift
+import Combine
 import Foundation
 import WidgetKit
 import WidgetSnapshot
@@ -65,6 +66,12 @@ final class WidgetSnapshotWriter {
             return
         }
         write(input, newScan: true)
+    }
+
+    /// Drops each source's seed value and merges later changes, so a findings-only change also schedules a rewrite.
+    static func rewriteTriggers<D: Publisher, F: Publisher>(devices: D, findings: F) -> AnyPublisher<Void, Never>
+    where D.Failure == Never, F.Failure == Never {
+        Publishers.Merge(devices.dropFirst().map { _ in () }, findings.dropFirst().map { _ in () }).eraseToAnyPublisher()
     }
 
     /// Debounced; the closure is read after the delay and the write replaces the newest sample instead of adding one.

@@ -35,6 +35,19 @@ enum WidgetPalette {
     }
 
     static func isTinted(_ mode: WidgetRenderingMode) -> Bool { mode == .accented || mode == .vibrant }
+
+    static let gridLine = Color.white.opacity(0.16)
+    static let baseline = Color.white.opacity(0.3)
+
+    /// Stacked chart segments; tinted modes spread critical and warning further apart than the capsule does.
+    static func chartColor(for kind: StatusKind, mode: WidgetRenderingMode) -> Color {
+        let tinted = isTinted(mode)
+        switch kind {
+        case .critical: return tinted ? .white : critical
+        case .warning: return tinted ? .white.opacity(0.45) : warning
+        default: return color(for: kind, mode: mode)
+        }
+    }
 }
 
 extension Color {

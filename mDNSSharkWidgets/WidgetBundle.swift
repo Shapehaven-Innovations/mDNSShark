@@ -7,5 +7,6 @@ struct MDNSSharkWidgets: WidgetBundle {
     var body: some Widget {
         DevicesWidget()
         ScanNowWidget()
+        SecurityWidget()
     }
 }

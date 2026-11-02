@@ -37,4 +37,43 @@ enum WidgetSamples {
     static var running: SnapshotEntry { entry(ago: 720, running: true) }
 
     static var empty: SnapshotEntry { SnapshotEntry(date: Date(), result: .missing, isScanRunning: false) }
+    static var needsUpdate: SnapshotEntry { SnapshotEntry(date: Date(), result: .newer(version: 2), isScanRunning: false) }
+
+    // MARK: Security
+
+    /// The mockup's twelve (critical, warning) pairs, oldest first.
+    static let securityHistory = [(0, 1), (0, 1), (1, 1), (1, 2), (0, 2), (0, 2), (0, 1), (1, 1), (1, 2), (1, 2), (1, 2), (1, 2)]
+    static let busyHistory = [(2, 6), (3, 9), (1, 4), (5, 14), (4, 12), (8, 20), (6, 18), (10, 30)]
+
+    private static func counts(_ s: Int, _ w: Int, _ c: Int, _ np: Int, _ p: Int) -> StatusCounts {
+        StatusCounts(total: s + w + c + np + p, secure: s, warning: w, critical: c, notProbed: np, pending: p)
+    }
+
+    /// Ten minutes between scans, the newest at the snapshot's scan time.
+    private static func history(_ pairs: [(Int, Int)], endingAt end: Date) -> [ScanSample] {
+        pairs.enumerated().map { i, p in
+            ScanSample(at: end.addingTimeInterval(Double(i - pairs.count + 1) * 600),
+                       counts: StatusCounts(total: 14, secure: 14 - p.0 - p.1, warning: p.1, critical: p.0, notProbed: 0, pending: 0))
+        }
+    }
+
+    private static func security(_ c: StatusCounts, _ pairs: [(Int, Int)], ago: TimeInterval = 120,
+                                 running: Bool = false) -> SnapshotEntry {
+        let now = Date()
+        let scannedAt = now.addingTimeInterval(-ago)
+        let snapshot = WidgetSnapshot(version: WidgetSnapshot.schemaVersion, scannedAt: scannedAt, subnet: "192.168.1.0/24",
+                                      counts: c, typeCounts: sixTypes, history: history(pairs, endingAt: scannedAt),
+                                      newDevices: [], topology: [], topologyOverflow: 0, ownDeviceKey: nil)
+        return SnapshotEntry(date: now, result: .loaded(snapshot), isScanRunning: running)
+    }
+
+    static var securityIssues: SnapshotEntry { security(counts(9, 2, 1, 3, 0), securityHistory) }
+    static var securityAllClear: SnapshotEntry { security(counts(12, 0, 0, 2, 0), Array(repeating: (0, 0), count: 12), ago: 300) }
+    static var securityChecking: SnapshotEntry { security(counts(9, 0, 0, 3, 2), [(0, 0), (0, 0), (0, 0)]) }
+    static var securityNotProbed: SnapshotEntry { security(counts(0, 0, 0, 3, 0), [(0, 0)]) }
+    static var securityFew: SnapshotEntry { security(counts(9, 2, 1, 3, 0), [(1, 2)]) }
+    static var securityBusy: SnapshotEntry { security(counts(20, 30, 10, 3, 0), busyHistory) }
+    static var securityStale: SnapshotEntry { security(counts(9, 2, 1, 3, 0), securityHistory, ago: 3 * 3600) }
+    static var securityRunning: SnapshotEntry { security(counts(9, 2, 1, 3, 0), securityHistory, running: true) }
+    static var securityNoDevices: SnapshotEntry { security(counts(0, 0, 0, 0, 0), []) }
 }

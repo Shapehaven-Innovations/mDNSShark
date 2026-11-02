@@ -62,6 +62,9 @@ struct DeepLinkRouterTests {
     @Test("the widget link parses to the Devices tab") func widgetLink() {
         #expect(DeepLinkRouter.parse(WidgetLink.devicesTab) == .tab(.devices))
     }
+    @Test("the security widget link parses to the Security tab") func securityLink() {
+        #expect(DeepLinkRouter.parse(WidgetLink.securityTab) == .tab(.security))
+    }
 }
 
 @Suite("Widget scan request")

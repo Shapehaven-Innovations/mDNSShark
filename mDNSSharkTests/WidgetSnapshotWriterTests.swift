@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import Combine
 import WidgetSnapshot
 @testable import mDNSShark
 
@@ -290,5 +291,34 @@ struct WidgetSnapshotWriterTests {
         let writer = makeWriter(store: nil, recorder: rec, clock: Clock(t0))
         writer.scanDidFinish(input([device("192.168.1.1")]))
         #expect(rec.kinds.isEmpty)
+    }
+
+    @Test("rewrite triggers drop the seeds and fire on a findings-only change")
+    func findingsTrigger() {
+        let devices = CurrentValueSubject<Int, Never>(0), findings = CurrentValueSubject<Int, Never>(0)
+        var fired = 0
+        let c = WidgetSnapshotWriter.rewriteTriggers(devices: devices, findings: findings).sink { fired += 1 }
+        #expect(fired == 0)
+        findings.send(1)
+        #expect(fired == 1)
+        devices.send(1)
+        #expect(fired == 2)
+        c.cancel()
+    }
+
+    @Test("a findings-only rewrite changes the statuses, replaces the newest sample and keeps scannedAt")
+    func findingsRewrite() async throws {
+        let store = tempStore(), rec = Recorder(), clock = Clock(t0)
+        let writer = makeWriter(store: store, recorder: rec, clock: clock)
+        let rows = [device("192.168.1.1"), device("192.168.1.2")]
+        writer.scanDidFinish(input(rows))
+        clock.date = t0.addingTimeInterval(600)
+        writer.scheduleRewrite { self.input(rows, status: { $0.ipAddress == "192.168.1.2" ? .critical : .secure }) }
+        try await Task.sleep(for: .milliseconds(300))
+        let snap = loaded(store)
+        #expect(snap?.counts.critical == 1 && snap?.counts.secure == 1)
+        #expect(snap?.history.count == 1 && snap?.history.last?.counts.critical == 1)
+        #expect(snap?.scannedAt == t0)
+        #expect(rec.kinds.suffix(WidgetKind.scanKinds.count) == ArraySlice(WidgetKind.scanKinds))
     }
 }
