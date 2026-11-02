@@ -2,7 +2,7 @@ import SwiftUI
 import WidgetKit
 import WidgetSnapshot
 
-/// Widget A: the device count from the last scan, its status capsule, a Scan button and, when medium, a ranked bar per device type.
+/// Devices Online: the device count from the last scan, its status capsule, a Scan button and, when medium, a ranked bar per device type.
 struct DevicesWidget: Widget {
     let kind = WidgetKind.devices
 

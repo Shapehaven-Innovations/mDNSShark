@@ -1,7 +1,7 @@
 import WidgetKit
 import SwiftUI
 
-// Later phases append the other widget kinds here.
+// Lists every widget this extension ships.
 @main
 struct MDNSSharkWidgets: WidgetBundle {
     var body: some Widget {

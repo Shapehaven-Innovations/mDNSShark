@@ -1,7 +1,7 @@
 import Foundation
 import WidgetSnapshot
 
-/// Mockup values for previews and the placeholder only; never written anywhere.
+/// Sample values for previews and the placeholder only; never written anywhere.
 enum WidgetSamples {
     static let counts = StatusCounts(total: 14, secure: 9, warning: 2, critical: 1, notProbed: 2, pending: 0)
 
@@ -41,7 +41,7 @@ enum WidgetSamples {
 
     // MARK: Security
 
-    /// The mockup's twelve (critical, warning) pairs, oldest first.
+    /// Twelve (critical, warning) pairs, oldest first.
     static let securityHistory = [(0, 1), (0, 1), (1, 1), (1, 2), (0, 2), (0, 2), (0, 1), (1, 1), (1, 2), (1, 2), (1, 2), (1, 2)]
     static let busyHistory = [(2, 6), (3, 9), (1, 4), (5, 14), (4, 12), (8, 20), (6, 18), (10, 30)]
 

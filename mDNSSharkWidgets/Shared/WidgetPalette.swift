@@ -14,7 +14,7 @@ enum WidgetPalette {
     static let scanFill = Color.white.opacity(0.18)
     static let scanStroke = Color.white.opacity(0.28)
 
-    /// 160 degree gradient from the mockup, lighter at the top left.
+    /// 160 degree gradient used for the card background, lighter at the top left.
     static func gradient(dark: Bool) -> LinearGradient {
         let colors = dark ? [Color(hex: 0x14525C), Color(hex: 0x00171F)] : [Color(hex: 0x246B78), Color(hex: 0x032E36)]
         return LinearGradient(colors: colors, startPoint: UnitPoint(x: 0.33, y: 0), endPoint: UnitPoint(x: 0.67, y: 1))

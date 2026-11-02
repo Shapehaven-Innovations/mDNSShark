@@ -2,7 +2,7 @@ import SwiftUI
 import WidgetKit
 import WidgetSnapshot
 
-/// Widget B: issues from the last scan with not probed always stated, in three home screen sizes and three lock screen shapes.
+/// Security at a Glance: issues from the last scan with not probed always stated, in three home screen sizes and three lock screen shapes.
 struct SecurityWidget: Widget {
     let kind = WidgetKind.security
 

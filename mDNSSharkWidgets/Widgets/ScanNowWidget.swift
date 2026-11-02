@@ -2,7 +2,7 @@ import SwiftUI
 import WidgetKit
 import WidgetSnapshot
 
-/// Widget D: how fresh the last scan is as a draining ring, with a full width Scan button.
+/// Scan Now: how fresh the last scan is as a draining ring, with a full width Scan button.
 struct ScanNowWidget: Widget {
     let kind = WidgetKind.scan
 

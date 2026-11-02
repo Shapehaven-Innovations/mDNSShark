@@ -59,6 +59,21 @@ struct WidgetModelsTests {
         #expect(m.accessibilityLabel == "Last scan 12 minutes ago, 14 devices, 9 secure, 2 warning, 1 critical, 2 not probed, 192.168.1.0/24")
     }
 
+    @Test("scan now small caption is singular for one device")
+    func scanNowSingular() {
+        let one = StatusCounts(total: 1, secure: 1, warning: 0, critical: 0, notProbed: 0, pending: 0)
+        guard case .loaded(let m) = ScanNowWidgetModel.make(.loaded(snapshot(one)), now: scan.addingTimeInterval(60), isScanRunning: false) else { Issue.record("not loaded"); return }
+        #expect(m.smallCaption == "device")
+    }
+
+    @Test("scan button label depends on the path and the running state")
+    func scanButtonLabels() {
+        #expect(WidgetCopy.scanButtonLabel(background: true, isRunning: false) == "Scan now")
+        #expect(WidgetCopy.scanButtonLabel(background: true, isRunning: true) == "Scan now, scan running")
+        #expect(WidgetCopy.scanButtonLabel(background: false, isRunning: false) == "Scan now, opens mDNSShark")
+        #expect(WidgetCopy.scanButtonLabel(background: false, isRunning: true) == "Scan now, opens mDNSShark, scan running")
+    }
+
     @Test("scan now stale: sliver ring, hours, out of date copy")
     func scanNowStaleCopy() {
         guard case .loaded(let m) = ScanNowWidgetModel.make(.loaded(snapshot()), now: scan.addingTimeInterval(3 * 3600 + 5), isScanRunning: false) else { Issue.record("not loaded"); return }

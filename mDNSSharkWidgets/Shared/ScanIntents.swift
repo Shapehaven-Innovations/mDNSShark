@@ -8,16 +8,20 @@ enum WidgetScanIntentChoice {
     static let runsInBackground = true
 }
 
-struct ScanNowIntent: AppIntent {
-    static let title: LocalizedStringResource = "Scan Now"
-    static let description = IntentDescription("Opens mDNSShark and scans your network.")
-    static let openAppWhenRun: Bool = true
+/// Public so the Release build can look the intent up by identifier, like BackgroundScanIntent.
+public struct ScanNowIntent: AppIntent {
+    public static let title: LocalizedStringResource = "Scan Now"
+    public static let description = IntentDescription("Opens mDNSShark and scans your network.")
+    public static let openAppWhenRun: Bool = true
+
+    public init() {}
 
     // Scanning stays in the app process; the intent only leaves a flag.
-    func perform() async throws -> some IntentResult {
+    public func perform() async throws -> some IntentResult {
         ScanRequestFlag.stamp(in: UserDefaults(suiteName: AppGroup.identifier) ?? .standard, at: Date())
-        WidgetCenter.shared.reloadTimelines(ofKind: WidgetKind.devices)
-        WidgetCenter.shared.reloadTimelines(ofKind: WidgetKind.scan)
+        for kind in [WidgetKind.devices, WidgetKind.scan, WidgetKind.security] {
+            WidgetCenter.shared.reloadTimelines(ofKind: kind)
+        }
         return .result()
     }
 }

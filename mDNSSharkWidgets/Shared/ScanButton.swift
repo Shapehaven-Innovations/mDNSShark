@@ -21,14 +21,17 @@ struct ScanButton: View {
         Group {
             if #available(iOS 26.0, *), WidgetScanIntentChoice.runsInBackground {
                 Button(intent: BackgroundScanIntent()) { label }
+                    .accessibilityLabel(WidgetCopy.scanButtonLabel(background: true, isRunning: isRunning))
+                    .accessibilityHint("Scans your network without opening the app")
             } else {
                 Button(intent: ScanNowIntent()) { label }
+                    .accessibilityLabel(WidgetCopy.scanButtonLabel(background: false, isRunning: isRunning))
+                    .accessibilityHint("Opens mDNSShark and scans your network")
             }
         }
         .buttonStyle(.plain)
         .invalidatableContent()
         .widgetAccentable()
-        .accessibilityLabel(WidgetCopy.scanAccessibilityLabel)
     }
 
     private var label: some View {

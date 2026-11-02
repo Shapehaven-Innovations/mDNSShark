@@ -18,6 +18,13 @@ public enum WidgetCopy {
     public static let needsUpdateAccessibilityLabel = "Update mDNSShark to show this widget"
     public static let scanRunningSuffix = ", scan running"
 
+    public static let scanBackgroundAccessibilityLabel = "Scan now"
+
+    /// VoiceOver label for the Scan button: only the open-the-app path says it opens the app.
+    public static func scanButtonLabel(background: Bool, isRunning: Bool) -> String {
+        (background ? scanBackgroundAccessibilityLabel : scanAccessibilityLabel) + (isRunning ? scanRunningSuffix : "")
+    }
+
     public static func deviceUnit(_ count: Int) -> String { count == 1 ? "device" : "devices" }
 }
 
@@ -226,7 +233,7 @@ public struct ScanNowWidgetModel: Equatable, Sendable {
                 ringFraction: stale ? staleRingFraction : Staleness.ringFraction(scannedAt: s.scannedAt, now: now),
                 ringValue: ring.value, ringUnit: ring.unit, isStale: stale,
                 title: stale ? WidgetCopy.outOfDate : WidgetCopy.lastScan,
-                smallCaption: stale ? WidgetCopy.mayDiffer : WidgetCopy.devices,
+                smallCaption: stale ? WidgetCopy.mayDiffer : WidgetCopy.deviceUnit(s.counts.total),
                 mediumCaption: stale ? WidgetCopy.networkMayHaveChanged : (s.subnet ?? WidgetCopy.subnetUnknown),
                 isScanRunning: isScanRunning, accessibilityLabel: parts.joined(separator: ", "))
         }

@@ -1,7 +1,7 @@
 // swift-tools-version:6.0
 import PackageDescription
 
-// The WidgetSnapshot module is Foundation only and shared by the app, the widget and (later) the tunnel.
+// The WidgetSnapshot module is Foundation only and shared by the app and the widget.
 // Its struct WidgetSnapshot shares the module name, so callers use unqualified names such as SnapshotStore.
 
 let package = Package(
