@@ -48,9 +48,9 @@ struct SettingsView: View {
                 tlsSection
                 bypassListSection
                 dnsSection
+                scanSection
                 captureFiltersSection
                 captureRoutingSection
-                scanSection
                 aboutSection
             }
             .listStyle(.insetGrouped)
@@ -269,12 +269,13 @@ struct SettingsView: View {
             .disabled(purchaseInFlight)
     }
 
+    /// Two rows, so each link has a full-width tap target.
+    @ViewBuilder
     private var legalLinks: some View {
-        HStack(spacing: 16) {
-            Link("Terms of Use", destination: Self.termsURL)
-            Link("Privacy Policy", destination: Self.privacyURL)
-        }
-        .font(.footnote)
+        Link("Terms of Use", destination: Self.termsURL)
+            .font(.footnote)
+        Link("Privacy Policy", destination: Self.privacyURL)
+            .font(.footnote)
     }
 
     private static let termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!

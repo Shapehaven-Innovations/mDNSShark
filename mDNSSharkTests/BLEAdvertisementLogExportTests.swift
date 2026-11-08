@@ -36,6 +36,17 @@ import DeviceFingerprint
         #expect(lines[1].contains(",-61,"))
     }
 
+    @Test func csvDefusesAFormulaLeadingNameButLeavesTheRSSIUnquoted() {
+        let csv = BLEAdvertisementLogExport.csv([record(name: "=1+1", rssi: -61, at: Date(timeIntervalSince1970: 1_800_000_000))])
+        let lines = csv.components(separatedBy: "\r\n").filter { !$0.isEmpty }
+        #expect(lines.count == 2)
+        // The company column ("Apple, Inc.") is quoted and holds a comma, so match the delimited cells, not a split.
+        #expect(lines[1].contains(",'=1+1,"))
+        #expect(!lines[1].contains(",=1+1,"))
+        #expect(lines[1].contains(",-61,"))
+        #expect(!lines[1].contains("'-61"))
+    }
+
     @Test func jsonCarriesLabelAndRecords() throws {
         let data = try BLEAdvertisementLogExport.json(twoRecords)
         let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])

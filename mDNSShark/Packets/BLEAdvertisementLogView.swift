@@ -51,8 +51,12 @@ struct BLEAdvertisementLogView: View {
                 }
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Menu {
-                        Button("Export JSON") { export(.json) }
-                        Button("Export CSV") { export(.csv) }
+                        Section {
+                            Button("Export JSON") { export(.json) }
+                            Button("Export CSV") { export(.csv) }
+                        } header: {
+                            Text("Includes names and raw advertisement data of nearby devices.")
+                        }
                     } label: {
                         Label("Export", systemImage: "square.and.arrow.up")
                     }

@@ -85,6 +85,7 @@ struct TopologyNodeView: View {
                     .accessibilityHidden(true)
                 }
             }
+            .animation(.snappy, value: node.hasBluetoothSuggestion)
             Text(node.device.hostname)
                 .font(.system(size: 9, weight: .medium))
                 .lineLimit(1).frame(maxWidth: 72)

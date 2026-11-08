@@ -16,7 +16,7 @@ public struct BluetoothIndicatorModel: Equatable, Sendable {
     public var isStale: Bool
     /// SnapshotFormatting.shortAge, e.g. "12 min ago".
     public var ageText: String
-    /// "7" fresh, "7 · 3 hr ago" stale.
+    /// "7" fresh, "7 · 3 hr ago" stale; "7 · 30+ min ago" from the stale edge to the hour.
     public var pillText: String
     /// "7 nearby · 2 suggested? · 12 min ago", with the suggested part omitted when 0.
     public var lineText: String
@@ -52,15 +52,18 @@ public struct BluetoothIndicatorModel: Equatable, Sendable {
         let elapsed = now.timeIntervalSince(summary.scannedAt)
         guard elapsed < Staleness.bluetoothOmitAfter else { return nil }
         let stale = elapsed >= Staleness.bluetoothFreshWindow
-        let age = SnapshotFormatting.shortAge(since: summary.scannedAt, now: now)
+        // The timeline has no Bluetooth marks between the stale edge and the hour, so a minute count there would
+        // sit under-reported for up to 30 minutes; "30+" is true for the whole window.
+        let beforeTheHour = stale && elapsed < 3600
+        let age = beforeTheHour ? "30+ min ago" : SnapshotFormatting.shortAge(since: summary.scannedAt, now: now)
+        let spokenAge = beforeTheHour ? "over 30 minutes ago" : SnapshotFormatting.age(since: summary.scannedAt, now: now)
         let n = summary.nearby, s = summary.suggested
         let nearbyPart = "\(n) \(WidgetCopy.nearby)"
         let suggestedSpoken = s == 0 ? "none suggested"
             : s == 1 ? "1 suggested as a network device, inferred"
             : "\(s) suggested as network devices, inferred"
         let clause = (stale ? WidgetCopy.bluetoothOutOfDate + ", " : "")
-            + "\(n) \(WidgetCopy.bluetoothUnit(n)) \(WidgetCopy.nearby), \(suggestedSpoken), Bluetooth scanned "
-            + SnapshotFormatting.age(since: summary.scannedAt, now: now)
+            + "\(n) \(WidgetCopy.bluetoothUnit(n)) \(WidgetCopy.nearby), \(suggestedSpoken), Bluetooth scanned " + spokenAge
         return BluetoothIndicatorModel(
             nearby: n, suggested: s, isStale: stale, ageText: age,
             pillText: stale ? "\(n)" + WidgetCopy.captionSeparator + age : "\(n)",

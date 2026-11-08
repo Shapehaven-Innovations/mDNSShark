@@ -98,6 +98,7 @@ struct DevicePickerSheet: View {
                                         Image(systemName: BluetoothSymbol.name)
                                             .font(.caption2)
                                             .foregroundColor(AppColors.info)
+                                            .layoutPriority(1)
                                             .accessibilityLabel("Bluetooth device suggested")
                                     }
                                 }

@@ -74,6 +74,26 @@ struct BluetoothIndicatorTests {
         #expect(m.accessibilityClause == "Bluetooth out of date, 7 Bluetooth devices nearby, 2 suggested as network devices, inferred, Bluetooth scanned 3 hours ago")
     }
 
+    @Test("between 30 and 60 minutes the age reads 30+ min so it is never under-reported before the hour mark",
+          arguments: [1800.0, 2400, 3000, 3599])
+    func stalePillBeforeTheHourReads30Plus(after: Double) {
+        let m = model(after: after)!
+        #expect(m.isStale)
+        #expect(m.ageText == "30+ min ago")
+        #expect(m.pillText == "7 · 30+ min ago")
+        #expect(m.lineText == "7 nearby · 2 suggested? · 30+ min ago")
+        #expect(m.securityLineText == "7 nearby · not assessed · 30+ min ago")
+        #expect(m.accessibilityClause == "Bluetooth out of date, 7 Bluetooth devices nearby, 2 suggested as network devices, inferred, Bluetooth scanned over 30 minutes ago")
+    }
+
+    @Test("from the hour mark the age is the ordinary hourly one")
+    func stalePillAtTheHourReadsHours() {
+        let m = model(after: 3600)!
+        #expect(m.pillText == "7 · 1 hr ago")
+        #expect(m.accessibilityClause.hasSuffix("Bluetooth scanned 1 hour ago"))
+        #expect(model(after: 29 * 60)!.ageText == "29 min ago")
+    }
+
     @Test("the suggested count carries a question mark")
     func questionMarkOnSuggested() {
         #expect(WidgetCopy.suggested(2) == "2 suggested?")
