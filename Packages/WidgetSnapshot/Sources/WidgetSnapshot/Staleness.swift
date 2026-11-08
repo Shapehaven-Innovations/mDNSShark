@@ -3,6 +3,8 @@ import Foundation
 public enum Staleness {
     public static let freshWindow: TimeInterval = 3600
     public static let newWindow: TimeInterval = 86_400
+    public static let bluetoothFreshWindow: TimeInterval = 1800
+    public static let bluetoothOmitAfter: TimeInterval = 86_400
 
     public static func isFresh(scannedAt: Date, now: Date) -> Bool {
         now.timeIntervalSince(scannedAt) < freshWindow

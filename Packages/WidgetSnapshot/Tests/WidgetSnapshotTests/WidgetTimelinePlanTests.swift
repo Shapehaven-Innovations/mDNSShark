@@ -57,6 +57,49 @@ struct WidgetTimelinePlanTests {
         #expect(plan.entries.count <= 90)
     }
 
+    @Test("Bluetooth adds minute marks to +30 min, the stale mark and the 24 h omit mark, and reloads at the earlier 24 h mark")
+    func bluetoothBoundaries() {
+        let now = scan.addingTimeInterval(3600 + 7)
+        let bt = now.addingTimeInterval(-600)
+        let plan = WidgetTimelinePlan.make(scannedAt: scan, now: now, awaitingUntil: nil, bluetoothScannedAt: bt)
+        let dates = plan.entries.map(\.date)
+        for minute in 11...30 { #expect(dates.contains(bt.addingTimeInterval(Double(minute) * 60))) }
+        #expect(dates.contains(bt.addingTimeInterval(1800)))
+        #expect(dates.contains(bt.addingTimeInterval(2 * 3600)))
+        #expect(dates.contains(bt.addingTimeInterval(86_400)))
+        #expect(!dates.contains(bt.addingTimeInterval(9 * 60)))
+        #expect(dates.allSatisfy { $0 >= now })
+        #expect(dates == dates.sorted() && Set(dates).count == dates.count)
+        #expect(dates.count < 130)
+        #expect(plan.reloadAfter == scan.addingTimeInterval(86_400))
+        let early = WidgetTimelinePlan.make(scannedAt: scan, now: scan.addingTimeInterval(60), awaitingUntil: nil,
+                                            bluetoothScannedAt: scan.addingTimeInterval(-3600))
+        #expect(early.reloadAfter == scan.addingTimeInterval(86_400 - 3600))
+    }
+
+    @Test("Bluetooth 3 s after the LAN scan keeps every gap after now at a minute or more")
+    func bluetoothNearLANKeepsMinuteGaps() {
+        let now = scan.addingTimeInterval(30)
+        let plan = WidgetTimelinePlan.make(scannedAt: scan, now: now, awaitingUntil: nil,
+                                           bluetoothScannedAt: scan.addingTimeInterval(3))
+        let dates = plan.entries.map(\.date)
+        #expect(dates.first == now)
+        let later = Array(dates.dropFirst())
+        #expect(zip(later, later.dropFirst()).allSatisfy { $1.timeIntervalSince($0) >= 60 })
+        #expect(dates.count <= 130)
+        #expect(dates.contains(scan.addingTimeInterval(3 + 1800)))
+        #expect(dates.contains(scan.addingTimeInterval(3 + 86_400)))
+    }
+
+    @Test("without Bluetooth the plan is unchanged", arguments: [nil, 0.0, 1800, 3600, 86_399, 400_000])
+    func withoutBluetoothPlanIsUnchanged(age: Double?) {
+        let now = scan.addingTimeInterval(500_000)
+        let scannedAt = age.map { now.addingTimeInterval(-$0) }
+        let base = WidgetTimelinePlan.make(scannedAt: scannedAt, now: now, awaitingUntil: now.addingTimeInterval(30))
+        let explicit = WidgetTimelinePlan.make(scannedAt: scannedAt, now: now, awaitingUntil: now.addingTimeInterval(30), bluetoothScannedAt: nil)
+        #expect(base == explicit)
+    }
+
     @Test("a scan dated in the future plans as fresh from now")
     func futureScan() {
         let plan = WidgetTimelinePlan.make(scannedAt: scan.addingTimeInterval(60), now: scan, awaitingUntil: nil)

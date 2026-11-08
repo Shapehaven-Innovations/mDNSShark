@@ -107,4 +107,36 @@ struct SecurityWidgetModelTests {
         #expect(m.largeAccessibilityLabel.hasSuffix(m.chart.accessibilityLabel + ", scan running"))
         #expect(!m.largeAccessibilityLabel.contains("scan running. Issues per scan"))
     }
+
+    func btSnap(_ counts: StatusCounts) -> SnapshotDecodeResult<WidgetSnapshot> {
+        guard case .loaded(var s) = snap(counts) else { return .missing }
+        s.bluetooth = BluetoothSummary(scannedAt: scan.addingTimeInterval(-600), nearby: 7, suggested: 2)
+        return .loaded(s)
+    }
+    let btClause = ". 7 Bluetooth devices nearby, 2 suggested as network devices, inferred, Bluetooth scanned 12 minutes ago, not security assessed"
+
+    @Test("small, medium and large labels carry the Bluetooth clause ending not security assessed, before scan running")
+    func securitySmallMediumLargeClauseEndsNotSecurityAssessed() {
+        let counts = c(9, 2, 1, 3, 0), now = scan.addingTimeInterval(120)
+        let shared = SnapshotFormatting.securityAccessibilityLabel(counts: counts, scannedAt: scan, now: now, isStale: false, isScanRunning: false)
+        guard case .loaded(let m) = SecurityWidgetModel.make(btSnap(counts), now: now, isScanRunning: true) else { Issue.record("not loaded"); return }
+        #expect(m.bluetooth?.securityLineText == "7 nearby · not assessed · 12 min ago")
+        #expect(m.accessibilityLabel == shared + btClause + ", scan running")
+        #expect(m.largeAccessibilityLabel == shared + ". " + m.chart.accessibilityLabel + btClause + ", scan running")
+        guard case .loaded(let idle) = SecurityWidgetModel.make(btSnap(counts), now: now, isScanRunning: false) else { Issue.record("not loaded"); return }
+        #expect(idle.accessibilityLabel.hasSuffix("not security assessed"))
+        #expect(home(counts)!.bluetooth == nil)
+    }
+
+    @Test("circular, rectangular and inline share a label that carries the Bluetooth clause")
+    func accessoryCircularRectangularInlineCarryClause() {
+        let counts = c(9, 2, 1, 3, 0), now = scan.addingTimeInterval(120)
+        let shared = SnapshotFormatting.securityAccessibilityLabel(counts: counts, scannedAt: scan, now: now, isStale: false, isScanRunning: false)
+        guard case .loaded(let a) = SecurityAccessoryModel.make(btSnap(counts), now: now, isScanRunning: true) else { Issue.record("not loaded"); return }
+        #expect(a.bluetooth?.nearby == 7)
+        #expect(a.accessibilityLabel == shared + btClause + ", scan running")
+        guard case .loaded(let idle) = SecurityAccessoryModel.make(btSnap(counts), now: now, isScanRunning: false) else { Issue.record("not loaded"); return }
+        #expect(idle.accessibilityLabel == shared + btClause)
+        #expect(lock(counts)!.bluetooth == nil)
+    }
 }

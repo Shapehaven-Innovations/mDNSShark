@@ -266,18 +266,7 @@ struct DiscoveredDevice: Identifiable, Equatable {
     var isApplianceMaker: Bool { manufacturer.map(ApplianceVendorHint.isApplianceVendor) ?? false }
 
     var deviceIcon: String {
-        switch deviceType {
-        case .router:   return "wifi.router"
-        case .tv:       return "tv"
-        case .camera:   return "video"
-        case .audio:    return "hifispeaker"
-        case .smartHome: return "lightbulb"
-        case .nas:      return "externaldrive.connected.to.line.below"
-        case .printer:  return "printer"
-        case .apple:    return appleModelIcon ?? "laptopcomputer.and.iphone"
-        case .computer: return "laptopcomputer"
-        case .unknown:  return "questionmark.circle"
-        }
+        deviceType == .apple ? (appleModelIcon ?? DeviceType.apple.symbol) : deviceType.symbol
     }
 
     /// Phone or tablet glyph only when a service's model string names one; otherwise nil so the generic Apple icon shows.
@@ -286,5 +275,23 @@ struct DiscoveredDevice: Identifiable, Equatable {
         if models.contains(where: { $0.hasPrefix("iPhone") }) { return "iphone" }
         if models.contains(where: { $0.hasPrefix("iPad") }) { return "ipad" }
         return nil
+    }
+}
+
+extension DeviceType {
+    /// The SF Symbol for this type; Apple rows may refine it with a model glyph in `deviceIcon`.
+    var symbol: String {
+        switch self {
+        case .router:   return "wifi.router"
+        case .tv:       return "tv"
+        case .camera:   return "video"
+        case .audio:    return "hifispeaker"
+        case .smartHome: return "lightbulb"
+        case .nas:      return "externaldrive.connected.to.line.below"
+        case .printer:  return "printer"
+        case .apple:    return "laptopcomputer.and.iphone"
+        case .computer: return "laptopcomputer"
+        case .unknown:  return "questionmark.circle"
+        }
     }
 }

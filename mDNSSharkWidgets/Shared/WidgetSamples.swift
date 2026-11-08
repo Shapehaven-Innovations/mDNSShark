@@ -13,19 +13,26 @@ enum WidgetSamples {
                                      "Printer": 1, "Audio": 1, "Other Apple": 1, "Doorbell": 1, "Thermostat": 1, "Lock": 1,
                                      "Sensor": 1]
 
-    static func snapshot(scannedAt: Date, typeCounts: [String: Int] = sixTypes) -> WidgetSnapshot {
+    /// Counts only, dated `ago` seconds before now.
+    static func bluetooth(nearby: Int, suggested: Int, ago: TimeInterval) -> BluetoothSummary {
+        BluetoothSummary(scannedAt: Date().addingTimeInterval(-ago), nearby: nearby, suggested: suggested)
+    }
+
+    static func snapshot(scannedAt: Date, typeCounts: [String: Int] = sixTypes, bluetooth: BluetoothSummary? = nil) -> WidgetSnapshot {
         let total = typeCounts.values.reduce(0, +)
         var counts = counts
         counts.total = total
         counts.secure = total - 5
         return WidgetSnapshot(version: WidgetSnapshot.schemaVersion, scannedAt: scannedAt, subnet: "192.168.1.0/24",
                               counts: counts, typeCounts: typeCounts, history: [], newDevices: [], topology: [],
-                              topologyOverflow: 0, ownDeviceKey: nil)
+                              topologyOverflow: 0, ownDeviceKey: nil, bluetooth: bluetooth)
     }
 
-    private static func entry(ago: TimeInterval, types: [String: Int] = sixTypes, running: Bool = false) -> SnapshotEntry {
+    private static func entry(ago: TimeInterval, types: [String: Int] = sixTypes, running: Bool = false,
+                              bluetooth: BluetoothSummary? = nil) -> SnapshotEntry {
         let now = Date()
-        return SnapshotEntry(date: now, result: .loaded(snapshot(scannedAt: now.addingTimeInterval(-ago), typeCounts: types)),
+        return SnapshotEntry(date: now, result: .loaded(snapshot(scannedAt: now.addingTimeInterval(-ago), typeCounts: types,
+                                                                 bluetooth: bluetooth)),
                              isScanRunning: running)
     }
 
@@ -35,6 +42,13 @@ enum WidgetSamples {
     static var stale: SnapshotEntry { entry(ago: 3 * 3600) }
     static var staleFourteenTypes: SnapshotEntry { entry(ago: 3 * 3600, types: fourteenTypeCounts) }
     static var running: SnapshotEntry { entry(ago: 720, running: true) }
+    static var freshBluetooth: SnapshotEntry { entry(ago: 720, bluetooth: bluetooth(nearby: 7, suggested: 2, ago: 720)) }
+    /// LAN fresh, Bluetooth stale.
+    static var staleBluetooth: SnapshotEntry { entry(ago: 720, bluetooth: bluetooth(nearby: 7, suggested: 2, ago: 3 * 3600)) }
+    /// LAN and Bluetooth both stale, the widest pill and caption together.
+    static var bothStaleBluetooth: SnapshotEntry {
+        entry(ago: 3 * 3600, bluetooth: bluetooth(nearby: 17, suggested: 12, ago: 23 * 3600))
+    }
 
     static var empty: SnapshotEntry { SnapshotEntry(date: Date(), result: .missing, isScanRunning: false) }
     static var needsUpdate: SnapshotEntry { SnapshotEntry(date: Date(), result: .newer(version: 2), isScanRunning: false) }
@@ -58,12 +72,13 @@ enum WidgetSamples {
     }
 
     private static func security(_ c: StatusCounts, _ pairs: [(Int, Int)], ago: TimeInterval = 120,
-                                 running: Bool = false) -> SnapshotEntry {
+                                 running: Bool = false, bluetooth: BluetoothSummary? = nil) -> SnapshotEntry {
         let now = Date()
         let scannedAt = now.addingTimeInterval(-ago)
         let snapshot = WidgetSnapshot(version: WidgetSnapshot.schemaVersion, scannedAt: scannedAt, subnet: "192.168.1.0/24",
                                       counts: c, typeCounts: sixTypes, history: history(pairs, endingAt: scannedAt),
-                                      newDevices: [], topology: [], topologyOverflow: 0, ownDeviceKey: nil)
+                                      newDevices: [], topology: [], topologyOverflow: 0, ownDeviceKey: nil,
+                                      bluetooth: bluetooth)
         return SnapshotEntry(date: now, result: .loaded(snapshot), isScanRunning: running)
     }
 
@@ -76,4 +91,13 @@ enum WidgetSamples {
     static var securityStale: SnapshotEntry { security(counts(9, 2, 1, 3, 0), securityHistory, ago: 3 * 3600) }
     static var securityRunning: SnapshotEntry { security(counts(9, 2, 1, 3, 0), securityHistory, running: true) }
     static var securityNoDevices: SnapshotEntry { security(counts(0, 0, 0, 0, 0), []) }
+    static var securityBluetooth: SnapshotEntry {
+        security(counts(9, 2, 1, 3, 0), securityHistory, bluetooth: bluetooth(nearby: 7, suggested: 2, ago: 720))
+    }
+    static var securityStaleBluetooth: SnapshotEntry {
+        security(counts(9, 2, 1, 3, 0), securityHistory, bluetooth: bluetooth(nearby: 7, suggested: 2, ago: 3 * 3600))
+    }
+    static var securityBothStaleBluetooth: SnapshotEntry {
+        security(counts(9, 2, 1, 3, 0), securityHistory, ago: 3 * 3600, bluetooth: bluetooth(nearby: 17, suggested: 12, ago: 23 * 3600))
+    }
 }

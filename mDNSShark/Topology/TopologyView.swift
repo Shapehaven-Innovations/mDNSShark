@@ -4,6 +4,7 @@ import SwiftUI
 struct TopologyView: View {
     @EnvironmentObject var scanVM: NetworkScanViewModel
     @EnvironmentObject var securityVM: SecurityViewModel
+    @EnvironmentObject var bluetoothVM: BluetoothViewModel
     // Only the id, not a DiscoveredDevice snapshot: `DiscoveredDevice` is a
     // struct, so a stored value here would freeze mac/manufacturer/
     // inferredOS at whatever they were at tap time. Re-deriving the live
@@ -14,6 +15,8 @@ struct TopologyView: View {
     @State private var navigateToDetail = false
     // Fallback while a rescan has not re-found the tapped device, so the pushed screen never goes blank.
     @State private var selectedDevice: DiscoveredDevice? = nil
+    // Set by the Bluetooth badge so the pushed detail scrolls to its Bluetooth card; a node tap clears it.
+    @State private var detailAnchor: DeviceDetailView.Anchor? = nil
     @State private var securityFilters: Set<SecurityStatus> = []
     @State private var typeFilters: Set<DeviceType> = []
     @State private var showingPicker = false
@@ -28,6 +31,7 @@ struct TopologyView: View {
     // Unit-circle positions: gateway at .zero, others at (cos θ, sin θ).
     // Actual pixel radius is applied at render time inside GeometryReader.
     private var visibleNodes: [TopologyNode] {
+        let suggested  = bluetoothVM.suggestedLANDeviceIDs
         let allDevices = scanVM.devices
         let findings   = securityVM.findings
         guard !allDevices.isEmpty else { return [] }
@@ -43,13 +47,15 @@ struct TopologyView: View {
 
         let (hub, others) = Self.layout(filtered)
         guard let gateway = hub else { return [] }
-        var result    = [TopologyNode(device: enriched(gateway, findings), position: .zero)]
+        var result    = [TopologyNode(device: enriched(gateway, findings), position: .zero,
+                                     bluetoothSuggested: suggested.contains(gateway.id))]
         guard !others.isEmpty else { return result }
 
         // One slot is held back for the services node so it never overlaps a device.
         let slots = others.count + (scanVM.unattachedServices.isEmpty ? 0 : 1)
         for (i, d) in others.enumerated() {
-            result.append(TopologyNode(device: enriched(d, findings), position: unitPosition(index: i, of: slots)))
+            result.append(TopologyNode(device: enriched(d, findings), position: unitPosition(index: i, of: slots),
+                                       bluetoothSuggested: suggested.contains(d.id)))
         }
         return result
     }
@@ -155,7 +161,12 @@ struct TopologyView: View {
                                         }
 
                                         ForEach(nodes) { node in
-                                            TopologyNodeView(node: node)
+                                            TopologyNodeView(node: node, onBluetoothBadgeTap: {
+                                                selectedDeviceID = node.device.id
+                                                selectedDevice = node.device
+                                                detailAnchor = .bluetooth
+                                                navigateToDetail = true
+                                            })
                                                 .transition(.opacity)
                                                 .scaleEffect(scale)
                                                 .position(pixelPos(node.position))
@@ -165,6 +176,7 @@ struct TopologyView: View {
                                                 .onTapGesture {
                                                     selectedDeviceID = node.device.id
                                                     selectedDevice = node.device
+                                                    detailAnchor = nil
                                                     navigateToDetail = true
                                                 }
                                                 .accessibilityAddTraits(.isButton)
@@ -196,13 +208,21 @@ struct TopologyView: View {
                                 }
                                 .font(.caption)
                                 .padding(.top, 10)
+
+                                // Its own row, shown only once a scan suggests something, so the status dots never wrap.
+                                if nodes.contains(where: \.hasBluetoothSuggestion) {
+                                    legendSymbol(BluetoothSymbol.name, AppColors.info, "Bluetooth suggested, inferred")
+                                        .font(.caption)
+                                        .padding(.top, 6)
+                                }
                             }
                         }
                         .sheet(isPresented: $showingPicker) {
                             DevicePickerSheet(
                                 pinnedIPsRaw: $pinnedIPsRaw,
                                 allDevices: scanVM.devices,
-                                findings: securityVM.findings
+                                findings: securityVM.findings,
+                                bluetoothSuggested: bluetoothVM.suggestedLANDeviceIDs
                             )
                         }
                         .padding(.horizontal)
@@ -227,7 +247,7 @@ struct TopologyView: View {
             .navigationDestination(isPresented: $navigateToDetail) {
                 // The device is held in state, not looked up from `nodes`, so a filter change or a rescan cannot blank the pushed screen;
                 // DeviceDetailView re-reads its live row and findings itself.
-                if let selectedDevice { DeviceDetailView(device: selectedDevice) }
+                if let selectedDevice { DeviceDetailView(device: selectedDevice, scrollTo: detailAnchor) }
             }
         }
     }
@@ -341,6 +361,19 @@ struct TopologyView: View {
     private func legendDot(_ color: Color, _ label: String) -> some View {
         HStack(spacing: 4) {
             Circle().fill(color).frame(width: 8, height: 8)
+            Text(label).foregroundColor(.secondary)
+        }
+    }
+
+    /// Legend entry drawn like the node badge, at 8 pt.
+    private func legendSymbol(_ symbol: String, _ color: Color, _ label: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: symbol)
+                .font(.system(size: 5, weight: .bold))
+                .foregroundColor(.white)
+                .frame(width: 8, height: 8)
+                .background(Circle().fill(color))
+                .accessibilityHidden(true)
             Text(label).foregroundColor(.secondary)
         }
     }

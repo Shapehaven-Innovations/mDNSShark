@@ -6,6 +6,7 @@ import StoreKit
 
 struct SettingsView: View {
     @EnvironmentObject var securityVM: SecurityViewModel
+    @EnvironmentObject var bluetoothVM: BluetoothViewModel
     @StateObject private var purchase = PurchaseManager.shared
     @State private var showManageSubscriptions = false
 
@@ -38,6 +39,9 @@ struct SettingsView: View {
     @State private var activeFilters: Set<String> = SharedSettings.captureFilterProtocols
     @State private var includeAllNetworks: Bool = SharedSettings.includeAllNetworksInCapture
 
+    // Scan
+    @State private var includeBluetooth: Bool = SharedSettings.includeBluetoothInScan
+
     var body: some View {
         NavigationView {
             List {
@@ -46,6 +50,7 @@ struct SettingsView: View {
                 dnsSection
                 captureFiltersSection
                 captureRoutingSection
+                scanSection
                 aboutSection
             }
             .listStyle(.insetGrouped)
@@ -571,6 +576,37 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Scan
+
+    // The header Scan only starts Bluetooth once access is already granted; this toggle never prompts.
+    private var scanSection: some View {
+        Section {
+            Toggle("Include Bluetooth in Scan", isOn: Binding(
+                get: { includeBluetooth },
+                set: { val in
+                    includeBluetooth = val
+                    SharedSettings.includeBluetoothInScan = val
+                }
+            ))
+            if bluetoothVM.authorization == .denied || bluetoothVM.authorization == .restricted {
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                } label: {
+                    Label("Bluetooth access is off for mDNSShark. Open Settings", systemImage: "exclamationmark.triangle")
+                }
+                .font(.footnote)
+            } else if bluetoothVM.authorization == .undetermined {
+                Text("Allow Bluetooth from Devices > Bluetooth before the Scan button can include it.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Scan")
+        } footer: {
+            Text("When on, the Scan button at the top of the screen also listens for nearby Bluetooth devices for \(Int(BluetoothViewModel.scanDuration)) seconds. It only does this after you have allowed Bluetooth and never asks for permission. Widgets never scan Bluetooth.")
+        }
+    }
+
     // MARK: - About
 
     private var aboutSection: some View {
@@ -582,6 +618,11 @@ struct SettingsView: View {
                 LegalAdvisoriesView(viewModel: securityVM)
             } label: {
                 Label("Legal and Advisories", systemImage: "info.circle")
+            }
+            NavigationLink {
+                AcknowledgementsView()
+            } label: {
+                Label("Acknowledgements", systemImage: "doc.text")
             }
             legalLinks
         }

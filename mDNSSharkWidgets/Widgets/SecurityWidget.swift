@@ -100,7 +100,12 @@ private struct SecuritySmall: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            SecurityHeader { HeaderSymbol(kind: model.headerSymbol) }
+            SecurityHeader {
+                HStack(spacing: 6) {
+                    if let bluetooth = model.bluetooth { BluetoothLine(model: bluetooth, style: .pill) }
+                    HeaderSymbol(kind: model.headerSymbol)
+                }
+            }
             Spacer(minLength: 4)
             Group {
                 SecurityHeroView(hero: model.hero, size: 44)
@@ -128,6 +133,9 @@ private struct SecurityMedium: View {
                 Spacer(minLength: 4)
                 SecurityHeroView(hero: model.hero, size: 52).opacity(model.isStale ? 0.6 : 1)
                 Spacer(minLength: 4)
+                if let bluetooth = model.bluetooth {
+                    BluetoothLine(model: bluetooth, style: .securityLine).padding(.bottom, 3)
+                }
                 SecurityCaption(text: model.ageText, isStale: model.isStale, checkingNote: model.checkingNote)
             }
             .frame(width: 130, alignment: .leading)
@@ -178,6 +186,9 @@ private struct SecurityLarge: View {
                 .opacity(model.isStale ? 0.6 : 1)
                 Spacer(minLength: 6)
                 IssueChartView(chart: model.chart, isStale: model.isStale).modifier(SecurityTile())
+                if let bluetooth = model.bluetooth {
+                    BluetoothLine(model: bluetooth, style: .securityLine).padding(.top, 6)
+                }
                 Spacer(minLength: 4)
                 // Pending already shows in the large legend, so the caption carries no checking line.
                 SecurityCaption(text: model.largeCaption, isStale: model.isStale)
@@ -228,24 +239,26 @@ private struct SecurityRectangular: View {
             .font(.headline)
             .widgetAccentable()
             row(model.primaryRow)
-            row(model.secondaryRow).opacity(0.85)
+            row(model.secondaryRow, bluetooth: model.bluetooth).opacity(0.85)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(model.accessibilityLabel)
     }
 
-    /// Words drop first when the row is too wide; the counts always stay.
-    private func row(_ segments: [CapsuleSegment]) -> some View {
+    /// Words drop first when the row is too wide; the counts always stay, and a Bluetooth count is dropped last.
+    private func row(_ segments: [CapsuleSegment], bluetooth: BluetoothIndicatorModel? = nil) -> some View {
         ViewThatFits(in: .horizontal) {
-            rowContent(segments, words: true)
-            rowContent(segments, words: false)
+            rowContent(segments, words: true, bluetooth: bluetooth)
+            rowContent(segments, words: false, bluetooth: bluetooth)
+            rowContent(segments, words: false, bluetooth: nil)
         }
     }
 
-    private func rowContent(_ segments: [CapsuleSegment], words: Bool) -> some View {
+    private func rowContent(_ segments: [CapsuleSegment], words: Bool, bluetooth: BluetoothIndicatorModel?) -> some View {
         HStack(spacing: 10) {
             ForEach(segments, id: \.kind) { StatusCountRow(segment: $0, style: .inline(showsWord: words, size: 13)) }
+            if let bluetooth { BluetoothLine(model: bluetooth, style: .inlineCount) }
         }
     }
 }
@@ -294,6 +307,7 @@ private struct AccessoryNotice: View {
     SecurityWidget()
 } timeline: {
     WidgetSamples.securityIssues
+    WidgetSamples.securityBluetooth
     WidgetSamples.securityAllClear
     WidgetSamples.securityChecking
     WidgetSamples.securityNotProbed
@@ -307,6 +321,7 @@ private struct AccessoryNotice: View {
     SecurityWidget()
 } timeline: {
     WidgetSamples.securityIssues
+    WidgetSamples.securityBluetooth
     WidgetSamples.securityAllClear
     WidgetSamples.securityChecking
     WidgetSamples.securityNotProbed
@@ -320,6 +335,7 @@ private struct AccessoryNotice: View {
     SecurityWidget()
 } timeline: {
     WidgetSamples.securityIssues
+    WidgetSamples.securityBluetooth
     WidgetSamples.securityAllClear
     WidgetSamples.securityChecking
     WidgetSamples.securityNotProbed
@@ -336,6 +352,7 @@ private struct AccessoryNotice: View {
     SecurityWidget()
 } timeline: {
     WidgetSamples.securityIssues
+    WidgetSamples.securityBluetooth
     WidgetSamples.securityAllClear
     WidgetSamples.securityStale
     WidgetSamples.empty
@@ -346,6 +363,7 @@ private struct AccessoryNotice: View {
     SecurityWidget()
 } timeline: {
     WidgetSamples.securityIssues
+    WidgetSamples.securityBluetooth
     WidgetSamples.securityAllClear
     WidgetSamples.securityStale
     WidgetSamples.empty
@@ -356,6 +374,7 @@ private struct AccessoryNotice: View {
     SecurityWidget()
 } timeline: {
     WidgetSamples.securityIssues
+    WidgetSamples.securityBluetooth
     WidgetSamples.securityAllClear
     WidgetSamples.securityStale
     WidgetSamples.empty
@@ -375,6 +394,26 @@ struct SecurityWidgetAX1Previews: PreviewProvider {
             SecurityWidgetView(entry: WidgetSamples.securityStale)
                 .previewContext(WidgetPreviewContext(family: .systemLarge))
                 .previewDisplayName("Security large AX1")
+            SecurityWidgetView(entry: WidgetSamples.securityBluetooth)
+                .previewContext(WidgetPreviewContext(family: .systemSmall))
+                .previewDisplayName("Security small Bluetooth AX1")
+            SecurityWidgetView(entry: WidgetSamples.securityBluetooth)
+                .previewContext(WidgetPreviewContext(family: .systemMedium))
+                .previewDisplayName("Security medium Bluetooth AX1")
+            SecurityWidgetView(entry: WidgetSamples.securityBluetooth)
+                .previewContext(WidgetPreviewContext(family: .systemLarge))
+                .previewDisplayName("Security large Bluetooth AX1")
+            ForEach(Array([("stale Bluetooth", WidgetSamples.securityStaleBluetooth), ("both stale", WidgetSamples.securityBothStaleBluetooth)].enumerated()), id: \.offset) { _, item in
+                SecurityWidgetView(entry: item.1)
+                    .previewContext(WidgetPreviewContext(family: .systemSmall))
+                    .previewDisplayName("Security small \(item.0) AX1")
+                SecurityWidgetView(entry: item.1)
+                    .previewContext(WidgetPreviewContext(family: .systemMedium))
+                    .previewDisplayName("Security medium \(item.0) AX1")
+                SecurityWidgetView(entry: item.1)
+                    .previewContext(WidgetPreviewContext(family: .systemLarge))
+                    .previewDisplayName("Security large \(item.0) AX1")
+            }
         }
         .environment(\.dynamicTypeSize, .accessibility1)
     }

@@ -20,6 +20,13 @@ enum WidgetSnapshotGuard {
     }
 }
 
+/// What a snapshot write does with the Bluetooth summary: keep the previous one, drop it, or store a new one.
+enum BluetoothSnapshotUpdate: Equatable {
+    case keep
+    case clear
+    case set(BluetoothSummary)
+}
+
 /// Writes the App Group snapshot the widgets read, once per finished scan and again (debounced) when late enrichment lands.
 @MainActor
 final class WidgetSnapshotWriter {
@@ -31,6 +38,7 @@ final class WidgetSnapshotWriter {
         var localNetwork: LocalNetworkPermissionGate.Decision? = nil
         var localNetworkDeniedBanner = false
         var requiresConfirmedGrant = false
+        var bluetooth: BluetoothSnapshotUpdate = .keep
     }
 
     private let store: SnapshotStore?
@@ -68,10 +76,11 @@ final class WidgetSnapshotWriter {
         write(input, newScan: true)
     }
 
-    /// Drops each source's seed value and merges later changes, so a findings-only change also schedules a rewrite.
-    static func rewriteTriggers<D: Publisher, F: Publisher>(devices: D, findings: F) -> AnyPublisher<Void, Never>
-    where D.Failure == Never, F.Failure == Never {
-        Publishers.Merge(devices.dropFirst().map { _ in () }, findings.dropFirst().map { _ in () }).eraseToAnyPublisher()
+    /// Drops the devices and findings seeds and merges later changes; `bluetooth` is already seedless, so it passes through.
+    static func rewriteTriggers<D: Publisher, F: Publisher, B: Publisher>(devices: D, findings: F, bluetooth: B) -> AnyPublisher<Void, Never>
+    where D.Failure == Never, F.Failure == Never, B.Failure == Never {
+        Publishers.Merge3(devices.dropFirst().map { _ in () }, findings.dropFirst().map { _ in () },
+                          bluetooth.map { _ in () }).eraseToAnyPublisher()
     }
 
     /// Debounced; the closure is read after the delay and the write replaces the newest sample instead of adding one.
@@ -99,9 +108,13 @@ final class WidgetSnapshotWriter {
         guard let store else { return }
         var previous: WidgetSnapshot?
         if case .loaded(let snapshot) = store.loadSnapshot() { previous = snapshot }
-        let result = Self.makeSnapshot(input: input, previous: previous, seen: store.loadSeen(), now: now(), newScan: newScan)
+        let seen = store.loadSeen()
+        let result = Self.makeSnapshot(input: input, previous: previous, seen: seen, now: now(), newScan: newScan)
+        // Compared after trimming, the form the file holds, so an unchanged rewrite neither saves nor reloads.
+        let unchanged = previous == result.snapshot.trimmedToFit()
         do {
-            try store.saveSeen(result.seen)
+            if result.seen != seen { try store.saveSeen(result.seen) }
+            if unchanged { return }
             try store.save(result.snapshot)
         } catch {
             logger.error("Widget snapshot write failed: \(error.localizedDescription, privacy: .public)")
@@ -160,12 +173,19 @@ final class WidgetSnapshotWriter {
             history[history.count - 1].counts = counts
         }
 
+        let bluetooth: BluetoothSummary?
+        switch input.bluetooth {
+        case .keep: bluetooth = previous?.bluetooth
+        case .clear: bluetooth = nil
+        case .set(let summary): bluetooth = summary
+        }
+
         let snapshot = WidgetSnapshot(version: WidgetSnapshot.schemaVersion,
                                       scannedAt: newScan ? now : (previous?.scannedAt ?? now),
                                       subnet: input.subnet, counts: counts, typeCounts: typeCounts, history: history,
                                       newDevices: Array(newDevices), topology: topology,
                                       topologyOverflow: max(0, ordered.count - WidgetSnapshot.topologyLimit),
-                                      ownDeviceKey: ownKey)
+                                      ownDeviceKey: ownKey, bluetooth: bluetooth)
         return (snapshot, updatedSeen)
     }
 }

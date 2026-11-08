@@ -163,12 +163,15 @@ struct WidgetSnapshotWriterTests {
         let writer = makeWriter(store: store, recorder: rec, clock: Clock(t0))
         writer.scanDidFinish(input([device("192.168.1.1")]))
         rec.kinds.removeAll()
-        for _ in 0..<3 {
-            writer.scheduleRewrite { self.input([self.device("192.168.1.1")]) }
+        // A different status each time, so only the debounce can collapse them, and the last one must win.
+        for status in [SecurityStatus.warning, .warning, .critical] {
+            writer.scheduleRewrite { self.input([self.device("192.168.1.1")], status: { _ in status }) }
             try await Task.sleep(for: .milliseconds(10))
         }
         try await Task.sleep(for: .milliseconds(300))
-        #expect(rec.kinds.count == WidgetKind.scanKinds.count)
+        #expect(rec.kinds == WidgetKind.scanKinds)
+        let counts = loaded(store)?.counts
+        #expect(counts?.critical == 1 && counts?.warning == 0 && counts?.secure == 0)
     }
 
     @Test("a rewrite with nil input or before any scan writes nothing")
@@ -293,16 +296,22 @@ struct WidgetSnapshotWriterTests {
         #expect(rec.kinds.isEmpty)
     }
 
-    @Test("rewrite triggers drop the seeds and fire on a findings-only change")
-    func findingsTrigger() {
+    @Test("rewrite triggers drop the devices and findings seeds, and fire on the Bluetooth publisher's first value")
+    func triggersDropSeedsAndFireOnBluetooth() {
         let devices = CurrentValueSubject<Int, Never>(0), findings = CurrentValueSubject<Int, Never>(0)
+        // Seedless like `BluetoothViewModel.widgetUpdates`, which already ends in dropFirst().
+        let bluetooth = PassthroughSubject<BluetoothSnapshotUpdate, Never>()
         var fired = 0
-        let c = WidgetSnapshotWriter.rewriteTriggers(devices: devices, findings: findings).sink { fired += 1 }
+        let c = WidgetSnapshotWriter.rewriteTriggers(devices: devices, findings: findings, bluetooth: bluetooth).sink { fired += 1 }
         #expect(fired == 0)
-        findings.send(1)
+        bluetooth.send(.set(summary))
         #expect(fired == 1)
-        devices.send(1)
+        findings.send(1)
         #expect(fired == 2)
+        devices.send(1)
+        #expect(fired == 3)
+        bluetooth.send(.clear)
+        #expect(fired == 4)
         c.cancel()
     }
 
@@ -320,5 +329,93 @@ struct WidgetSnapshotWriterTests {
         #expect(snap?.history.count == 1 && snap?.history.last?.counts.critical == 1)
         #expect(snap?.scannedAt == t0)
         #expect(rec.kinds.suffix(WidgetKind.scanKinds.count) == ArraySlice(WidgetKind.scanKinds))
+    }
+
+    private let summary = BluetoothSummary(scannedAt: Date(timeIntervalSince1970: 1_800_000_100), nearby: 5, suggested: 2)
+
+    private func btInput(_ update: BluetoothSnapshotUpdate) -> WidgetSnapshotWriter.Input {
+        var i = input([device("192.168.1.1")])
+        i.bluetooth = update
+        return i
+    }
+
+    @Test("scan end stores a set Bluetooth summary")
+    func scanEndStoresSetSummary() {
+        let store = tempStore()
+        let writer = makeWriter(store: store, recorder: Recorder(), clock: Clock(t0))
+        writer.scanDidFinish(btInput(.set(summary)))
+        #expect(loaded(store)?.bluetooth == summary)
+    }
+
+    @Test("keep preserves the previous summary")
+    func keepPreservesPreviousSummary() {
+        let store = tempStore(), clock = Clock(t0)
+        let writer = makeWriter(store: store, recorder: Recorder(), clock: clock)
+        writer.scanDidFinish(btInput(.set(summary)))
+        clock.date = t0.addingTimeInterval(60)
+        writer.scanDidFinish(btInput(.keep))
+        #expect(loaded(store)?.bluetooth == summary)
+    }
+
+    @Test("clear removes the summary")
+    func clearRemovesSummary() {
+        let store = tempStore(), clock = Clock(t0)
+        let writer = makeWriter(store: store, recorder: Recorder(), clock: clock)
+        writer.scanDidFinish(btInput(.set(summary)))
+        clock.date = t0.addingTimeInterval(60)
+        writer.scanDidFinish(btInput(.clear))
+        #expect(loaded(store) != nil)
+        #expect(loaded(store)?.bluetooth == nil)
+    }
+
+    @Test("a rewrite whose only change is Bluetooth writes once and reloads the scan kinds")
+    func bluetoothOnlyRewriteWritesOnceAndReloads() async throws {
+        let store = tempStore(), rec = Recorder(), clock = Clock(t0)
+        let writer = makeWriter(store: store, recorder: rec, clock: clock)
+        writer.scanDidFinish(btInput(.keep))
+        rec.kinds.removeAll()
+        clock.date = t0.addingTimeInterval(120)
+        // A different summary each time, so only the debounce can collapse them, and the last one must win.
+        let first = BluetoothSummary(scannedAt: summary.scannedAt, nearby: 3, suggested: 0)
+        let second = BluetoothSummary(scannedAt: summary.scannedAt, nearby: 4, suggested: 1)
+        for update in [first, second, summary] {
+            writer.scheduleRewrite { self.btInput(.set(update)) }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try await Task.sleep(for: .milliseconds(300))
+        let snap = loaded(store)
+        #expect(snap?.bluetooth == summary)
+        #expect(snap?.scannedAt == t0 && snap?.history.count == 1)
+        #expect(rec.kinds == WidgetKind.scanKinds)
+    }
+
+    @Test("a rewrite with unchanged input saves nothing and reloads nothing, also for a fractional-second Bluetooth date",
+          arguments: [0.0, 0.123_456_789])
+    func unchangedRewriteSavesNothing(fraction: Double) async throws {
+        let store = tempStore(), rec = Recorder(), clock = Clock(t0)
+        let writer = makeWriter(store: store, recorder: rec, clock: clock)
+        let summary = BluetoothSummary(scannedAt: self.summary.scannedAt.addingTimeInterval(fraction), nearby: 5, suggested: 2)
+        writer.scanDidFinish(btInput(.set(summary)))
+        let file = store.directory.appendingPathComponent(SnapshotStore.snapshotFile)
+        let before = try Data(contentsOf: file)
+        let modified = try FileManager.default.attributesOfItem(atPath: file.path)[.modificationDate] as? Date
+        rec.kinds.removeAll()
+        clock.date = t0.addingTimeInterval(120)
+        writer.scheduleRewrite { self.btInput(.set(summary)) }
+        try await Task.sleep(for: .milliseconds(300))
+        writer.scheduleRewrite { self.btInput(.keep) }
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(try Data(contentsOf: file) == before)
+        #expect(try FileManager.default.attributesOfItem(atPath: file.path)[.modificationDate] as? Date == modified)
+        #expect(rec.kinds.isEmpty)
+    }
+
+    @Test("keep with no previous snapshot leaves it nil")
+    func keepWithNoPreviousIsNil() {
+        let store = tempStore()
+        let writer = makeWriter(store: store, recorder: Recorder(), clock: Clock(t0))
+        writer.scanDidFinish(btInput(.keep))
+        #expect(loaded(store) != nil)
+        #expect(loaded(store)?.bluetooth == nil)
     }
 }

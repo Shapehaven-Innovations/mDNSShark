@@ -1,9 +1,28 @@
 // mDNSShark/Header/AppHeaderView.swift
 import SwiftUI
 
+/// Text for the header's Bluetooth chip; the count comes from advertisements and never joins the LAN device count.
+enum BluetoothHeaderChip {
+    static func text(nearby: Int, isScanning: Bool) -> String? {
+        if isScanning { return "Bluetooth scanning…" }
+        return nearby == 0 ? nil : "\(nearby) Bluetooth nearby"
+    }
+
+    static func accessibilityLabel(nearby: Int) -> String {
+        "\(nearby) Bluetooth \(nearby == 1 ? "device" : "devices") nearby, from advertisements"
+    }
+
+    static let hint = "Opens Devices filtered to Bluetooth"
+
+    /// The label keeps the count; the value says a scan is running.
+    static func accessibilityValue(isScanning: Bool) -> String { isScanning ? "Scanning" : "" }
+}
+
 struct AppHeaderView: View {
     @EnvironmentObject var scanVM: NetworkScanViewModel
     @EnvironmentObject var securityVM: SecurityViewModel
+    @EnvironmentObject var bluetoothVM: BluetoothViewModel
+    @EnvironmentObject var coordinator: AppCoordinator
 
     var body: some View {
         let devices = scanVM.devices
@@ -23,7 +42,7 @@ struct AppHeaderView: View {
                 }
                 Spacer()
                 Button {
-                    scanVM.startScan()
+                    coordinator.startHeaderScan()
                 } label: {
                     Label("Scan", systemImage: "arrow.clockwise")
                         .font(.subheadline.weight(.semibold))
@@ -31,7 +50,7 @@ struct AppHeaderView: View {
                         .background(Color(.secondarySystemBackground))
                         .clipShape(Capsule())
                 }
-                .disabled(scanVM.isScanning)
+                .disabled(coordinator.isAnyScanRunning)
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
 
@@ -43,6 +62,15 @@ struct AppHeaderView: View {
                     AppBadge(text: "\(devices.count) devices", color: Color(.systemGray))
                     if serviceCount > 0 {
                         AppBadge(text: "\(serviceCount) \(serviceCount == 1 ? "service" : "services")", color: AppColors.info)
+                    }
+                    if let text = BluetoothHeaderChip.text(nearby: bluetoothVM.nearbyCount, isScanning: bluetoothVM.isScanning) {
+                        Button { coordinator.showDevices(filter: .bluetooth) } label: {
+                            AppBadge(text: text, color: AppColors.info)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(BluetoothHeaderChip.accessibilityLabel(nearby: bluetoothVM.nearbyCount))
+                        .accessibilityValue(BluetoothHeaderChip.accessibilityValue(isScanning: bluetoothVM.isScanning))
+                        .accessibilityHint(BluetoothHeaderChip.hint)
                     }
                     // One chip per non-empty status, in the same colour as the node, badge and legend. Pending has its own chip below.
                     ForEach([SecurityStatus.secure, .warning, .critical, .notProbed], id: \.self) { status in

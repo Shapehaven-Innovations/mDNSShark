@@ -204,4 +204,33 @@ struct WidgetModelsTests {
     func smallLabelUnchanged() {
         #expect(devicesModel(["TV": 2])?.accessibilityLabel == "14 devices, 9 secure, 2 warning, 1 critical, 2 not probed, scanned just now")
     }
+
+    func withBluetooth(ago: Double = 120) -> WidgetSnapshot {
+        var s = snapshot()
+        s.bluetooth = BluetoothSummary(scannedAt: scan.addingTimeInterval(720 - ago), nearby: 7, suggested: 2)
+        return s
+    }
+    let clause = "7 Bluetooth devices nearby, 2 suggested as network devices, inferred, Bluetooth scanned 2 minutes ago"
+
+    @Test("devices small and medium labels insert the Bluetooth clause before scan running")
+    func devicesSmallAndMediumLabelsInsertClauseBeforeRunning() {
+        guard case .loaded(let m) = DevicesWidgetModel.make(.loaded(withBluetooth()), now: scan.addingTimeInterval(720), isScanRunning: true) else { Issue.record("not loaded"); return }
+        #expect(m.bluetooth?.nearby == 7)
+        #expect(m.accessibilityLabel == "14 devices, 9 secure, 2 warning, 1 critical, 2 not probed, scanned 12 minutes ago. " + clause + ", scan running")
+        #expect(m.mediumAccessibilityLabel == "14 devices, 192.168.1.0/24, 9 secure, 2 warning, 1 critical, 2 not probed, scanned 12 minutes ago. No type data. " + clause + ", scan running")
+        guard case .loaded(let idle) = DevicesWidgetModel.make(.loaded(withBluetooth()), now: scan.addingTimeInterval(720), isScanRunning: false) else { Issue.record("not loaded"); return }
+        #expect(idle.accessibilityLabel.hasSuffix(". " + clause))
+        #expect(devicesModel([:])?.bluetooth == nil)
+    }
+
+    @Test("scan now fresh and stale labels insert the Bluetooth clause before scan running")
+    func scanNowFreshAndStaleInsertClause() {
+        guard case .loaded(let fresh) = ScanNowWidgetModel.make(.loaded(withBluetooth()), now: scan.addingTimeInterval(720), isScanRunning: true) else { Issue.record("not loaded"); return }
+        #expect(fresh.accessibilityLabel == "Last scan 12 minutes ago, 14 devices, 9 secure, 2 warning, 1 critical, 2 not probed, 192.168.1.0/24. " + clause + ", scan running")
+        var s = snapshot()
+        s.bluetooth = BluetoothSummary(scannedAt: scan.addingTimeInterval(3 * 3600 - 600), nearby: 7, suggested: 0)
+        guard case .loaded(let stale) = ScanNowWidgetModel.make(.loaded(s), now: scan.addingTimeInterval(3 * 3600 + 5), isScanRunning: false) else { Issue.record("not loaded"); return }
+        #expect(stale.isStale && stale.bluetooth?.isStale == false)
+        #expect(stale.accessibilityLabel == "Out of date, scanned 3 hours ago, 14 devices, 9 secure, 2 warning, 1 critical, 2 not probed, may differ. 7 Bluetooth devices nearby, none suggested, Bluetooth scanned 10 minutes ago")
+    }
 }

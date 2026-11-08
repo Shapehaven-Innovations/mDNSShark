@@ -28,7 +28,8 @@ struct SnapshotTimelineProvider: TimelineProvider {
         let now = Date()
         let result = Self.load()
         let plan = WidgetTimelinePlan.make(scannedAt: Self.scannedAt(result), now: now,
-                                           awaitingUntil: Self.awaitingUntil(result, now: now))
+                                           awaitingUntil: Self.awaitingUntil(result, now: now),
+                                           bluetoothScannedAt: Self.bluetoothScannedAt(result))
         let entries = plan.entries.map { SnapshotEntry(date: $0.date, result: result, isScanRunning: $0.isScanRunning) }
         completion(Timeline(entries: entries, policy: .after(plan.reloadAfter)))
     }
@@ -39,6 +40,11 @@ struct SnapshotTimelineProvider: TimelineProvider {
 
     private static func scannedAt(_ result: SnapshotDecodeResult<WidgetSnapshot>) -> Date? {
         if case .loaded(let snapshot) = result { return snapshot.scannedAt }
+        return nil
+    }
+
+    private static func bluetoothScannedAt(_ result: SnapshotDecodeResult<WidgetSnapshot>) -> Date? {
+        if case .loaded(let snapshot) = result { return snapshot.bluetooth?.scannedAt }
         return nil
     }
 

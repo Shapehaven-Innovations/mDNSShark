@@ -27,11 +27,14 @@ enum AppTab: String, CaseIterable {
 @MainActor
 final class AppCoordinator: ObservableObject {
     @Published var selectedTab: AppTab = .topology
+    /// Set by `showDevices(filter:)`; the Devices tab consumes it.
+    @Published var devicesFilterRequest: DevicesFilter?
 
     let networkScanViewModel: NetworkScanViewModel
     let securityViewModel: SecurityViewModel
     let packetCaptureManager: PacketCaptureManager
     let analysisViewModel: AnalysisViewModel
+    let bluetoothViewModel: BluetoothViewModel
 
     let deepLinkRouter = DeepLinkRouter()
     let widgetWriter = WidgetSnapshotWriter(store: SnapshotStore.appGroup())
@@ -47,6 +50,7 @@ final class AppCoordinator: ObservableObject {
         })
         packetCaptureManager  = pcm
         analysisViewModel     = AnalysisViewModel()
+        bluetoothViewModel    = BluetoothViewModel(store: BLEDeviceStore.appSupport())
         wire()
         UserDefaults.standard.removeObject(forKey: "preferredColorScheme") // retired theme override
         Task { await securityViewModel.loadThreatDataStatus() }
@@ -64,8 +68,25 @@ final class AppCoordinator: ObservableObject {
             localNetwork: networkScanViewModel.scanPermissionDecision,
             localNetworkDeniedBanner: networkScanViewModel.isLocalNetworkDenied,
             // A scan ending with the app not active (a widget run) may replace the snapshot only after a confirmed grant.
-            requiresConfirmedGrant: UIApplication.shared.applicationState != .active)
+            requiresConfirmedGrant: UIApplication.shared.applicationState != .active,
+            bluetooth: bluetoothViewModel.widgetUpdate())
     }
+
+    func showDevices(filter: DevicesFilter) {
+        devicesFilterRequest = filter
+        selectedTab = .devices
+    }
+
+    /// The header Scan: always the LAN scan, plus Bluetooth when it is already allowed and the setting is on. Never prompts.
+    func startHeaderScan() {
+        networkScanViewModel.startScan()
+        if BluetoothScanPolicy.headerScanStartsBluetooth(authorization: bluetoothViewModel.authorization,
+                                                         includeSetting: SharedSettings.includeBluetoothInScan) {
+            bluetoothViewModel.startScanIfAuthorized()
+        }
+    }
+
+    var isAnyScanRunning: Bool { networkScanViewModel.isScanning || bluetoothViewModel.isScanning }
 
     func open(_ url: URL) {
         if let tab = deepLinkRouter.open(url, devices: networkScanViewModel.devices, isScanning: networkScanViewModel.isScanning) {
@@ -96,7 +117,10 @@ final class AppCoordinator: ObservableObject {
 
         // The closure runs after the debounce, so it reads settled rows and findings, not the willSet value.
         // A threat-data refresh changes findings without changing devices, so both sources schedule the debounced rewrite.
-        WidgetSnapshotWriter.rewriteTriggers(devices: networkScanViewModel.$devices, findings: securityViewModel.$findings)
+        // Bluetooth changes are throttled to one a minute as a backstop on top of the debounce and the writer's equality check.
+        WidgetSnapshotWriter.rewriteTriggers(
+            devices: networkScanViewModel.$devices, findings: securityViewModel.$findings,
+            bluetooth: bluetoothViewModel.widgetUpdates.throttle(for: .seconds(60), scheduler: DispatchQueue.main, latest: true))
             .sink { [weak self] _ in
                 self?.widgetWriter.scheduleRewrite { [weak self] in
                     guard let self, !self.networkScanViewModel.isScanning else { return nil }
@@ -111,6 +135,12 @@ final class AppCoordinator: ObservableObject {
                 self?.securityViewModel.assess(devices: $0)
                 self?.deepLinkRouter.devicesChanged($0)
             }
+            .store(in: &cancellables)
+
+        // A LAN scan republishes devices many times a second; the matcher needs at most four runs a second, always with the newest list.
+        networkScanViewModel.$devices
+            .throttle(for: .milliseconds(250), scheduler: DispatchQueue.main, latest: true)
+            .sink { [weak self] in self?.bluetoothViewModel.updateLANDevices($0) }
             .store(in: &cancellables)
 
         packetCaptureManager.$packets

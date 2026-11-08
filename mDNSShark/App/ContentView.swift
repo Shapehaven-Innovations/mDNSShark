@@ -52,6 +52,7 @@ struct ContentView: View {
         }
         .onOpenURL { coordinator.open($0) }
         .onChange(of: scenePhase) { _, phase in
+            coordinator.bluetoothViewModel.scenePhaseChanged(isActive: phase == .active)
             if phase == .active {
                 Task { await PurchaseManager.shared.refreshEntitlements() }
                 let reason = SharedSettings.tlsInterceptorLastError

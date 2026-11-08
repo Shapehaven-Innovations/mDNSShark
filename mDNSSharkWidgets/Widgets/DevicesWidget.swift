@@ -42,9 +42,11 @@ private struct DevicesSmall: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
+            // The tighter spacing applies only with Bluetooth, so the layout without it is unchanged.
+            HStack(spacing: model.bluetooth == nil ? nil : 4) {
                 WidgetMark()
                 Spacer(minLength: 4)
+                if let bluetooth = model.bluetooth { BluetoothLine(model: bluetooth, style: .pill) }
                 ScanButton(isRunning: model.isScanRunning, size: .compact)
             }
             Spacer(minLength: 4)
@@ -59,19 +61,33 @@ private struct DevicesMedium: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 18) {
-            VStack(alignment: .leading, spacing: 0) {
-                WidgetMark()
-                Spacer(minLength: 2)
-                DevicesSummary(model: model, heroSize: 36, capsuleTop: 6, label: model.mediumAccessibilityLabel)
-                ScanButton(isRunning: model.isScanRunning, size: .large)
-                    .fixedSize()
-                    .padding(.top, 6)
+            // When the Bluetooth line cannot fit the column height (AX1), it becomes a pill beside the mark.
+            ViewThatFits(in: .vertical) {
+                column(lineBelow: true)
+                column(lineBelow: false)
             }
             .frame(width: 142, alignment: .leading)
             .frame(maxHeight: .infinity)
 
             TypeChart(types: model.types, isStale: model.isStale)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+    }
+
+    private func column(lineBelow: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                WidgetMark()
+                if !lineBelow, let bluetooth = model.bluetooth { BluetoothLine(model: bluetooth, style: .pill) }
+            }
+            Spacer(minLength: 2)
+            DevicesSummary(model: model, heroSize: 36, capsuleTop: 6, label: model.mediumAccessibilityLabel)
+            if lineBelow, let bluetooth = model.bluetooth {
+                BluetoothLine(model: bluetooth, style: .line).padding(.top, 3)
+            }
+            ScanButton(isRunning: model.isScanRunning, size: .large)
+                .fixedSize()
+                .padding(.top, 6)
         }
     }
 }
@@ -127,6 +143,8 @@ private struct DevicesSummary: View {
     WidgetSamples.fresh
     WidgetSamples.stale
     WidgetSamples.running
+    WidgetSamples.freshBluetooth
+    WidgetSamples.staleBluetooth
     WidgetSamples.empty
 }
 
@@ -138,6 +156,8 @@ private struct DevicesSummary: View {
     WidgetSamples.fourteenTypes
     WidgetSamples.staleFourteenTypes
     WidgetSamples.running
+    WidgetSamples.freshBluetooth
+    WidgetSamples.staleBluetooth
     WidgetSamples.empty
 }
 
@@ -151,6 +171,20 @@ struct DevicesWidgetAX1Previews: PreviewProvider {
             DevicesWidgetView(entry: WidgetSamples.staleFourteenTypes)
                 .previewContext(WidgetPreviewContext(family: .systemMedium))
                 .previewDisplayName("Devices medium AX1")
+            DevicesWidgetView(entry: WidgetSamples.freshBluetooth)
+                .previewContext(WidgetPreviewContext(family: .systemSmall))
+                .previewDisplayName("Devices small Bluetooth AX1")
+            DevicesWidgetView(entry: WidgetSamples.freshBluetooth)
+                .previewContext(WidgetPreviewContext(family: .systemMedium))
+                .previewDisplayName("Devices medium Bluetooth AX1")
+            ForEach(Array([("stale Bluetooth", WidgetSamples.staleBluetooth), ("both stale", WidgetSamples.bothStaleBluetooth)].enumerated()), id: \.offset) { _, item in
+                DevicesWidgetView(entry: item.1)
+                    .previewContext(WidgetPreviewContext(family: .systemSmall))
+                    .previewDisplayName("Devices small \(item.0) AX1")
+                DevicesWidgetView(entry: item.1)
+                    .previewContext(WidgetPreviewContext(family: .systemMedium))
+                    .previewDisplayName("Devices medium \(item.0) AX1")
+            }
         }
         .environment(\.dynamicTypeSize, .accessibility1)
     }

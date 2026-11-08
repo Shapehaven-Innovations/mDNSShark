@@ -174,6 +174,7 @@ public struct DevicesWidgetModel: Equatable, Sendable {
     public var ageText: String
     public var isStale: Bool
     public var isScanRunning: Bool
+    public var bluetooth: BluetoothIndicatorModel?
     /// The small widget's label.
     public var accessibilityLabel: String
     /// The medium widget's label: count, subnet, status counts, age, then the type breakdown.
@@ -184,7 +185,8 @@ public struct DevicesWidgetModel: Equatable, Sendable {
         .from(result) { s in
             let stale = !Staleness.isFresh(scannedAt: s.scannedAt, now: now)
             let prefix = stale ? WidgetCopy.outOfDate + ". " : ""
-            let suffix = isScanRunning ? WidgetCopy.scanRunningSuffix : ""
+            let bluetooth = BluetoothIndicatorModel.make(s.bluetooth, now: now)
+            let suffix = (bluetooth.map { ". " + $0.accessibilityClause } ?? "") + (isScanRunning ? WidgetCopy.scanRunningSuffix : "")
             let label = prefix + SnapshotFormatting.accessibilityLabel(counts: s.counts, scannedAt: s.scannedAt, now: now) + suffix
             let types = TypeBreakdown.make(s.typeCounts)
             var parts = ["\(s.counts.total) \(WidgetCopy.deviceUnit(s.counts.total))"]
@@ -196,7 +198,8 @@ public struct DevicesWidgetModel: Equatable, Sendable {
                 total: s.counts.total, unit: WidgetCopy.deviceUnit(s.counts.total),
                 segments: s.counts.capsuleSegments, types: types,
                 ageText: "Scanned " + SnapshotFormatting.age(since: s.scannedAt, now: now),
-                isStale: stale, isScanRunning: isScanRunning, accessibilityLabel: label, mediumAccessibilityLabel: medium)
+                isStale: stale, isScanRunning: isScanRunning, bluetooth: bluetooth,
+                accessibilityLabel: label, mediumAccessibilityLabel: medium)
         }
     }
 }
@@ -215,6 +218,7 @@ public struct ScanNowWidgetModel: Equatable, Sendable {
     public var smallCaption: String
     public var mediumCaption: String
     public var isScanRunning: Bool
+    public var bluetooth: BluetoothIndicatorModel?
     public var accessibilityLabel: String
 
     public static func make(_ result: SnapshotDecodeResult<WidgetSnapshot>, now: Date,
@@ -225,9 +229,11 @@ public struct ScanNowWidgetModel: Equatable, Sendable {
             let ring = SnapshotFormatting.ringAge(since: s.scannedAt, now: now)
             let devices = "\(s.counts.total) \(WidgetCopy.deviceUnit(s.counts.total))"
             let status = SnapshotFormatting.statusPhrases(s.counts)
-            var parts = stale ? ["\(WidgetCopy.outOfDate), scanned \(age)", devices] + status + [WidgetCopy.mayDiffer]
+            let parts = stale ? ["\(WidgetCopy.outOfDate), scanned \(age)", devices] + status + [WidgetCopy.mayDiffer]
                               : ["\(WidgetCopy.lastScan) \(age)", devices] + status + (s.subnet.map { [$0] } ?? [])
-            if isScanRunning { parts.append("scan running") }
+            let bluetooth = BluetoothIndicatorModel.make(s.bluetooth, now: now)
+            let label = parts.joined(separator: ", ") + (bluetooth.map { ". " + $0.accessibilityClause } ?? "")
+                + (isScanRunning ? WidgetCopy.scanRunningSuffix : "")
             return ScanNowWidgetModel(
                 total: s.counts.total, subnet: s.subnet, segments: s.counts.capsuleSegments,
                 ringFraction: stale ? staleRingFraction : Staleness.ringFraction(scannedAt: s.scannedAt, now: now),
@@ -235,7 +241,7 @@ public struct ScanNowWidgetModel: Equatable, Sendable {
                 title: stale ? WidgetCopy.outOfDate : WidgetCopy.lastScan,
                 smallCaption: stale ? WidgetCopy.mayDiffer : WidgetCopy.deviceUnit(s.counts.total),
                 mediumCaption: stale ? WidgetCopy.networkMayHaveChanged : (s.subnet ?? WidgetCopy.subnetUnknown),
-                isScanRunning: isScanRunning, accessibilityLabel: parts.joined(separator: ", "))
+                isScanRunning: isScanRunning, bluetooth: bluetooth, accessibilityLabel: label)
         }
     }
 }

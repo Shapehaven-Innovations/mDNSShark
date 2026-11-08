@@ -5,6 +5,8 @@ struct DevicePickerSheet: View {
     @Binding var pinnedIPsRaw: String
     let allDevices: [DiscoveredDevice]
     let findings: [SecurityFinding]
+    /// LAN devices a nearby Bluetooth peripheral is suggested for, so a device hidden by the 10-node cap can still be found.
+    var bluetoothSuggested: Set<UUID> = []
 
     @Environment(\.presentationMode) private var presentationMode
     @State private var searchText = ""
@@ -88,9 +90,17 @@ struct DevicePickerSheet: View {
                                 Text(device.hostname)
                                     .font(.subheadline.weight(.medium))
                                     .foregroundColor(.primary)
-                                Text("\(device.ipAddress) · \(device.deviceType.label)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                HStack(spacing: 4) {
+                                    Text("\(device.ipAddress) · \(device.deviceType.label)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    if bluetoothSuggested.contains(device.id) {
+                                        Image(systemName: BluetoothSymbol.name)
+                                            .font(.caption2)
+                                            .foregroundColor(AppColors.info)
+                                            .accessibilityLabel("Bluetooth device suggested")
+                                    }
+                                }
                             }
                             Spacer()
                             if pinnedIPs.contains(device.ipAddress) {

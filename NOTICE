@@ -1,0 +1,7 @@
+Third-party notices for mDNSShark
+
+bluetooth-numbers-database
+Copyright (c) 2019 - 2020, Nordic Semiconductor ASA
+BSD 3-Clause License. Full text in
+Packages/DeviceFingerprint/Sources/DeviceFingerprint/Resources/bluetooth-numbers-database-LICENSE.txt
+and in the app under Settings > About > Acknowledgements.

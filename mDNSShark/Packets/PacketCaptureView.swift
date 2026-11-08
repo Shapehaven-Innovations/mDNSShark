@@ -8,6 +8,7 @@ struct PacketCaptureView: View {
     @State private var showWarning = false
     @State private var showExportError = false
     @State private var showDeleteConfirm = false
+    @State private var showingBluetoothLog = false
     private let protocols = PacketCaptureChip.all
 
     private var filtered: [PacketModel] {
@@ -28,6 +29,13 @@ struct PacketCaptureView: View {
                                 .tint(selectedProtocol == p ? AppColors.info : .secondary)
                                 .font(.caption.weight(selectedProtocol == p ? .semibold : .regular))
                         }
+                        // Opens the separate advertisement log; it is not a protocol filter.
+                        Button { showingBluetoothLog = true } label: {
+                            Label("Bluetooth", systemImage: BluetoothSymbol.name)
+                        }
+                            .buttonStyle(.bordered)
+                            .tint(.secondary)
+                            .font(.caption)
                     }
                     .padding(.horizontal, 16).padding(.vertical, 8)
                 }
@@ -120,6 +128,9 @@ struct PacketCaptureView: View {
                     isPresented: $showWarning
                 )
                 .presentationDetents([PresentationDetent.medium])
+            }
+            .sheet(isPresented: $showingBluetoothLog) {
+                BLEAdvertisementLogView()
             }
             .alert("Export Failed", isPresented: $showExportError) {
                 Button("OK", role: .cancel) {}

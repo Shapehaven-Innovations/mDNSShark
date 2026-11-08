@@ -22,6 +22,7 @@ struct mDNSSharkApp: App {
                 .environmentObject(coordinator.packetCaptureManager)
                 .environmentObject(coordinator.analysisViewModel)
                 .environmentObject(coordinator.deepLinkRouter)
+                .environmentObject(coordinator.bluetoothViewModel)
         }
     }
 }

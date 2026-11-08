@@ -107,7 +107,11 @@ struct WidgetScanRunnerTests {
     static let shortTail = WidgetScanLimits(total: 25, minimumScan: 10, preflightTimeout: 4, settleMargin: 1.5, standardScan: 25, tailGrace: 0.2)
 
     func runner(_ fake: Fake, limits: WidgetScanLimits = .standard) -> WidgetScanRunner {
-        WidgetScanRunner(limits: limits, environment: WidgetScanRunner.Environment(
+        WidgetScanRunner(limits: limits, environment: environment(fake))
+    }
+
+    func environment(_ fake: Fake) -> WidgetScanRunner.Environment {
+        WidgetScanRunner.Environment(
             gateSettled: { fake.gateSettled },
             grantedBefore: { fake.grantedBefore },
             appActive: { fake.appActive },
@@ -123,7 +127,7 @@ struct WidgetScanRunnerTests {
             reloadWidgets: { fake.reloads += 1 },
             now: { fake.now },
             processStart: fake.processStart,
-            backgroundTasks: fake.tasks))
+            backgroundTasks: fake.tasks)
     }
 
     @Test("a settled background run scans once and leaves no flag") func headless() async {
@@ -247,5 +251,11 @@ struct WidgetScanRunnerTests {
         let fake = Fake(); fake.tasks.grants = false
         #expect(await runner(fake, limits: Self.shortTail).run(openApp: { false }) == .scanned)
         #expect(fake.tasks.ended.isEmpty)
+    }
+
+    @Test("restartScan is the only start call and the environment has no Bluetooth member") func restartScanIsTheOnlyStartCall() {
+        let env = environment(Fake())
+        let labels = Set(Mirror(reflecting: env).children.compactMap(\.label))
+        #expect(labels == ["gateSettled", "grantedBefore", "appActive", "isScanning", "preflight", "settleGate", "restartScan", "scanFinished", "defaults", "reloadWidgets", "now", "processStart", "backgroundTasks"])
     }
 }

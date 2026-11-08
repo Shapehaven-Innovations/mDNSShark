@@ -1,0 +1,6 @@
+Source: https://github.com/NordicSemiconductor/bluetooth-numbers-database
+Files: v1/company_ids.json, v1/service_uuids.json
+Commit: d379cc06c9c3681bc1c1cd4d61c246a0b0f80b0e
+Fetched: 2026-11-08
+License: BSD-3-Clause (see bluetooth-numbers-database-LICENSE.txt)
+Converted by scripts/convert_bluetooth_numbers.py

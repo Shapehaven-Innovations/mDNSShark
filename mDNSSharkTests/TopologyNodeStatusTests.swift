@@ -86,6 +86,35 @@ struct TopologyNodeStatusTests {
         #expect(TopologyNode(device: device).accessibilityLabel == "tv, 192.168.1.30, secure, vendor advisory")
     }
 
+    @Test("a Bluetooth suggestion is spoken last and never changes the status")
+    func bluetoothSuggestionIsSpokenLast() {
+        var secure = DiscoveredDevice(hostname: "mac", ipAddress: "192.168.1.10")
+        secure.probesSettled = true
+        let node = TopologyNode(device: secure, bluetoothSuggested: true)
+        #expect(node.accessibilityLabel == "mac, 192.168.1.10, secure, Bluetooth device suggested")
+        #expect(node.securityStatus == .secure)
+    }
+
+    @Test("off-network is spoken before the Bluetooth suggestion")
+    func offNetworkThenBluetoothOrder() {
+        var device = DiscoveredDevice(hostname: "mac", ipAddress: "10.0.0.5")
+        device.probesSettled = true
+        device.isOnLocalSubnet = false
+        let label = TopologyNode(device: device, bluetoothSuggested: true).accessibilityLabel
+        #expect(label.hasSuffix(", on another network, Bluetooth device suggested"))
+    }
+
+    @Test("a node has no Bluetooth suggestion by default")
+    func defaultHasNoSuggestion() {
+        let device = DiscoveredDevice(hostname: "mac", ipAddress: "192.168.1.10")
+        #expect(TopologyNode(device: device).hasBluetoothSuggestion == false)
+    }
+
+    @Test("the VoiceOver action name is fixed")
+    func actionNameIsFixed() {
+        #expect(TopologyNode.bluetoothActionName == "Show Bluetooth details")
+    }
+
     @Test("the services node label counts services without a device")
     func servicesNodeLabel() {
         #expect(ServicesGroupNodeView.accessibilityLabel(count: 1) == "1 service without a device")

@@ -43,8 +43,14 @@ private struct ScanNowSmall: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
-                ScanNowTitle(isStale: model.isStale, title: model.title, font: .system(size: 15, weight: .semibold),
-                             freshColor: WidgetPalette.text)
+                HStack(spacing: 4) {
+                    ScanNowTitle(isStale: model.isStale, title: model.title, font: .system(size: 15, weight: .semibold),
+                                 freshColor: WidgetPalette.text)
+                    if let bluetooth = model.bluetooth {
+                        Spacer(minLength: 4)
+                        BluetoothLine(model: bluetooth, style: .pill)
+                    }
+                }
                 Spacer(minLength: 4)
                 HStack(spacing: 12) {
                     FreshnessRing(fraction: model.ringFraction, isStale: model.isStale, value: model.ringValue,
@@ -102,7 +108,11 @@ private struct ScanNowMedium: View {
                     Spacer(minLength: 4)
                     StatusCapsule(segments: model.segments)
                         .opacity(model.isStale ? 0.6 : 1)
-                    Spacer(minLength: 4)
+                    if let bluetooth = model.bluetooth {
+                        BluetoothLine(model: bluetooth, style: .line).padding(.vertical, 4)
+                    } else {
+                        Spacer(minLength: 4)
+                    }
                 }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(model.accessibilityLabel)
@@ -144,6 +154,8 @@ private struct ScanNowTitle: View {
     WidgetSamples.fresh
     WidgetSamples.stale
     WidgetSamples.running
+    WidgetSamples.freshBluetooth
+    WidgetSamples.staleBluetooth
     WidgetSamples.empty
 }
 
@@ -153,6 +165,8 @@ private struct ScanNowTitle: View {
     WidgetSamples.fresh
     WidgetSamples.stale
     WidgetSamples.running
+    WidgetSamples.freshBluetooth
+    WidgetSamples.staleBluetooth
     WidgetSamples.empty
 }
 
@@ -166,6 +180,20 @@ struct ScanNowWidgetAX1Previews: PreviewProvider {
             ScanNowWidgetView(entry: WidgetSamples.stale)
                 .previewContext(WidgetPreviewContext(family: .systemMedium))
                 .previewDisplayName("Scan Now medium AX1")
+            ScanNowWidgetView(entry: WidgetSamples.freshBluetooth)
+                .previewContext(WidgetPreviewContext(family: .systemSmall))
+                .previewDisplayName("Scan Now small Bluetooth AX1")
+            ScanNowWidgetView(entry: WidgetSamples.freshBluetooth)
+                .previewContext(WidgetPreviewContext(family: .systemMedium))
+                .previewDisplayName("Scan Now medium Bluetooth AX1")
+            ForEach(Array([("stale Bluetooth", WidgetSamples.staleBluetooth), ("both stale", WidgetSamples.bothStaleBluetooth)].enumerated()), id: \.offset) { _, item in
+                ScanNowWidgetView(entry: item.1)
+                    .previewContext(WidgetPreviewContext(family: .systemSmall))
+                    .previewDisplayName("Scan Now small \(item.0) AX1")
+                ScanNowWidgetView(entry: item.1)
+                    .previewContext(WidgetPreviewContext(family: .systemMedium))
+                    .previewDisplayName("Scan Now medium \(item.0) AX1")
+            }
         }
         .environment(\.dynamicTypeSize, .accessibility1)
     }

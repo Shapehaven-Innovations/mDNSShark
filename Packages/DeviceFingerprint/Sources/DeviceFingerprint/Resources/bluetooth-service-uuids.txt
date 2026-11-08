@@ -1,0 +1,129 @@
+1800	Generic Access
+1811	Alert Notification Service
+1815	Automation IO
+180F	Battery Service
+1810	Blood Pressure
+181B	Body Composition
+181E	Bond Management Service
+181F	Continuous Glucose Monitoring
+1805	Current Time Service
+1818	Cycling Power
+1816	Cycling Speed and Cadence
+180A	Device Information
+181A	Environmental Sensing
+1826	Fitness Machine
+1801	Generic Attribute
+1808	Glucose
+1809	Health Thermometer
+180D	Heart Rate
+1823	HTTP Proxy
+1812	Human Interface Device
+1802	Immediate Alert
+1821	Indoor Positioning
+183A	Insulin Delivery
+1820	Internet Protocol Support Service
+1803	Link Loss
+1819	Location and Navigation
+1827	Mesh Provisioning Service
+1828	Mesh Proxy Service
+1807	Next DST Change Service
+1825	Object Transfer Service
+180E	Phone Alert Status Service
+1822	Pulse Oximeter Service
+1829	Reconnection Configuration
+1806	Reference Time Update Service
+1814	Running Speed and Cadence
+1813	Scan Parameters
+1824	Transport Discovery
+1804	Tx Power
+181C	User Data
+181D	Weight Scale
+183B	Binary Sensor
+183C	Emergency Configuration
+183E	Physical Activity Monitor
+1843	Audio Input Control
+1844	Volume Control
+1845	Volume Offset Control
+1846	Coordinated Set Identification
+1847	Device Time
+1848	Media Control
+1849	Generic Media Control
+1860	Tire Pressure Monitoring System Service
+184A	Constant Tone Extension
+184B	Telephone Bearer
+184C	Generic Telephone Bearer
+184D	Microphone Control
+184E	Audio Stream Control
+184F	Broadcast Audio Scan
+1850	Published Audio Capabilities
+1851	Basic Audio Announcement
+1852	Broadcast Audio Announcement
+1853	Common Audio
+1854	Hearing Access
+1855	Telephony and Media Audio
+1856	Public Broadcast Announcement
+1857	Electronic Shelf Label
+1858	Gaming Audio
+1859	Mesh Proxy Solicitation
+185B	Ranging Service (RAS)
+FE0F	Signify Netherlands B.V. (formerly Philips Lighting) Service
+932C32BD-0000-47A2-835A-A8D455B859DD	Philips Hue Light Control Service
+B8843ADD-0000-4AA1-8794-C3F462030BDA	Philips Hue Light Update Service
+7905F431-B5CE-4E99-A40F-4B1E122D00D0	Apple Notification Center Service
+89D3502B-0F36-433A-8EF4-C502AD55F8DC	Apple Media Service
+7DFC6000-7D1C-4951-86AA-8D9728F8D66C	Apple Reserved Service
+7DFC7000-7D1C-4951-86AA-8D9728F8D66C	Apple Reserved Service
+7DFC8000-7D1C-4951-86AA-8D9728F8D66C	Apple Reserved Service
+7DFC9000-7D1C-4951-86AA-8D9728F8D66C	Apple Reserved Service
+E95D0753-251D-470A-A062-FA1922DFA9A8	micro:bit Accelerometer Service
+E95DF2D8-251D-470A-A062-FA1922DFA9A8	micro:bit Magnetometer Service
+E95D9882-251D-470A-A062-FA1922DFA9A8	micro:bit Button Service
+E95D127B-251D-470A-A062-FA1922DFA9A8	micro:bit IO Pin Service
+E95DD91D-251D-470A-A062-FA1922DFA9A8	micro:bit LED Service
+E95D93AF-251D-470A-A062-FA1922DFA9A8	micro:bit Event Service
+E95D93B0-251D-470A-A062-FA1922DFA9A8	micro:bit DFU Control Service
+E95D6100-251D-470A-A062-FA1922DFA9A8	micro:bit Temperature Service
+EF680100-9B35-4933-9B10-52FFA9740042	Thingy Configuration Service
+EF680200-9B35-4933-9B10-52FFA9740042	Thingy Weather Station Service
+EF680300-9B35-4933-9B10-52FFA9740042	Thingy UI Service
+EF680400-9B35-4933-9B10-52FFA9740042	Thingy Motion Service
+EF680500-9B35-4933-9B10-52FFA9740042	Thingy Sound Service
+A5B46352-9D13-479F-9FCB-3DCDF0A13F4D	Thingy Sensor Hub
+00001523-1212-EFDE-1523-785FEABCD123	Nordic LED and Button Service
+6E400001-B5A3-F393-E0A9-E50E24DCCA9E	Nordic UART Service
+57A70000-9350-11ED-A1EB-0242AC120002	Nordic Status Message Service
+14387800-130C-49E7-B877-2881C89CB258	Nordic Wi-Fi Provisioning Service
+0483DADD-6C9D-6CA9-5D41-03AD4FFF4ABB	Nordic Throughput Service
+21490000-494A-4573-98AF-F126AF76F490	Nordic Direction and Distance Finding Service
+FEAA	Eddystone
+A3C87500-8ED3-4BDF-8A39-A01BEBEDE295	Eddystone Configuration Service
+FE2C	Fast Pair Service
+00001530-1212-EFDE-1523-785FEABCD123	Legacy DFU Service
+FE59	Secure DFU Service
+8E400001-F315-4F60-9FB8-838830DAEA50	Experimental Buttonless DFU Service
+B2007AAA-C203-43A5-8B6F-A7F3D001A1E0	QuickStart Service
+E2A00001-EC31-4EC3-A97A-1C34D87E9878	Edge Impulse Remote Management Service
+FCB2	Location Enabled Advertisement Service
+FD6F	Exposure Notification Service
+8D53DC1D-1DB7-4CD3-868B-8A527460AA84	SMP Service
+00001623-1212-EFDE-1623-785FEABCD123	LEGO® Wireless Protocol v3 Hub Service
+00001625-1212-EFDE-1623-785FEABCD123	LEGO® Wireless Protocol v3 Bootloader Service
+FEBB	File Transfer Service by Adafruit
+ADAF0100-C332-42A8-93BD-25E905756CB8	Adafruit Temperature Service
+ADAF0200-C332-42A8-93BD-25E905756CB8	Adafruit Accelerometer Service
+ADAF0300-C332-42A8-93BD-25E905756CB8	Adafruit Light Service
+ADAF0400-C332-42A8-93BD-25E905756CB8	Adafruit Gyroscope Service
+ADAF0500-C332-42A8-93BD-25E905756CB8	Adafruit Magnetometer Service
+ADAF0600-C332-42A8-93BD-25E905756CB8	Adafruit Button Service
+ADAF0700-C332-42A8-93BD-25E905756CB8	Adafruit Humidity Service
+ADAF0800-C332-42A8-93BD-25E905756CB8	Adafruit Barometric Service
+ADAF0900-C332-42A8-93BD-25E905756CB8	Adafruit Addressable Service
+ADAF0A00-C332-42A8-93BD-25E905756CB8	Adafruit Color Service
+ADAF0B00-C332-42A8-93BD-25E905756CB8	Adafruit Sound Service
+ADAF0C00-C332-42A8-93BD-25E905756CB8	Adafruit Tone Service
+ADAF0D00-C332-42A8-93BD-25E905756CB8	Adafruit Quaternion Service
+ADAF0E00-C332-42A8-93BD-25E905756CB8	Adafruit Proximity Service
+F000FFC0-0451-4000-B000-000000000000	Texas Instruments Over-the-Air Download (OAD) Service
+0FDA92B2-44A2-4AF2-84F5-FA682BAA2B8D	Helium Hotspot Custom Service
+54220000-F6A5-4007-A371-722F4EBD8436	Memfault Diagnostic Service
+FD0D	Blecon Advertising Service

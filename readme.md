@@ -6,7 +6,7 @@ mDNSShark is an **open-source** iPhone app that shows what is on your local netw
 
 ## Simplicity and Privacy
 
-Every scan runs on your phone, with **no external servers**. The one exception is a button you tap yourself: **Refresh CISA Data** on the Security tab downloads CISA's public vulnerability catalog and asks NIST's National Vulnerability Database (NVD) about specific device vendors. Your device list and scan results are never uploaded, but those NVD queries do name vendors seen on your network (see [Security Assessment](#security-assessment)). There is no telemetry, no analytics, and no trackers. Discovery needs only local network access; Packet Capture also asks you to allow a VPN configuration. If you deny local network access, scans find little beyond your router and the app shows a banner with an Open Settings button.
+Every scan runs on your phone, with **no external servers**. The one exception is a button you tap yourself: **Refresh CISA Data** on the Security tab downloads CISA's public vulnerability catalog and asks NIST's National Vulnerability Database (NVD) about specific device vendors. Your device list and scan results are never uploaded, but those NVD queries do name vendors seen on your network (see [Security Assessment](#security-assessment)). There is no telemetry, no analytics, and no trackers. Discovery needs only local network access; Packet Capture also asks you to allow a VPN configuration. If you deny local network access, scans find little beyond your router and the app shows a banner with an Open Settings button. Bluetooth scanning runs only while the app is in front and only after you tap Allow Bluetooth; the app never connects to a device unless you tap Read device info on it, and nothing about nearby devices leaves your phone.
 
 <details>
 <summary><strong>Terms in a Hurry</strong></summary>
@@ -31,6 +31,7 @@ Every scan runs on your phone, with **no external servers**. The one exception i
 - **SSDP**: Finds UPnP devices such as smart TVs and internet gateways.
 - **Local Subnet Scans**: Always sweeps the /24 subnet on TCP port 80; other ports are probed only on hosts already found.
 - **OUI Lookups**: Matches a device's MAC-like address to its manufacturer.
+- **Bluetooth LE nearby devices**: Lists nearby Bluetooth Low Energy devices from their advertisements inside Devices (filter All, LAN, Bluetooth), guesses their type from public Bluetooth SIG, Matter, Eddystone, Fast Pair, Swift Pair and Apple Continuity tables, and suggests, never confirms, which ones may also be a device on your Wi-Fi. No MAC addresses are available to apps, so every match is inferred. Company names come from Nordic Semiconductor's bluetooth-numbers-database (BSD-3-Clause).
 - **Security Assessment**: Flags risky exposed services and checks each manufacturer against CISA's Known Exploited Vulnerabilities (KEV) catalog and the NVD.
 - **TLS Inspection**: A local HTTPS proxy, built on a PacketTunnel extension, that decrypts and logs HTTPS traffic for analysis. Available as a monthly subscription with a free 3-day trial.
 
@@ -213,6 +214,10 @@ CA and leaf material is stored in the iOS Keychain under the shared access group
 2. **iOS**: 18.2 or later, for the app and the `PacketTunnel` extension.
 3. **Network**: Wi-Fi is recommended for full scanning.
 4. **Development (optional)**: a recent **Xcode** (verified with 26.5). TLS Inspection can't be tested in the Simulator; the extension and the CA trust flow need a real device.
+
+## License
+
+mDNSShark is released under the [MIT License](LICENSE). Third-party notices are in [NOTICE](NOTICE) and in the app under Settings > About > Acknowledgements.
 
 ## Contribute and Collaborate
 

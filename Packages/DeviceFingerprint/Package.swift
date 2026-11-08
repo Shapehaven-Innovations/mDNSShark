@@ -15,7 +15,7 @@ let package = Package(
         .library(name: "DeviceFingerprint", targets: ["DeviceFingerprint"])
     ],
     targets: [
-        .target(name: "DeviceFingerprint"),
+        .target(name: "DeviceFingerprint", resources: [.process("Resources")]),
         .testTarget(name: "DeviceFingerprintTests", dependencies: ["DeviceFingerprint"])
     ]
 )

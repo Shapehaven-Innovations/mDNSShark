@@ -95,6 +95,7 @@ public struct SecurityWidgetModel: Equatable, Sendable {
     public var chart: IssueChart
     public var isStale: Bool
     public var isScanRunning: Bool
+    public var bluetooth: BluetoothIndicatorModel?
     public var accessibilityLabel: String
     /// The large widget's label: the shared label, then the chart's spoken list, then the running suffix.
     public var largeAccessibilityLabel: String
@@ -109,7 +110,8 @@ public struct SecurityWidgetModel: Equatable, Sendable {
             let notProbed = WidgetCopy.notProbedCount(counts.notProbed)
             let base = SnapshotFormatting.securityAccessibilityLabel(counts: counts, scannedAt: s.scannedAt, now: now,
                                                                      isStale: stale, isScanRunning: false)
-            let running = isScanRunning ? WidgetCopy.scanRunningSuffix : ""
+            let bluetooth = BluetoothIndicatorModel.make(s.bluetooth, now: now)
+            let running = (bluetooth.map { ". " + $0.securityAccessibilityClause } ?? "") + (isScanRunning ? WidgetCopy.scanRunningSuffix : "")
             let label = base + running
             let chart = IssueChart.make(s.history)
             return SecurityWidgetModel(
@@ -118,7 +120,7 @@ public struct SecurityWidgetModel: Equatable, Sendable {
                 checkingNote: counts.pending > 0 ? WidgetCopy.checking(counts.pending) : nil,
                 smallCaption: notProbed + WidgetCopy.captionSeparator + age, ageText: ageText,
                 largeCaption: notProbed + WidgetCopy.captionSeparator + ageText, chart: chart,
-                isStale: stale, isScanRunning: isScanRunning, accessibilityLabel: label,
+                isStale: stale, isScanRunning: isScanRunning, bluetooth: bluetooth, accessibilityLabel: label,
                 largeAccessibilityLabel: base + ". " + chart.accessibilityLabel + running)
         }
     }
@@ -136,6 +138,7 @@ public struct SecurityAccessoryModel: Equatable, Sendable {
     public var inlineText: String
     public var inlineSymbol: String
     public var isStale: Bool
+    public var bluetooth: BluetoothIndicatorModel?
     public var accessibilityLabel: String
 
     public static func make(_ result: SnapshotDecodeResult<WidgetSnapshot>, now: Date,
@@ -147,14 +150,18 @@ public struct SecurityAccessoryModel: Equatable, Sendable {
             var secondary = [CapsuleSegment(kind: .secure, count: counts.secure), CapsuleSegment(kind: .notProbed, count: counts.notProbed)]
             if counts.pending > 0 { secondary.append(CapsuleSegment(kind: .pending, count: counts.pending)) }
             let symbol = verdict.stateSymbol(isStale: stale)
+            let bluetooth = BluetoothIndicatorModel.make(s.bluetooth, now: now)
+            let label = SnapshotFormatting.securityAccessibilityLabel(
+                counts: counts, scannedAt: s.scannedAt, now: now, isStale: stale, isScanRunning: false)
+                + (bluetooth.map { ". " + $0.securityAccessibilityClause } ?? "")
+                + (isScanRunning ? WidgetCopy.scanRunningSuffix : "")
             return SecurityAccessoryModel(
                 gaugeFraction: probed > 0 ? Double(counts.secure) / Double(probed) : 0, gaugeValue: counts.issues,
                 stateSymbol: symbol,
                 primaryRow: [CapsuleSegment(kind: .critical, count: counts.critical), CapsuleSegment(kind: .warning, count: counts.warning)],
                 secondaryRow: secondary, rectTitle: stale ? WidgetCopy.outOfDate : WidgetCopy.security,
                 inlineText: inlineText(counts, stale: stale), inlineSymbol: symbol, isStale: stale,
-                accessibilityLabel: SnapshotFormatting.securityAccessibilityLabel(
-                    counts: counts, scannedAt: s.scannedAt, now: now, isStale: stale, isScanRunning: isScanRunning))
+                bluetooth: bluetooth, accessibilityLabel: label)
         }
     }
 

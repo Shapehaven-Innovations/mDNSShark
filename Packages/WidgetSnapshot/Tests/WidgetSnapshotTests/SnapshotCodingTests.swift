@@ -56,4 +56,29 @@ struct SnapshotCodingTests {
     func kinds() {
         #expect(WidgetKind.scanKinds == ["devices", "security", "newdevices", "scan", "mix", "topology"])
     }
+
+    @Test("a snapshot with a Bluetooth summary round trips")
+    func roundTripWithBluetooth() throws {
+        var s = Self.sample
+        s.bluetooth = BluetoothSummary(scannedAt: Date(timeIntervalSince1970: 1_000_400), nearby: 7, suggested: 2)
+        let data = try SnapshotCoding.encode(s)
+        #expect(SnapshotCoding.decodeVersioned(WidgetSnapshot.self, from: data, supported: WidgetSnapshot.schemaVersion) == .loaded(s))
+    }
+
+    @Test("an old snapshot without the bluetooth key decodes with nil")
+    func oldSnapshotWithoutBluetoothKeyDecodesNil() throws {
+        let data = try SnapshotCoding.encode(Self.sample)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        #expect(json["bluetooth"] == nil)
+        guard case .loaded(let decoded) = SnapshotCoding.decodeVersioned(WidgetSnapshot.self, from: data, supported: 1) else {
+            Issue.record("did not load")
+            return
+        }
+        #expect(decoded.bluetooth == nil)
+    }
+
+    @Test("the schema version stays 1")
+    func versionStaysOne() {
+        #expect(WidgetSnapshot.schemaVersion == 1)
+    }
 }

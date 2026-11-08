@@ -44,20 +44,24 @@ public enum BonjourTypeCatalog {
         "_homeconnect._tcp": "brand", "_octoprint._tcp": "vendor",
     ]
 
+    /// Kind implied by a HomeKit accessory category identifier, nil for categories that say nothing.
+    public static func hapCategoryKind(_ ci: Int) -> DeviceKind? {
+        switch ci {
+        case 17, 18: return .camera
+        case 26, 34: return .audio
+        case 31, 35, 36: return .tv
+        case 33: return .network
+        case 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 19, 20, 21, 22, 23, 28, 29, 30: return .smartHome
+        default: return nil
+        }
+    }
+
     /// Kind for one service, nil when the type says nothing. `_hap._tcp` uses `ci`, `_matterc._udp` uses `DT`, `_amzn-alexa._tcp` only marks iRobot vacuums by name, and `_sideplay._tcp` only ecobee models by `mdl`.
     public static func kind(serviceType: String, instanceName: String, txt: [String: String]) -> DeviceKind? {
         let type = serviceType.hasSuffix(".") ? String(serviceType.dropLast()) : serviceType
         switch type {
         case "_hap._tcp":
-            guard let ci = txt["ci"].flatMap({ Int($0) }) else { return nil }
-            switch ci {
-            case 17, 18: return .camera
-            case 26, 34: return .audio
-            case 31, 35, 36: return .tv
-            case 33: return .network
-            case 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 19, 20, 21, 22, 23, 28, 29, 30: return .smartHome
-            default: return nil
-            }
+            return txt["ci"].flatMap { Int($0) }.flatMap { hapCategoryKind($0) }
         case "_matterc._udp":
             guard let dt = txt["DT"], Int(dt) != nil else { return nil }
             return CameraHint.isCameraMatterDeviceType(dt) ? .camera : .smartHome

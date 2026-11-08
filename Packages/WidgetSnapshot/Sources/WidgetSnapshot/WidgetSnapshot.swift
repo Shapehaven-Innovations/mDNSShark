@@ -84,6 +84,19 @@ public struct DeviceBrief: Codable, Equatable, Sendable {
     }
 }
 
+/// Counts from the last Bluetooth scan; no names, identifiers or signal strengths.
+public struct BluetoothSummary: Codable, Equatable, Sendable {
+    public var scannedAt: Date
+    public var nearby: Int
+    public var suggested: Int
+
+    public init(scannedAt: Date, nearby: Int, suggested: Int) {
+        self.scannedAt = scannedAt
+        self.nearby = nearby
+        self.suggested = suggested
+    }
+}
+
 public struct WidgetSnapshot: Codable, Equatable, Sendable {
     public static let schemaVersion = 1
 
@@ -97,10 +110,11 @@ public struct WidgetSnapshot: Codable, Equatable, Sendable {
     public var topology: [DeviceBrief]
     public var topologyOverflow: Int
     public var ownDeviceKey: String?
+    public var bluetooth: BluetoothSummary?
 
     public init(version: Int, scannedAt: Date, subnet: String?, counts: StatusCounts, typeCounts: [String: Int],
                 history: [ScanSample], newDevices: [DeviceBrief], topology: [DeviceBrief],
-                topologyOverflow: Int, ownDeviceKey: String?) {
+                topologyOverflow: Int, ownDeviceKey: String?, bluetooth: BluetoothSummary? = nil) {
         self.version = version
         self.scannedAt = scannedAt
         self.subnet = subnet
@@ -111,5 +125,6 @@ public struct WidgetSnapshot: Codable, Equatable, Sendable {
         self.topology = topology
         self.topologyOverflow = topologyOverflow
         self.ownDeviceKey = ownDeviceKey
+        self.bluetooth = bluetooth
     }
 }
