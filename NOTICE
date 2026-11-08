@@ -1,4 +1,9 @@
-Third-party notices for mDNSShark
+mDNSShark
+Copyright 2025 Rebecca Lees
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+This product includes data from third parties:
 
 bluetooth-numbers-database
 Copyright (c) 2019 - 2020, Nordic Semiconductor ASA

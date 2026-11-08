@@ -7,7 +7,7 @@ struct AcknowledgementsView: View {
         List {
             Section("mDNSShark") {
                 Link(destination: URL(string: "https://github.com/Shapehaven-Innovations/mDNSShark/blob/main/LICENSE")!) {
-                    Label("Licensed under the MIT License", systemImage: "arrow.up.right.square")
+                    Label("Licensed under the Apache License 2.0", systemImage: "arrow.up.right.square")
                 }
             }
             Section("Bluetooth names") {

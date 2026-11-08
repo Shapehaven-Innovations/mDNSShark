@@ -217,7 +217,7 @@ CA and leaf material is stored in the iOS Keychain under the shared access group
 
 ## License
 
-mDNSShark is released under the [MIT License](LICENSE). Third-party notices are in [NOTICE](NOTICE) and in the app under Settings > About > Acknowledgements.
+mDNSShark is released under the [Apache License 2.0](LICENSE). Third-party notices are in [NOTICE](NOTICE) and in the app under Settings > About > Acknowledgements.
 
 ## Contribute and Collaborate
 
