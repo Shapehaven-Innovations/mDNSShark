@@ -1,0 +1,95 @@
+0C3C	Alarm Clock CGC1
+0576	3-in-1 Alarm Clock CGD1
+066F	Temperature/Humidity Sensor CGDK2
+0347	Temperature/Humidity Sensor CGG1
+0B48	Temperature/Humidity Sensor CGG1-ENCRYPTED
+03D6	Door/Window Sensor CGH1
+78D1	Door/Window Sensor MC-COMM
+0A83	Motion/Light Sensor CGPR1
+03BC	Grow Care Garden GCLS002
+0098	Plant Sensor HHCCJCY01
+015D	Smart Flower Pot HHCCPOT002
+02DF	Formaldehyde Sensor JQJCY01YM
+0997	Smoke Detector JTYJGD03MI
+1568	Switch (single button) K9B-1BTN
+1569	Switch (double button) K9B-2BTN
+0DFD	Switch (triple button) K9B-3BTN
+1C10	Switch (single button) K9BB-1BTN
+3A61	Switch (quadruple button) KS1
+3E17	Switch (quadruple button) KS1BP
+1889	Door/Window Sensor MS1BB(MI)
+2AEB	Motion Sensor HS1BB(MI)
+3F0F	Flood and Rain Sensor RS1BB(MI)
+3F4C	Seat Pressure Sensor PS1BB
+01AA	Temperature/Humidity Sensor LYWSDCGQ
+045B	Temperature/Humidity Sensor LYWSD02
+16E4	Temperature/Humidity Sensor LYWSD02MMC
+2542	Temperature/Humidity Sensor LYWSD02MMC
+055B	Temperature/Humidity Sensor LYWSD03MMC
+2832	Temperature/Humidity Sensor MJWSD05MMC
+4C47	Temperature/Humidity Sensor MJWSD05MMC
+55B5	Temperature/Humidity Sensor MJWSD06MMC
+5BEA	Temperature/Humidity Sensor MJWSD06MMC
+5DB1	Temperature/Humidity Sensor MBS17
+7712	Water Leak Sensor zhiee.flood.sj01
+78DB	Temperature/Humidity Sensor ESM787
+098B	Door/Window Sensor MCCGQ02HL
+06D3	Alarm Clock MHO-C303
+0387	Temperature/Humidity Sensor MHO-C401
+07F6	Nightlight MJYD02YL
+04E9	Door Lock MJZNMSQ01YD
+00DB	Baby Thermometer MMC-T201-1
+0391	Body Thermometer MMC-W505
+03DD	Nightlight MUE4094RT
+0489	Smart Toothbrush M1S-T500
+0806	Smart Toothbrush T700
+1790	Smart Toothbrush T700
+0A8D	Motion Sensor RTCGQ02LM
+3531	Motion Sensor XMPIRO2SXS
+4C60	Motion Sensor XMPIRO2GSXS
+4683	Occupancy Sensor XMOSB01XS
+0863	Flood Detector SJWS01LM
+6375	Water Leak Sensor 2 SJWS02LM
+045C	Smart Kettle V-SK152
+040A	Mosquito Repellent WX08ZM
+04E1	Magic Cube XMMF01JQD
+1203	Thermometer XMWSDJ04MMC
+1949	Switch (double button) XMWXKG01YL
+2387	Button XMWXKG01LM
+098C	Door Lock XMZNMST02YD
+09B0	Safe Box loock.safe.v1
+0599	Door Lock MJZNMS03LM
+0784	Door Lock XMZNMS04LM
+0E39	Door Lock XMZNMS08LM
+07BF	Wireless Switch YLAI003
+38BB	Wireless Switch PTX_YK1_QMIMB
+78A3	Wireless Switch AFWXKG220000
+0153	Remote Control YLYK01YL
+068E	Fan Remote Control YLYK01YL-FANCL
+04E6	Ventilator Fan Remote Control YLYK01YL-VENFAN
+03BF	Bathroom Heater Remote YLYB01YL-BHFRC
+03B6	Dimmer Switch YLKG07YL/YLKG08YL
+0083	Smart Kettle YM-K1501
+0113	Smart Kettle YM-K1501EU
+069E	Door Lock ZNMS16LM
+069F	Door Lock ZNMS17LM
+0380	Door Lock DSL-C08
+11C2	Door Lock Lockin-SV40
+0DE7	Odor Eliminator SU001-T
+30D9	Body Composition Scale MJTZC01YM
+3BD5	Body Composition Scale MJTZC01YM
+45C9	Smart Scale S200 MJTZC02YM
+48CF	Body Composition Scale MJTZC01YM
+4C04	Smart Scale S200 MJTZC02YM
+4DCB	Smart Scale S200 MJTZC02YM
+4B05	Body Composition Scale MJTZC03YM
+4FC2	Body Composition Scale MJTZC01YM
+4F59	Temperature/Humidity Sensor CGDK3
+50FB	Human Presence Sensor ES3
+520B	Temperature/Humidity Sensor with Button KS2BB
+5968	Switch (double button) XMWS01XS
+59FA	Smart Band 10 M2457B1
+59FB	Smart Band 10 NFC M2456B1
+59FC	Smart Band 10 Ceramic Edition M2456B1
+6188	Smart Band 10 Glimmer Edition M2456B1
+6A0F	Human Presence Sensor ES5BB

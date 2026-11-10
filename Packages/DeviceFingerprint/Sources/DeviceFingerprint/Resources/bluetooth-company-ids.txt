@@ -896,7 +896,7 @@
 962	Snapchat Inc
 963	Casambi Technologies Oy
 964	Pico Technology Inc.
-965	St. Jude Medical, Inc.
+965	Abbott Medical
 966	Intricon
 967	Structural Health Systems, Inc.
 968	Avvel International
@@ -4019,4 +4019,53 @@
 4372	Metabowerke GmbH
 4373	Thermia Aktiebolag
 4374	ALLRA LIMITED
-65535	Bluetooth SIG Specification Reserved Default Vendor ID for Remote Devices Without Device ID Service Record.
+4375	Tive, Inc.
+4376	Villeroy & Boch AG
+4377	TSUKURUBAI, LIMITED LIABILITY COMPANY
+4378	BOKE Drivers Co., Ltd.
+4379	DIGITANIMAL S.L.
+4380	Techavtomatica
+4381	Commodore International Corporation
+4382	DS TAGS Group B.V.
+4383	iAppliance Inc.
+4384	PI-CRYSTAL INC.
+4385	ennos ag
+4386	FUSE BLUEJAY LIMITED
+4387	Hudl, Inc.
+4388	DOLLAR JUDGE INC
+4389	Wavarts Technologies, Co., Ltd
+4390	Hakemann GmbH & Co. KG
+4391	Permobil AB
+4392	NIC IMPEX
+4393	I.T.O. Vaarwegmarkering B.V.
+4394	Flowil International Lighting (Holding) B.V.
+4395	IXI Eyewear Oy
+4396	mees audio technology., co.ltd.
+4397	Aktiia SA
+4398	Oticon Medical AB
+4399	SECANDA Systems AG
+4400	Pi Variables, Inc.
+4401	Chirp Innovation, LLC
+4402	Nicrew Technology Co., Limited
+4403	THEKEEON Co., Ltd.
+4404	Barksdale, Inc.
+4405	Shenzhen GetD Technology Co.,Ltd.
+4406	Loop
+4407	Eberlein Innovations EOOD
+4408	Crane Aerospace & Electronics
+4409	NaturalCycles Nordic AB
+4410	Celadon, Inc.
+4411	ONiO AS
+4412	SOTI INC.
+4413	Venndelta Pty Ltd
+4414	Westinghouse Air Brake Technologies Corporation
+4415	Dreamarea Inc.
+4416	WEGZWEI GmbH
+4417	AXsensor AB (publ)
+4418	Eight Sleep Inc.
+4419	Shenzhen HJT Electronics Co., Ltd.
+4420	GENXUNITED HOLDINGS INC.
+4421	Hon Hai Precision Ind. Co., Ltd.
+4422	Murray Blair Pty Ltd
+4423	NESTLE PURINA PETCARE COMPANY
+4424	Revelyst, Inc.

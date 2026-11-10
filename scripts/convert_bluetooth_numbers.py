@@ -4,6 +4,7 @@
 # Converts Nordic Semiconductor's bluetooth-numbers-database JSON
 # (v1/company_ids.json and v1/service_uuids.json, BSD-3-Clause) into the
 # `key<TAB>name` text files BLECompanyTable and BLEServiceNameTable parse.
+# Note: bluetooth-company-ids.txt is now written by scripts/update_ble_data.py (Bluetooth SIG). Do not run this for company IDs.
 # Usage: convert_bluetooth_numbers.py company_ids.json service_uuids.json out_dir
 import json
 import os

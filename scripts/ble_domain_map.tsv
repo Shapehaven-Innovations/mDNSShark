@@ -1,0 +1,64 @@
+# Home Assistant integration domain -> row label and BLEKind, for scripts/update_ble_data.py.
+# A matcher whose domain is missing here is skipped and listed in the run report; add it here to include it.
+# kind is a BLEKind raw value: phone computer wearable earbuds audio tv tracker findMy health inputDevice beacon smartHome camera printer
+acaia	Acaia coffee scale	smartHome
+airthings_ble	Airthings air sensor	smartHome
+aranet	Aranet air sensor	smartHome
+avea	Avea light	smartHome
+besen	Besen EV charger	smartHome
+bluemaestro	BlueMaestro sensor	smartHome
+bthome	BTHome sensor	smartHome
+casper_glow	Casper Glow light	smartHome
+chef_iq	Chef iQ cooking device	smartHome
+dormakaba_dkey	Dormakaba lock	smartHome
+eq3btsmart	eQ-3 radiator thermostat	smartHome
+eufylife_ble	Eufy smart scale	health
+eurotronic_cometblue	Comet Blue radiator thermostat	smartHome
+exicom_spin_ble	Exicom EV charger	smartHome
+fjaraskupan	Fjaraskupan kitchen fan	smartHome
+flic_button	Flic button	inputDevice
+gardena_bluetooth	Gardena garden device	smartHome
+govee_ble	Govee sensor or light	smartHome
+hue_ble	Philips Hue light	smartHome
+husqvarna_automower_ble	Husqvarna robotic mower	smartHome
+idasen_desk	Linak standing desk	smartHome
+improv_ble	Improv Wi-Fi setup device	smartHome
+inkbird	Inkbird thermometer	smartHome
+iron_os	Pinecil soldering iron	smartHome
+iseo_argo_ble	ISEO lock	smartHome
+kegtron	Kegtron keg monitor	smartHome
+keymitt_ble	MicroBot button pusher	smartHome
+kulersky	Kuler Sky light	smartHome
+lamarzocco	La Marzocco espresso machine	smartHome
+ld2410_ble	LD2410 presence sensor	smartHome
+led_ble	LED strip controller	smartHome
+medcom_ble	Medcom radiation monitor	smartHome
+melnor	Melnor sprinkler timer	smartHome
+moat	Moat sensor	smartHome
+mopeka	Mopeka tank sensor	smartHome
+motionblinds_ble	Motionblinds blind	smartHome
+okok_scale	OKOK smart scale	health
+opendisplay	OpenDisplay tag	smartHome
+oralb	Oral-B toothbrush	health
+probe_plus	Probe Plus thermometer	smartHome
+qingping	Qingping air sensor	smartHome
+rapt_ble	RAPT brewing sensor	smartHome
+ruuvitag_ble	RuuviTag sensor	smartHome
+sensirion_ble	Sensirion sensor	smartHome
+sensorpro	SensorPro sensor	smartHome
+sensorpush	SensorPush sensor	smartHome
+shelly	Shelly device	smartHome
+snooz	Snooz sleep sound machine	smartHome
+specialized_turbo	Specialized e-bike	smartHome
+steamvr_base_station	SteamVR base station	smartHome
+switchbot	SwitchBot device	smartHome
+thermobeacon	ThermoBeacon sensor	smartHome
+thermopro	ThermoPro thermometer	smartHome
+tilt_ble	Tilt hydrometer	smartHome
+togrill	ToGrill thermometer	smartHome
+victron_ble	Victron power device	smartHome
+xiaomi_ble	Xiaomi device	smartHome
+yalexs_ble	August or Yale lock	smartHome
+# Skipped on purpose: homekit_controller and ibeacon (decoded from Apple frames already).
+homekit_controller	-	-
+ibeacon	-	-

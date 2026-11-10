@@ -1,0 +1,36 @@
+0055	AirTag
+0220	AirPods (1st generation)
+0320	Powerbeats³ Wireless
+0520	Beatsˣ
+0620	Beats Solo³ Wireless
+0720	Beats Studio³ Wireless
+0920	Beats Studio³ Wireless
+0A20	AirPods Max
+0B20	Powerbeats Pro (2019)
+0C20	Beats Solo Pro
+0D20	Powerbeats (4th generation)
+0E20	AirPods Pro (1st generation)
+0F20	AirPods (2nd generation)
+1020	Beats Flex
+1120	Beats Studio Buds
+1220	Beats Fit Pro
+1320	AirPods (3rd generation)
+1420	AirPods Pro (2nd generation)
+1620	Beats Studio Buds +
+1720	Beats Studio Pro
+1920	AirPods 4
+1A20	Beats Pill (3rd generation)
+1B20	AirPods 4 with Active Noise Cancellation
+1D20	Powerbeats Pro 2
+1F20	AirPods Max with USB-C
+2420	AirPods Pro (2nd generation)
+2520	Beats Solo 4
+2620	Beats Solo Buds
+2720	AirPods Pro 3
+2820	AirPods Pro 3
+2D20	AirPods Max 2
+2F20	Powerbeats Fit
+3020	Wireless Charging Case for AirPods 5
+3620	AirPods 5
+3820	Beats 360
+0026	Beats Pill+

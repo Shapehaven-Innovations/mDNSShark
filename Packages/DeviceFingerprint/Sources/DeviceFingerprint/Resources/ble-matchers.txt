@@ -1,0 +1,170 @@
+ThermoBeacon sensor	smartHome	mfr=16 start=00 svc=FFF0
+ThermoBeacon sensor	smartHome	mfr=17 start=00 svc=FFF0
+ThermoBeacon sensor	smartHome	mfr=20 start=00 svc=FFF0
+ThermoBeacon sensor	smartHome	mfr=21 start=00 svc=FFF0
+ThermoBeacon sensor	smartHome	mfr=24 start=00 svc=FFF0
+LD2410 presence sensor	smartHome	mfr=256 start=0701 svc=AF30
+ThermoBeacon sensor	smartHome	mfr=27 start=00 svc=FFF0
+ThermoBeacon sensor	smartHome	mfr=48 start=00 svc=FFF0
+Mopeka tank sensor	smartHome	mfr=89 start=03 svc=FEE5
+Mopeka tank sensor	smartHome	mfr=89 start=04 svc=FEE5
+Mopeka tank sensor	smartHome	mfr=89 start=05 svc=FEE5
+Mopeka tank sensor	smartHome	mfr=89 start=06 svc=FEE5
+Mopeka tank sensor	smartHome	mfr=89 start=08 svc=FEE5
+Mopeka tank sensor	smartHome	mfr=89 start=09 svc=FEE5
+Mopeka tank sensor	smartHome	mfr=89 start=0A svc=FEE5
+Mopeka tank sensor	smartHome	mfr=89 start=0B svc=FEE5
+Mopeka tank sensor	smartHome	mfr=89 start=0C svc=FEE5
+Mopeka tank sensor	smartHome	mfr=89 start=12 svc=FEE5
+Govee sensor or light	smartHome	mfr=1 svc=EC88
+Govee sensor or light	smartHome	mfr=10032 svc=8251
+Gardena garden device	smartHome	mfr=1062 svc=98BD0001-0B0E-421A-84E5-DDBF75DC6DE4
+Inkbird thermometer	smartHome	mfr=12628 start=41432D
+Inkbird thermometer	smartHome	mfr=12884 start=006200
+Melnor sprinkler timer	smartHome	mfr=13 start=59
+Govee sensor or light	smartHome	mfr=14474 svc=8151
+RAPT brewing sensor	smartHome	mfr=16722 start=5054
+RAPT brewing sensor	smartHome	mfr=17739 start=47
+Aranet air sensor	smartHome	mfr=1794 svc=F0CD1400-95DA-4F4B-9AC8-AA55D312AF0C
+Aranet air sensor	smartHome	mfr=1794 svc=FCE0
+Govee sensor or light	smartHome	mfr=18994 svc=8551
+Govee sensor or light	smartHome	mfr=19506 svc=1801
+Govee sensor or light	smartHome	mfr=26589 svc=8351
+ToGrill thermometer	smartHome	mfr=34714 svc=CEE0
+Govee sensor or light	smartHome	mfr=34819 start=EC000001
+SensorPro sensor	smartHome	mfr=43605 start=0101A4C1
+SensorPro sensor	smartHome	mfr=43605 start=0105A4C1
+Govee sensor or light	smartHome	mfr=43682 svc=8151
+August or Yale lock	smartHome	mfr=465 svc=FE24
+Govee sensor or light	smartHome	mfr=53579 svc=8151
+Govee sensor or light	smartHome	mfr=57391 svc=8351
+Govee sensor or light	smartHome	mfr=59970 svc=8151
+OKOK smart scale	health	mfr=61695 start=0204
+Govee sensor or light	smartHome	mfr=63391 svc=8351
+Govee sensor or light	smartHome	mfr=63585 svc=8151
+Govee sensor or light	smartHome	mfr=6966 svc=8451
+Victron power device	smartHome	mfr=737 start=10
+Specialized e-bike	smartHome	mfr=76 start=0215545552424F484D49
+Tilt hydrometer	smartHome	mfr=76 start=0215A495BB
+Govee sensor or light	smartHome	mfr=818 svc=8551
+Airthings air sensor	smartHome	mfr=820 svc=B42E1C08-ADE7-11E4-89D3-123B93F75CBA
+Airthings air sensor	smartHome	mfr=820 svc=B42E1F6E-ADE7-11E4-89D3-123B93F75CBA
+Airthings air sensor	smartHome	mfr=820 svc=B42E3882-ADE7-11E4-89D3-123B93F75CBA
+Airthings air sensor	smartHome	mfr=820 svc=B42E4A8E-ADE7-11E4-89D3-123B93F75CBA
+Airthings air sensor	smartHome	mfr=820 svc=B42E90A2-ADE7-11E4-89D3-123B93F75CBA
+Specialized e-bike	smartHome	mfr=89 start=545552424F484D49
+Specialized e-bike	smartHome	mfr=89 svc=00000001-3731-3032-494D-484F42525554
+Specialized e-bike	smartHome	mfr=89 svc=00000002-3731-3032-494D-484F42525554
+Specialized e-bike	smartHome	mfr=89 svc=00000003-3731-3032-494D-484F42525554
+Improv Wi-Fi setup device	smartHome	svc=00467768-6228-2272-4663-277478268000 svcdata=4677
+Philips Hue light	smartHome	svc=FE0F svcdata=FE0F
+RuuviTag sensor	smartHome	mfr=1177
+SteamVR base station	smartHome	mfr=1373
+Chef iQ cooking device	smartHome	mfr=1485
+Acaia coffee scale	smartHome	mfr=16962
+Sensirion sensor	smartHome	mfr=1749
+Oral-B toothbrush	health	mfr=220
+SwitchBot device	smartHome	mfr=2409
+Shelly device	smartHome	mfr=2985
+BlueMaestro sensor	smartHome	mfr=307
+Probe Plus thermometer	smartHome	mfr=36606
+OKOK smart scale	health	mfr=4554
+Specialized e-bike	smartHome	mfr=525
+Govee sensor or light	smartHome	mfr=61320
+Kegtron keg monitor	smartHome	mfr=65535
+SwitchBot device	smartHome	mfr=741
+OKOK smart scale	health	mfr=8394
+SwitchBot device	smartHome	mfr=89
+OpenDisplay tag	smartHome	mfr=9286
+Flic button	inputDevice	svc=00420000-8F59-4420-870D-84F3B617E493
+Flic button	inputDevice	svc=00C90000-2CBD-4F2A-A725-5CCD960FFB7D
+Medcom radiation monitor	smartHome	svc=39B31FEC-B63A-4EF7-B163-A7317872007F
+Comet Blue radiator thermostat	smartHome	svc=47E9EE00-47E9-11E4-8939-164230D1DF67
+Exicom EV charger	smartHome	svc=49535343-FE7D-4AE5-8FA9-9FAFD205E455
+Govee sensor or light	smartHome	svc=5550
+Snooz sleep sound machine	smartHome	svc=729F0608-496A-47FE-A124-3A62AAA3FBC0
+Fjaraskupan kitchen fan	smartHome	svc=77A2BD49-1E5A-4961-BBA1-21F34FA4BC7B
+Kuler Sky light	smartHome	svc=8D96A001-0002-64C2-0001-9ACC4838521C
+Husqvarna robotic mower	smartHome	svc=98BD0001-0B0E-421A-84E5-DDBF75DC6DE4
+Linak standing desk	smartHome	svc=99FA0001-338A-1024-8A49-009C0215F78A
+Pinecil soldering iron	smartHome	svc=9EAE1000-9D0D-48C5-AA55-33E27F9BC533
+MicroBot button pusher	smartHome	svc=ABCD
+SwitchBot device	smartHome	svc=CBA20D00-224D-11E6-9FB8-0002A5D5C51B
+Dormakaba lock	smartHome	svc=E7A60000-6639-429F-94FD-86DE8EA26897
+Dormakaba lock	smartHome	svc=E7A60001-6639-429F-94FD-86DE8EA26897
+SensorPush sensor	smartHome	svc=EF090000-11D6-42BA-93B8-9DD7EC090AA9
+ISEO lock	smartHome	svc=F000
+ISEO lock	smartHome	svc=F001
+ISEO lock	smartHome	svc=F002
+ISEO lock	smartHome	svc=F003
+ISEO lock	smartHome	svc=F004
+ISEO lock	smartHome	svc=F005
+ISEO lock	smartHome	svc=F006
+ISEO lock	smartHome	svc=F007
+ISEO lock	smartHome	svc=F008
+ISEO lock	smartHome	svc=F009
+ISEO lock	smartHome	svc=F00A
+ISEO lock	smartHome	svc=F00B
+ISEO lock	smartHome	svc=F00C
+ISEO lock	smartHome	svc=F00D
+ISEO lock	smartHome	svc=F00E
+ISEO lock	smartHome	svc=F00F
+ISEO lock	smartHome	svc=F010
+ISEO lock	smartHome	svc=F011
+ISEO lock	smartHome	svc=F012
+ISEO lock	smartHome	svc=F013
+ISEO lock	smartHome	svc=F014
+ISEO lock	smartHome	svc=F015
+ISEO lock	smartHome	svc=F016
+ISEO lock	smartHome	svc=F017
+ISEO lock	smartHome	svc=F018
+ISEO lock	smartHome	svc=F019
+ISEO lock	smartHome	svc=F01A
+ISEO lock	smartHome	svc=F01B
+ISEO lock	smartHome	svc=F01C
+ISEO lock	smartHome	svc=F01D
+ISEO lock	smartHome	svc=F01E
+ISEO lock	smartHome	svc=F01F
+ISEO lock	smartHome	svc=F020
+ISEO lock	smartHome	svc=F021
+ISEO lock	smartHome	svc=F022
+ISEO lock	smartHome	svc=F023
+ISEO lock	smartHome	svc=F024
+ISEO lock	smartHome	svc=F025
+ISEO lock	smartHome	svc=F026
+ISEO lock	smartHome	svc=F027
+ISEO lock	smartHome	svc=F028
+ISEO lock	smartHome	svc=F029
+ISEO lock	smartHome	svc=F02A
+ISEO lock	smartHome	svc=F02B
+ISEO lock	smartHome	svc=F02C
+ISEO lock	smartHome	svc=F02D
+ISEO lock	smartHome	svc=F02E
+ISEO lock	smartHome	svc=F02F
+ISEO lock	smartHome	svc=F030
+ISEO lock	smartHome	svc=F031
+ISEO lock	smartHome	svc=F032
+ISEO lock	smartHome	svc=F033
+ISEO lock	smartHome	svc=F034
+ISEO lock	smartHome	svc=F035
+ISEO lock	smartHome	svc=F036
+ISEO lock	smartHome	svc=F037
+ISEO lock	smartHome	svc=F038
+ISEO lock	smartHome	svc=F039
+ISEO lock	smartHome	svc=F03A
+ISEO lock	smartHome	svc=F03B
+ISEO lock	smartHome	svc=F03C
+ISEO lock	smartHome	svc=F03D
+ISEO lock	smartHome	svc=F03E
+ISEO lock	smartHome	svc=F03F
+Avea light	smartHome	svc=F815E810-456C-6761-746F-4D756E696368
+SwitchBot device	smartHome	svcdata=0D00
+Xiaomi device	smartHome	svcdata=181B
+BTHome sensor	smartHome	svcdata=181C
+Xiaomi device	smartHome	svcdata=181D
+BTHome sensor	smartHome	svcdata=181E
+BTHome sensor	smartHome	svcdata=FCD2
+SwitchBot device	smartHome	svcdata=FD3D
+Xiaomi device	smartHome	svcdata=FD50
+Qingping air sensor	smartHome	svcdata=FDCD
+Xiaomi device	smartHome	svcdata=FE95
