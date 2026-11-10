@@ -168,12 +168,4 @@ import DeviceFingerprint
             #expect(!BluetoothAccessView.showsOpenSettings(state), "\(state)")
         }
     }
-
-    @Test func detailAddOnlyWhenNotOnNetwork() {
-        #expect(BLEPeripheralDetailView.showsAdd(isLive: true, savedID: nil, relationshipTitle: BLERelationshipText.notOnNetwork))
-        #expect(!BLEPeripheralDetailView.showsAdd(isLive: true, savedID: nil, relationshipTitle: "Could be TV, also fits 1 other device"))
-        #expect(!BLEPeripheralDetailView.showsAdd(isLive: true, savedID: nil, relationshipTitle: "Possibly TV?"))
-        #expect(!BLEPeripheralDetailView.showsAdd(isLive: false, savedID: nil, relationshipTitle: BLERelationshipText.notOnNetwork))
-        #expect(!BLEPeripheralDetailView.showsAdd(isLive: true, savedID: UUID(), relationshipTitle: BLERelationshipText.notOnNetwork))
-    }
 }

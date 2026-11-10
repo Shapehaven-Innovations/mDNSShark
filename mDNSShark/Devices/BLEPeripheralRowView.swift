@@ -10,41 +10,40 @@ struct BLEPeripheralRowView: View {
     var onOpenDevice: ((UUID) -> Void)?
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
+        TimelineView(.periodic(from: .now, by: 5)) { context in
             let dim = peripheral.lifecycle(now: context.date) == .dim
             CardView {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 12) {
                         // Only the icon dims, so the text keeps full contrast.
-                        Image(systemName: peripheral.icon).font(.title2).foregroundColor(AppColors.info).frame(width: 32)
+                        Image(systemName: peripheral.icon).font(.title3).foregroundColor(AppColors.info).frame(width: 28)
                             .opacity(dim ? Self.dimmedIconOpacity : 1)
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 6) {
-                                Text(peripheral.displayName).font(.headline).lineLimit(1)
+                                Text(peripheral.displayName).font(.body.weight(.semibold)).lineLimit(1)
                                 Image(systemName: BluetoothSymbol.name).font(.caption).foregroundColor(AppColors.info)
                                     .accessibilityLabel("Bluetooth")
                             }
-                            Text(Self.companyLine(company: peripheral.parsed.companyName, typeLabel: peripheral.typeLabel))
-                                .font(.subheadline).foregroundColor(.secondary)
-                            Text("\(peripheral.rssi) dBm · \(peripheral.distance.label)")
-                                .font(.caption).foregroundColor(.secondary)
-                            if dim {
-                                Text("Last seen \(max(0, Int(context.date.timeIntervalSince(peripheral.lastSeen))))s ago")
-                                    .font(.caption).foregroundColor(.secondary)
-                            }
+                            Text(Self.detailLine(company: peripheral.parsed.companyName, typeLabel: peripheral.typeLabel,
+                                                 rssi: peripheral.rssi, distance: peripheral.distance.label,
+                                                 lastSeenSeconds: dim ? max(0, Int(context.date.timeIntervalSince(peripheral.lastSeen))) : nil))
+                                .font(.caption).foregroundColor(.secondary).lineLimit(2)
                         }
                         Spacer()
                         Image(systemName: "chevron.right").font(.caption).foregroundColor(.secondary).accessibilityHidden(true)
                     }
-                    statusLine
-                    if status.title == BLERelationshipText.notOnNetwork, let onAdd {
-                        Button("Add to devices", action: onAdd).buttonStyle(.bordered).font(.subheadline)
-                            .accessibilityHint("Keeps this Bluetooth device in your Devices list")
-                    }
+                    // "Not on network" is the section title, so only a suggestion or match needs a line here.
+                    if status.title != BLERelationshipText.notOnNetwork { statusLine }
                 }
             }
             .accessibilityElement(children: .combine)
+            // Temporary add path until swipe actions land.
+            .contextMenu {
+                if status.title == BLERelationshipText.notOnNetwork, let onAdd {
+                    Button("Add to devices", systemImage: "plus.circle", action: onAdd)
+                }
+            }
             .accessibilityActions {
                 // The combined element hides the inner buttons from VoiceOver, so they come back as named actions.
                 if status.title == BLERelationshipText.notOnNetwork, let onAdd {
@@ -76,6 +75,12 @@ struct BLEPeripheralRowView: View {
     }
 
     static let dimmedIconOpacity = 0.4
+
+    /// "<company> · <type> · -86 dBm · Far", with "Last seen" replacing the proximity when the row is dimmed.
+    static func detailLine(company: String?, typeLabel: String, rssi: Int, distance: String, lastSeenSeconds: Int?) -> String {
+        let tail = lastSeenSeconds.map { "Last seen \($0)s ago" } ?? distance
+        return "\(companyLine(company: company, typeLabel: typeLabel)) · \(rssi) dBm · \(tail)"
+    }
 
     /// "<company> · <type>", or the type alone when nothing names a company.
     static func companyLine(company: String?, typeLabel: String) -> String {

@@ -35,8 +35,6 @@ struct BLEPeripheralDetailView: View {
                         peripheral: p,
                         relationship: [line],
                         onOpenDevice: { id in if scanVM.devices.contains(where: { $0.id == id }) { openDeviceID = id } },
-                        onAdd: Self.showsAdd(isLive: live != nil, savedID: p.savedID, relationshipTitle: line.title)
-                            ? { bluetoothVM.addToDevices(p.id) } : nil,
                         onReadInfo: live != nil ? { confirmingRead = true } : nil)
                     .confirmationDialog(Self.readConfirmation(name: p.displayName), isPresented: $confirmingRead, titleVisibility: .visible) {
                         Button("Read device info") { Task { await bluetoothVM.readDeviceInfo(p.id) } }
@@ -120,11 +118,6 @@ struct BLEPeripheralDetailView: View {
             }
             Button("Cancel", role: .cancel) {}
         }
-    }
-
-    /// "Add to devices" shows only for a live, unsaved row that fits no network device.
-    nonisolated static func showsAdd(isLive: Bool, savedID: UUID?, relationshipTitle: String) -> Bool {
-        isLive && savedID == nil && relationshipTitle == BLERelationshipText.notOnNetwork
     }
 
     /// The confirmation text for the one user-started connection.

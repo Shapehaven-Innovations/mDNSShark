@@ -14,7 +14,6 @@ struct BluetoothCardView: View {
     let relationship: [BLERelationshipText.Line]
     var onOpenDevice: ((UUID) -> Void)? = nil
     var onOpenPeripheral: ((UUID) -> Void)? = nil
-    var onAdd: (() -> Void)? = nil
     var onReadInfo: (() -> Void)? = nil
     var peripheralLinks: [PeripheralLink] = []
 
@@ -67,10 +66,6 @@ struct BluetoothCardView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Bluetooth details for \(link.name)")
                 .accessibilityHint("Opens what this Bluetooth device advertises")
-            }
-            if let onAdd {
-                Button("Add to devices", action: onAdd).buttonStyle(.bordered)
-                    .accessibilityHint("Keeps this Bluetooth device in your Devices list")
             }
         }
     }
