@@ -36,15 +36,9 @@ struct TopologyNode: Identifiable {
     let device: DiscoveredDevice
     var position: CGPoint
     var securityStatus: SecurityStatus
-    /// True when a nearby Bluetooth peripheral is suggested (inferred) for this device; informational only, the status never changes.
-    var hasBluetoothSuggestion: Bool
 
-    /// Name of the custom VoiceOver action that opens the device detail at its Bluetooth card.
-    static let bluetoothActionName = "Show Bluetooth details"
-
-    init(device: DiscoveredDevice, position: CGPoint = .zero, bluetoothSuggested: Bool = false) {
+    init(device: DiscoveredDevice, position: CGPoint = .zero) {
         self.id = device.id; self.device = device; self.position = position
-        self.hasBluetoothSuggestion = bluetoothSuggested
         self.securityStatus = Self.status(findings: device.securityFindings, settled: device.probesSettled, probed: device.wasProbed)
     }
 
@@ -55,12 +49,11 @@ struct TopologyNode: Identifiable {
         filters.isEmpty || filters.contains(status)
     }
 
-    /// VoiceOver text for the node: "<hostname>, <ip>, <status>[, vendor advisory][, on another network][, Bluetooth device suggested]".
+    /// VoiceOver text for the node: "<hostname>, <ip>, <status>[, vendor advisory][, on another network]".
     var accessibilityLabel: String {
         var text = "\(device.hostname), \(device.ipAddress), \(securityStatus.accessibilityName)"
         if device.securityFindings.hasVendorAdvisory { text += ", vendor advisory" }
         if device.isOnLocalSubnet == false { text += ", on another network" }
-        if hasBluetoothSuggestion { text += ", Bluetooth device suggested" }
         return text
     }
 }

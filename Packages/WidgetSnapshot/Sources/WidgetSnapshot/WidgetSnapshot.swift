@@ -88,12 +88,10 @@ public struct DeviceBrief: Codable, Equatable, Sendable {
 public struct BluetoothSummary: Codable, Equatable, Sendable {
     public var scannedAt: Date
     public var nearby: Int
-    public var suggested: Int
 
-    public init(scannedAt: Date, nearby: Int, suggested: Int) {
+    public init(scannedAt: Date, nearby: Int) {
         self.scannedAt = scannedAt
         self.nearby = nearby
-        self.suggested = suggested
     }
 }
 

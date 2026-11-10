@@ -8,9 +8,9 @@ struct BluetoothLine: View {
         /// Symbol and the pill text in a filled capsule, with no stroke so it never reads as the Scan button.
         /// Too narrow for the stale age, it shows the count only, then nothing; the spoken clause keeps both.
         case pill
-        /// Symbol and the line text, dropping the age, then "nearby", then the suggested part, then falling back to the pill.
+        /// Symbol and the line text, dropping the age, then falling back to the pill.
         case line
-        /// The line with "not assessed" in place of the suggested part, which outlasts the age and "nearby".
+        /// The line with "not assessed" after the count, which outlasts the age and "nearby".
         case securityLine
         /// Symbol and nearby count in the lock screen row's inline metrics.
         case inlineCount
@@ -33,8 +33,6 @@ struct BluetoothLine: View {
             ViewThatFits(in: .horizontal) {
                 text(model.lineText)
                 text(model.lineTextWithoutAge)
-                text(model.lineTextCompact)
-                text(model.lineTextNearbyAndAge)
                 pill
             }
         case .securityLine:

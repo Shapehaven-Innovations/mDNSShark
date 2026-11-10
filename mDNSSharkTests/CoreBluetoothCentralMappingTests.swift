@@ -11,7 +11,8 @@ import DeviceFingerprint
             CBAdvertisementDataServiceDataKey: [CBUUID(string: "FEAA"): Data([0x10])], CBAdvertisementDataTxPowerLevelKey: NSNumber(value: -4),
             CBAdvertisementDataIsConnectable: NSNumber(value: true)]
         let s = CoreBluetoothCentral.sighting(identifier: UUID(), advertisement: adv, rssi: NSNumber(value: -70), at: Date())
-        #expect(s.fields.localName == "Tile" && s.fields.serviceUUIDs == ["FEED", "180F"] && s.fields.serviceData["FEAA"] == Data([0x10]) && s.fields.txPower == -4 && s.fields.isConnectable == true && s.rssi == -70)
+        // Overflow UUIDs are best effort per Apple and stay out of the advertised list.
+        #expect(s.fields.localName == "Tile" && s.fields.serviceUUIDs == ["FEED"] && s.fields.serviceData["FEAA"] == Data([0x10]) && s.fields.txPower == -4 && s.fields.isConnectable == true && s.rssi == -70)
         #expect(s.fields.manufacturerData == Data([0x4C, 0x00]))
     }
 

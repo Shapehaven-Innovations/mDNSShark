@@ -66,6 +66,7 @@ public enum AppleContinuity {
     public static func proximityPairingModelHint(_ payload: Data) -> String? {
         let b = Array(payload)
         guard b.count >= 3 else { return nil }
-        return proximityPairingModels[UInt16(b[1]) << 8 | UInt16(b[2])]
+        let code = UInt16(b[1]) << 8 | UInt16(b[2])
+        return BLEServiceNameTable.bundledAppleProximity.name(forUUID: String(format: "%04X", code)) ?? proximityPairingModels[code]
     }
 }

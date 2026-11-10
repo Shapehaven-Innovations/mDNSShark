@@ -33,7 +33,7 @@ public enum BLEDisplayName {
     private static let legalSuffixes: Set<String> = ["inc", "ltd", "llc", "co", "corp", "corporation", "gmbh", "limited", "ag", "ab", "bv", "sa", "plc", "kg", "oy"]
 
     /// A company name without legal suffixes, for the fallback title only. The literal name stays in the subtitle.
-    static func shortCompany(_ name: String) -> String? {
+    public static func shortCompany(_ name: String) -> String? {
         var words = name.split(separator: " ").map(String.init)
         func trimmed(_ s: String) -> String { String(s.drop { ",. ".contains($0) }.reversed().drop { ",. ".contains($0) }.reversed()) }
         while words.count > 1 {

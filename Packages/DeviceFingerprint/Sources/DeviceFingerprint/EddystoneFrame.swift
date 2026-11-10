@@ -1,11 +1,13 @@
 import Foundation
 
-/// One Eddystone frame from service data for 0xFEAA.
+/// One Eddystone frame from service data for 0xFEAA, or the Google Find Hub tracker frame that shares the UUID.
 public enum EddystoneFrame: Equatable, Sendable {
     case uid(namespace: String, instance: String, txPower: Int8)
     case url(String, txPower: Int8)
     case tlm(batteryMilliVolts: UInt16?, temperatureCelsius: Double?)
     case eid
+    /// Frame type 0x40, or 0x41 when unwanted tracking protection is on; a 20 or 32 byte EID and an optional flags byte.
+    case findHub(trackingProtection: Bool)
     case unknown(UInt8)
 
     public static let serviceUUID = "FEAA"
@@ -44,6 +46,9 @@ public enum EddystoneFrame: Equatable, Sendable {
             return .tlm(batteryMilliVolts: battery, temperatureCelsius: temperature)
         case 0x30:
             return .eid
+        case 0x40, 0x41:
+            guard [21, 22, 33, 34].contains(b.count) else { return nil }
+            return .findHub(trackingProtection: type == 0x41)
         default:
             return .unknown(type)
         }

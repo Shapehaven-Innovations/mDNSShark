@@ -7,7 +7,7 @@ enum BLEScanEndReason: Equatable {
     case user, timeout, sceneInactive, powerLost
 }
 
-/// App-scoped owner of Bluetooth scanning. Bluetooth rows never flow into `DiscoveredDevice`; LAN devices are only read for suggestions.
+/// App-scoped owner of Bluetooth scanning. Bluetooth rows never flow into `DiscoveredDevice` and are never matched to LAN devices.
 @MainActor
 final class BluetoothViewModel: ObservableObject {
     static let scanDuration: TimeInterval = 25
@@ -20,8 +20,6 @@ final class BluetoothViewModel: ObservableObject {
     @Published private(set) var isScanning = false
     @Published private(set) var authorization: BLEAuthorization
     @Published private(set) var powerState: BLEPowerState = .unknown
-    @Published private(set) var matches: BLEMatchTable = .empty
-    @Published private(set) var suggestedLANDeviceIDs: Set<UUID> = []
     @Published private(set) var lastScanSummary: BluetoothSummary?
     @Published private(set) var saved: [BLESavedDevice] = []
     @Published private(set) var log: [BLEAdvertisementRecord] = []
@@ -37,12 +35,6 @@ final class BluetoothViewModel: ObservableObject {
 
     /// Published rows heard during the running scan.
     var seenThisScanCount: Int { peripherals.filter { seenThisScan.contains($0.id) }.count }
-
-    /// Published rows heard during the running scan that carry a suggestion; ties never count.
-    var seenThisScanSuggestedCount: Int {
-        let suggested = matches.suggestedPeripheralIDs
-        return peripherals.filter { seenThisScan.contains($0.id) && suggested.contains($0.id) }.count
-    }
 
     /// True while sightings wait for the next publish tick.
     var hasPendingPublish: Bool { tickTask != nil }
@@ -64,8 +56,6 @@ final class BluetoothViewModel: ObservableObject {
     /// A scan the user asked for that is still waiting on power, the prompt answer or the scene.
     private var requestedDuration: TimeInterval?
     private var seenThisScan: Set<UUID> = []
-    /// The rows counted in `lastScanSummary`, so a matcher re-run can refresh its `suggested`.
-    private var summarySeen: Set<UUID> = []
     /// The most recent CoreBluetooth identifier per row, used only for the user-started read.
     private var latestIdentifier: [UUID: UUID] = [:]
     /// Rows folded into another row, so a detail screen opened on the old id follows the device.
@@ -74,8 +64,6 @@ final class BluetoothViewModel: ObservableObject {
     private var foldedIdentifiers: [UUID: Set<UUID>] = [:]
     /// When the running scan began; a split-off row counts toward this scan only if it was heard since.
     private var scanStartedAt: Date?
-    private var candidates: [BLEMatchCandidate] = []
-    private var matchedSubjects: [BLEMatchSubject] = []
     private var sceneActive = true
     private var inactiveAt: Date?
     /// The in-flight Device Information read, owned here so scene loss or power loss can cancel it.
@@ -124,7 +112,7 @@ final class BluetoothViewModel: ObservableObject {
         return startScanIfAuthorized()
     }
 
-    /// Drops every unsaved row unseen for `BLELifecycle.dimAfter` and republishes, so suggestions and badges follow.
+    /// Drops every unsaved row unseen for `BLELifecycle.dimAfter` and republishes.
     func pruneDimmedUnsaved() {
         let removed = rows.pruneDimmedUnsaved(now: now())
         guard !removed.isEmpty else { return }
@@ -204,7 +192,6 @@ final class BluetoothViewModel: ObservableObject {
         scanStartedAt = now()
         rows.markAllStale()
         central.startScan(allowDuplicates: true)
-        // Set before `isScanning`, so the Device detail card shows suggestions made during the first scan.
         hasScannedThisSession = true
         isScanning = true
         publishNow()
@@ -222,10 +209,7 @@ final class BluetoothViewModel: ObservableObject {
         if callCentral { central?.stopScan() }
         isScanning = false
         publishNow()
-        if freeze {
-            summarySeen = seenThisScan
-            lastScanSummary = Self.summary(seenThisScan: seenThisScan, matches: matches, now: now())
-        }
+        if freeze { lastScanSummary = BluetoothSummary(scannedAt: now(), nearby: seenThisScan.count) }
         hasScannedThisSession = true
         seenThisScan = []
     }
@@ -235,7 +219,6 @@ final class BluetoothViewModel: ObservableObject {
         guard auth == .denied || auth == .restricted else { return }
         requestedDuration = nil
         if isScanning { endScan(callCentral: true, freeze: false) }
-        summarySeen = []
         if lastScanSummary != nil { lastScanSummary = nil }
     }
 
@@ -280,13 +263,12 @@ final class BluetoothViewModel: ObservableObject {
         scheduleTick()
     }
 
-    /// A removed row's read target, scan membership and summary membership move to the row that absorbed it.
+    /// A removed row's read target and scan membership move to the row that absorbed it.
     private func moveBookkeeping(from removed: UUID, to survivor: UUID, identifiers: Set<UUID>) {
         foldedIdentifiers[removed] = identifiers
         latestIdentifier[survivor] = latestIdentifier[removed] ?? latestIdentifier[survivor]
         latestIdentifier[removed] = nil
         if seenThisScan.remove(removed) != nil { seenThisScan.insert(survivor) }
-        if summarySeen.remove(removed) != nil { summarySeen.insert(survivor) }
         foldedInto[removed] = survivor
         for (old, target) in foldedInto where target == removed { foldedInto[old] = survivor }
         reattachSaved(survivor)
@@ -324,7 +306,7 @@ final class BluetoothViewModel: ObservableObject {
         tick()
     }
 
-    /// Prunes, publishes rows and the log, and re-runs the matcher only when its subjects changed.
+    /// Prunes, then publishes rows and the log.
     private func tick() {
         tickTask = nil
         let t = now()
@@ -348,8 +330,6 @@ final class BluetoothViewModel: ObservableObject {
         }
         let sorted = rows.peripherals.sorted(by: Self.displayOrder)
         if sorted != peripherals { peripherals = sorted }
-        let subjects = Self.subjects(from: peripherals.filter { $0.lifecycle(now: t) != .expired })
-        if subjects != matchedSubjects { rematch(subjects) }
     }
 
     /// Clears every per-row record of pruned rows, so no read, count or redirect points at a row that is gone.
@@ -357,7 +337,6 @@ final class BluetoothViewModel: ObservableObject {
         for id in ids {
             latestIdentifier[id] = nil
             seenThisScan.remove(id)
-            summarySeen.remove(id)
             for (old, target) in foldedInto where target == id {
                 foldedInto[old] = nil
                 foldedIdentifiers[old] = nil
@@ -370,60 +349,6 @@ final class BluetoothViewModel: ObservableObject {
         let order = a.displayName.localizedStandardCompare(b.displayName)
         if order != .orderedSame { return order == .orderedAscending }
         return a.id.uuidString < b.id.uuidString
-    }
-
-    // MARK: Matching
-
-    func updateLANDevices(_ devices: [DiscoveredDevice]) {
-        let next = Self.candidates(from: devices)
-        guard next != candidates else { return }
-        candidates = next
-        let t = now()
-        rematch(Self.subjects(from: peripherals.filter { $0.lifecycle(now: t) != .expired }))
-    }
-
-    private func rematch(_ subjects: [BLEMatchSubject]) {
-        matchedSubjects = subjects
-        let table = BLEMatcher.match(subjects: subjects, candidates: candidates)
-        if table != matches { matches = table }
-        let ids = table.suggestedDeviceIDs
-        if ids != suggestedLANDeviceIDs { suggestedLANDeviceIDs = ids }
-        if var summary = lastScanSummary {
-            let suggested = summarySeen.intersection(table.suggestedPeripheralIDs).count
-            if suggested != summary.suggested {
-                summary.suggested = suggested
-                lastScanSummary = summary
-            }
-        }
-    }
-
-    /// Matter IDs from the `_matterc._udp` TXT `VP` key, AirPlay from `_airplay._tcp` or `_raop._tcp`, HomeKit from `_hap._tcp`.
-    nonisolated static func candidates(from devices: [DiscoveredDevice]) -> [BLEMatchCandidate] {
-        devices.map { device in
-            let types = Set(device.bonjourServices.map(\.serviceType))
-            let vp = device.bonjourServices.lazy
-                .filter { $0.serviceType == "_matterc._udp" }
-                .compactMap { MatterTXT.vendorProduct($0.txtRecords) }
-                .first
-            return BLEMatchCandidate(id: device.id, name: device.hostname, manufacturer: device.manufacturer,
-                                     matterVendorID: vp?.vendorID, matterProductID: vp?.productID,
-                                     hasAirPlay: types.contains("_airplay._tcp") || types.contains("_raop._tcp"),
-                                     hasHomeKit: types.contains("_hap._tcp"))
-        }
-    }
-
-    nonisolated static func subjects(from peripherals: [BLEPeripheral]) -> [BLEMatchSubject] {
-        peripherals.map { p in
-            BLEMatchSubject(id: p.id, name: p.parsed.displayName, companyName: p.parsed.companyName,
-                            matterVendorID: p.parsed.matter?.vendorID, matterProductID: p.parsed.matter?.productID,
-                            continuity: Set(p.parsed.continuity.compactMap(\.type)), homeKitCategory: p.parsed.homeKit?.category)
-        }
-    }
-
-    /// Ties are not suggestions, so they never count.
-    nonisolated static func summary(seenThisScan: Set<UUID>, matches: BLEMatchTable, now: Date) -> BluetoothSummary {
-        BluetoothSummary(scannedAt: now, nearby: seenThisScan.count,
-                         suggested: seenThisScan.intersection(matches.suggestedPeripheralIDs).count)
     }
 
     // MARK: Saved devices

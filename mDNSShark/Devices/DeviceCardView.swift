@@ -5,8 +5,6 @@ struct DeviceCardView: View {
     let device: DiscoveredDevice
     let issueCount: Int
     let badgeColor: Color
-    /// True when a nearby Bluetooth peripheral is suggested (inferred) for this device.
-    var bluetoothSuggested: Bool = false
 
     var body: some View {
         CardView {
@@ -14,13 +12,7 @@ struct DeviceCardView: View {
                 HStack {
                     Image(systemName: device.deviceIcon).font(.title2).foregroundColor(badgeColor).frame(width: 32)
                     VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
-                            Text(device.hostname).font(.headline)
-                            if bluetoothSuggested {
-                                Image(systemName: BluetoothSymbol.name).foregroundColor(AppColors.info)
-                                    .accessibilityLabel("Bluetooth device suggested")
-                            }
-                        }
+                        Text(device.hostname).font(.headline)
                         HStack(spacing: 6) {
                             Text(device.ipAddress).font(.subheadline).foregroundColor(.secondary)
                             if device.isOnLocalSubnet == false { AppBadge(text: "Other network", color: AppColors.pending) }

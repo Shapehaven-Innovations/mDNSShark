@@ -54,6 +54,64 @@ struct BLEPeripheralSetTests {
         #expect(set.peripherals[0].lastSeen == t0 + 30)
     }
 
+    @Test func sameNameWithAndWithoutCompanyIsOneRowAndStaysOneWhenBothAreHeard() {
+        var set = BLEPeripheralSet()
+        let withCompany = UUID(), withoutCompany = UUID()
+        ingest(&set, sighting(withCompany, name: "LE-Bose", company: 0x004C, at: t0))
+        ingest(&set, sighting(withoutCompany, name: "LE-Bose", company: nil, at: t0 + 1))
+        for i in 0..<4 {
+            ingest(&set, sighting(withCompany, name: "LE-Bose", company: 0x004C, at: t0 + 3 + Double(i)))
+            ingest(&set, sighting(withoutCompany, name: "LE-Bose", company: nil, at: t0 + 3.5 + Double(i)))
+        }
+        #expect(set.peripherals.count == 1)
+        #expect(set.peripherals[0].identifiers == [withCompany, withoutCompany])
+    }
+
+    @Test func namelessRowsGetATitleFromFramesNotUnnamed() {
+        var set = BLEPeripheralSet()
+        let tile = UUID(), plain = UUID(), apple = UUID()
+        ingest(&set, sighting(tile, company: nil, serviceData: ["FEED": Data([0x02, 0x00])]))
+        ingest(&set, sighting(plain, company: nil))
+        let appleFields = BLEAdvertisementFields(txPower: 12, isConnectable: true)
+        set.ingest(BLESighting(identifier: apple, fields: appleFields, rssi: -70, at: t0), parsed: parser.parse(appleFields))
+        let titles = Dictionary(uniqueKeysWithValues: set.peripherals.map { ($0.identifiers.first!, $0.displayName) })
+        #expect(titles[tile] == "Tile tracker")
+        #expect(titles[apple] == "Possibly Apple device")
+        #expect(titles[plain]?.hasPrefix("Bluetooth device") == true)
+    }
+
+    @Test func readAppleModelTitlesTheRowAndTypesIt() {
+        var set = BLEPeripheralSet()
+        let id = UUID()
+        let row = ingest(&set, sighting(id, company: nil))
+        set.update(row) { $0.deviceInfo = BLEDeviceInfo(manufacturer: "Apple Inc.", model: "iPhone14,3", firmware: nil, batteryPercent: nil) }
+        let p = set.peripherals[0]
+        #expect(p.displayName == "iPhone 13 Pro Max")
+        #expect(p.kind == .phone)
+    }
+
+    @Test func heartRateMeasurementDecodesEightAndSixteenBitValues() {
+        #expect(CoreBluetoothCentral.heartRate(from: Data([0x00, 72])) == 72)
+        #expect(CoreBluetoothCentral.heartRate(from: Data([0x01, 0x2C, 0x01])) == 300)
+        #expect(CoreBluetoothCentral.heartRate(from: Data([0x01, 0x2C])) == nil)
+        var info = BLEDeviceInfo()
+        CoreBluetoothCentral.apply(Data([0x00, 0]), characteristic: "2A37", to: &info)
+        #expect(info.heartRateBPM == nil)
+        CoreBluetoothCentral.apply(Data([0x00, 64]), characteristic: "2A37", to: &info)
+        #expect(info.heartRateBPM == 64)
+    }
+
+    @Test func bundledTablesLabelXiaomiHomeAssistantAndAirPodsFrames() {
+        let xiaomi = BLEAdvertisementFields(serviceData: ["FE95": Data([0x30, 0x58, 0xAA, 0x01, 0x00])])
+        #expect(parser.parse(xiaomi).hint?.label.hasPrefix("Xiaomi") == true)
+        #expect(parser.parse(xiaomi).kind == .smartHome)
+
+        let thermoBeacon = BLEAdvertisementFields(manufacturerData: Data([0x10, 0x00, 0x00, 0x01]), serviceUUIDs: ["FFF0"])
+        #expect(parser.parse(thermoBeacon).hint?.label == "ThermoBeacon sensor")
+
+        #expect(AppleContinuity.proximityPairingModelHint(Data([0x01, 0x14, 0x20])) == "AirPods Pro (2nd generation)")
+    }
+
     @Test func ambiguousNameDoesNotCoalesce() {
         var set = BLEPeripheralSet()
         let a = UUID(), b = UUID()

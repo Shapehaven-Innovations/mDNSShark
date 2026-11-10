@@ -14,8 +14,16 @@ final class BLEFrameParserTests: XCTestCase {
     func test_eddystoneUIDAndUnknown() {
         let uid = Data([0x00, 0xE7] + [UInt8](repeating: 0xAB, count: 10) + [UInt8](repeating: 0x01, count: 6))
         XCTAssertEqual(EddystoneFrame.parse(serviceData: uid), .uid(namespace: String(repeating: "AB", count: 10), instance: "010101010101", txPower: -25))
-        XCTAssertEqual(EddystoneFrame.parse(serviceData: Data([0x40, 0x00])), .unknown(0x40))
+        XCTAssertEqual(EddystoneFrame.parse(serviceData: Data([0x50, 0x00])), .unknown(0x50))
         XCTAssertNil(EddystoneFrame.parse(serviceData: Data()))
+    }
+    func test_findHubFrameNeedsAFullEID() {
+        let eid20 = [UInt8](repeating: 0xAB, count: 20), eid32 = [UInt8](repeating: 0xCD, count: 32)
+        XCTAssertEqual(EddystoneFrame.parse(serviceData: Data([0x40] + eid20)), .findHub(trackingProtection: false))
+        XCTAssertEqual(EddystoneFrame.parse(serviceData: Data([0x41] + eid20 + [0x01])), .findHub(trackingProtection: true))
+        XCTAssertEqual(EddystoneFrame.parse(serviceData: Data([0x40] + eid32 + [0x00])), .findHub(trackingProtection: false))
+        XCTAssertNil(EddystoneFrame.parse(serviceData: Data([0x40, 0x00])))
+        XCTAssertNil(EddystoneFrame.parse(serviceData: Data([0x41] + eid20 + [0x01, 0x02])))
     }
     func test_fastPairModelOnlyForThreeBytes() {
         XCTAssertEqual(FastPairAdvertisement.parse(serviceData: Data([0x2C, 0xFE, 0x01]))?.modelID, 0x2CFE01)

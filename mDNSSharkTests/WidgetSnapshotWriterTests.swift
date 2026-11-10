@@ -331,7 +331,7 @@ struct WidgetSnapshotWriterTests {
         #expect(rec.kinds.suffix(WidgetKind.scanKinds.count) == ArraySlice(WidgetKind.scanKinds))
     }
 
-    private let summary = BluetoothSummary(scannedAt: Date(timeIntervalSince1970: 1_800_000_100), nearby: 5, suggested: 2)
+    private let summary = BluetoothSummary(scannedAt: Date(timeIntervalSince1970: 1_800_000_100), nearby: 5)
 
     private func btInput(_ update: BluetoothSnapshotUpdate) -> WidgetSnapshotWriter.Input {
         var i = input([device("192.168.1.1")])
@@ -376,8 +376,8 @@ struct WidgetSnapshotWriterTests {
         rec.kinds.removeAll()
         clock.date = t0.addingTimeInterval(120)
         // A different summary each time, so only the debounce can collapse them, and the last one must win.
-        let first = BluetoothSummary(scannedAt: summary.scannedAt, nearby: 3, suggested: 0)
-        let second = BluetoothSummary(scannedAt: summary.scannedAt, nearby: 4, suggested: 1)
+        let first = BluetoothSummary(scannedAt: summary.scannedAt, nearby: 3)
+        let second = BluetoothSummary(scannedAt: summary.scannedAt, nearby: 4)
         for update in [first, second, summary] {
             writer.scheduleRewrite { self.btInput(.set(update)) }
             try await Task.sleep(for: .milliseconds(10))
@@ -394,7 +394,7 @@ struct WidgetSnapshotWriterTests {
     func unchangedRewriteSavesNothing(fraction: Double) async throws {
         let store = tempStore(), rec = Recorder(), clock = Clock(t0)
         let writer = makeWriter(store: store, recorder: rec, clock: clock)
-        let summary = BluetoothSummary(scannedAt: self.summary.scannedAt.addingTimeInterval(fraction), nearby: 5, suggested: 2)
+        let summary = BluetoothSummary(scannedAt: self.summary.scannedAt.addingTimeInterval(fraction), nearby: 5)
         writer.scanDidFinish(btInput(.set(summary)))
         let file = store.directory.appendingPathComponent(SnapshotStore.snapshotFile)
         let before = try Data(contentsOf: file)

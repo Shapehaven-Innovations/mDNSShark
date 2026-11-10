@@ -207,10 +207,10 @@ struct WidgetModelsTests {
 
     func withBluetooth(ago: Double = 120) -> WidgetSnapshot {
         var s = snapshot()
-        s.bluetooth = BluetoothSummary(scannedAt: scan.addingTimeInterval(720 - ago), nearby: 7, suggested: 2)
+        s.bluetooth = BluetoothSummary(scannedAt: scan.addingTimeInterval(720 - ago), nearby: 7)
         return s
     }
-    let clause = "7 Bluetooth devices nearby, 2 suggested as network devices, inferred, Bluetooth scanned 2 minutes ago"
+    let clause = "7 Bluetooth devices nearby, Bluetooth scanned 2 minutes ago"
 
     @Test("devices small and medium labels insert the Bluetooth clause before scan running")
     func devicesSmallAndMediumLabelsInsertClauseBeforeRunning() {
@@ -228,9 +228,9 @@ struct WidgetModelsTests {
         guard case .loaded(let fresh) = ScanNowWidgetModel.make(.loaded(withBluetooth()), now: scan.addingTimeInterval(720), isScanRunning: true) else { Issue.record("not loaded"); return }
         #expect(fresh.accessibilityLabel == "Last scan 12 minutes ago, 14 devices, 9 secure, 2 warning, 1 critical, 2 not probed, 192.168.1.0/24. " + clause + ", scan running")
         var s = snapshot()
-        s.bluetooth = BluetoothSummary(scannedAt: scan.addingTimeInterval(3 * 3600 - 600), nearby: 7, suggested: 0)
+        s.bluetooth = BluetoothSummary(scannedAt: scan.addingTimeInterval(3 * 3600 - 600), nearby: 7)
         guard case .loaded(let stale) = ScanNowWidgetModel.make(.loaded(s), now: scan.addingTimeInterval(3 * 3600 + 5), isScanRunning: false) else { Issue.record("not loaded"); return }
         #expect(stale.isStale && stale.bluetooth?.isStale == false)
-        #expect(stale.accessibilityLabel == "Out of date, scanned 3 hours ago, 14 devices, 9 secure, 2 warning, 1 critical, 2 not probed, may differ. 7 Bluetooth devices nearby, none suggested, Bluetooth scanned 10 minutes ago")
+        #expect(stale.accessibilityLabel == "Out of date, scanned 3 hours ago, 14 devices, 9 secure, 2 warning, 1 critical, 2 not probed, may differ. 7 Bluetooth devices nearby, Bluetooth scanned 10 minutes ago")
     }
 }

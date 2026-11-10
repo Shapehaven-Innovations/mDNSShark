@@ -5,14 +5,12 @@ import DeviceFingerprint
 /// Detail for one Bluetooth peripheral, re-read from `BluetoothViewModel` on every body pass so it stays live.
 struct BLEPeripheralDetailView: View {
     @EnvironmentObject var bluetoothVM: BluetoothViewModel
-    @EnvironmentObject var scanVM: NetworkScanViewModel
     @Environment(\.dismiss) private var dismiss
     let peripheralID: UUID
     /// The last live row seen, used only once the row has left the live list.
     @State private var lastKnown: BLEPeripheral?
     @State private var confirmingRead = false
     @State private var confirmingForget = false
-    @State private var openDeviceID: UUID?
 
     init(peripheralID: UUID) { self.peripheralID = peripheralID }
 
@@ -29,13 +27,8 @@ struct BLEPeripheralDetailView: View {
                     Spacer()
                 }
                 if let p = peripheral {
-                    let line = relationship(for: p)
                     header(p, isLive: live != nil)
-                    BluetoothCardView(
-                        peripheral: p,
-                        relationship: [line],
-                        onOpenDevice: { id in if scanVM.devices.contains(where: { $0.id == id }) { openDeviceID = id } },
-                        onReadInfo: live != nil ? { confirmingRead = true } : nil)
+                    BluetoothCardView(peripheral: p, onReadInfo: live != nil ? { confirmingRead = true } : nil)
                     .confirmationDialog(Self.readConfirmation(name: p.displayName), isPresented: $confirmingRead, titleVisibility: .visible) {
                         Button("Read device info") { Task { await bluetoothVM.readDeviceInfo(p.id) } }
                         Button("Cancel", role: .cancel) {}
@@ -50,18 +43,7 @@ struct BLEPeripheralDetailView: View {
             .padding(.horizontal).padding(.vertical, 8)
         }
         .toolbar(.hidden, for: .navigationBar)
-        .navigationDestination(item: $openDeviceID) { id in
-            if let device = scanVM.devices.first(where: { $0.id == id }) { DeviceDetailView(device: device) }
-        }
         .onChange(of: live, initial: true) { _, row in if let row { lastKnown = row } }
-    }
-
-    private func relationship(for p: BLEPeripheral) -> BLERelationshipText.Line {
-        let devices = scanVM.devices
-        return BLERelationshipText.forPeripheral(
-            peripheralID: p.id, table: bluetoothVM.matches, isSaved: p.savedID != nil,
-            deviceName: { id in devices.first { $0.id == id }?.hostname ?? "Unknown device" },
-            deviceIP: { id in devices.first { $0.id == id }?.ipAddress })
     }
 
     @ViewBuilder private func header(_ p: BLEPeripheral, isLive: Bool) -> some View {
@@ -122,6 +104,6 @@ struct BLEPeripheralDetailView: View {
 
     /// The confirmation text for the one user-started connection.
     nonisolated static func readConfirmation(name: String) -> String {
-        "mDNSShark will connect to \(name) once, read its Device Information and Battery services, and disconnect within 5 seconds. Nothing is written to the device."
+        "mDNSShark will connect to \(name) once, read its Device Information and Battery services, listen for one heart rate measurement if it has a Heart Rate service, and disconnect within 5 seconds. Nothing is written to the device."
     }
 }

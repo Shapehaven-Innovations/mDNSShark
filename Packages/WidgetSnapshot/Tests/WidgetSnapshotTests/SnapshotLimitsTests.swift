@@ -94,7 +94,7 @@ struct SnapshotLimitsTests {
     @Test("trimmedToFit never drops the Bluetooth summary")
     func trimmedToFitKeepsBluetooth() {
         var s = Self.big()
-        let summary = BluetoothSummary(scannedAt: Date(timeIntervalSince1970: 90), nearby: 4, suggested: 1)
+        let summary = BluetoothSummary(scannedAt: Date(timeIntervalSince1970: 90), nearby: 4)
         s.bluetooth = summary
         let out = s.trimmedToFit(maxBytes: 200)
         #expect(out.bluetooth == summary)

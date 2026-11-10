@@ -41,22 +41,6 @@ import WidgetSnapshot
         #expect(vm.lastScanSummary == frozen)
     }
 
-    @Test func matcherRerunChangesOnlySuggested() async throws {
-        let (vm, factory, _) = H.makeVM()
-        vm.startScanIfAuthorized()
-        factory.fake.subject.send(.sighting(H.sighting(name: "Sonos Roam", company: H.sonos)))
-        try await H.settle(vm)
-        vm.stopScan(reason: .user)
-        let frozen = try #require(vm.lastScanSummary)
-        #expect(frozen.suggested == 0)
-        vm.updateLANDevices([H.lan("Sonos Roam")])
-        #expect(vm.lastScanSummary?.suggested == 1)
-        #expect(vm.lastScanSummary?.nearby == frozen.nearby)
-        #expect(vm.lastScanSummary?.scannedAt == frozen.scannedAt)
-        vm.updateLANDevices([])
-        #expect(vm.lastScanSummary == frozen)
-    }
-
     @Test func widgetUpdateTable() async throws {
         let (vm, factory, auth) = H.makeVM()
         #expect(vm.widgetUpdate() == .keep)
@@ -86,10 +70,6 @@ import WidgetSnapshot
         for i in 0..<20 { factory.fake.subject.send(.sighting(H.sighting(id, name: "Sonos Roam", company: H.sonos, rssi: -40 - i))) }
         try await H.settle(vm)
         #expect(received.value.isEmpty)
-        // A suggestion change does reach the sink, with the new value rather than the old one.
-        vm.updateLANDevices([H.lan("Sonos Roam")])
-        #expect(received.value.count == 1)
-        if case .set(let s)? = received.value.first { #expect(s.suggested == 1) } else { Issue.record("expected .set") }
         sink.cancel()
     }
 }

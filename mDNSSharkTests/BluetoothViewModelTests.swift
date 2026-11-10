@@ -33,10 +33,6 @@ enum BLEVMHarness {
         return BLESighting(identifier: id, fields: BLEAdvertisementFields(localName: name, manufacturerData: mfg), rssi: rssi, at: at)
     }
 
-    static func lan(_ name: String, manufacturer: String? = "Sonos, Inc.", services: [BonjourService] = []) -> DiscoveredDevice {
-        DiscoveredDevice(hostname: name, ipAddress: "192.168.1.\(Int.random(in: 2...250))", manufacturer: manufacturer, bonjourServices: services)
-    }
-
     /// Polls until `condition` holds or `timeout` passes, so slow parallel runs do not race fixed sleeps.
     static func waitUntil(_ timeout: Duration = .seconds(30), _ condition: () -> Bool) async throws {
         let clock = ContinuousClock()
@@ -315,8 +311,7 @@ enum BLEVMHarness {
         try await H.settle(both)
         #expect(both.peripherals.count == 2)
         #expect(both.peripherals.filter { $0.savedID == saved.id }.count == 1)
-        let plan = DevicesListPlan.make(filter: .bluetooth, devices: [], peripherals: both.peripherals, saved: both.saved,
-                                        matches: both.matches, now: t0 + 204)
+        let plan = DevicesListPlan.make(filter: .bluetooth, devices: [], peripherals: both.peripherals, saved: both.saved, now: t0 + 204)
         #expect(!plan.sections.flatMap(\.rows).contains(.saved(try #require(both.saved.first))))
     }
 
@@ -398,38 +393,20 @@ enum BLEVMHarness {
         #expect(factory.fake.cancelledReads == 1)
     }
 
-    @Test func expiredSavedRowGivesNoSuggestionAfterTick() async throws {
+    @Test func expiredSavedRowIsKeptAfterTick() async throws {
         let t0 = Date(timeIntervalSince1970: 1_800_000_000)
         let clock = Box(t0)
         let (vm, factory, _) = H.makeVM(now: { clock.value })
-        vm.updateLANDevices([H.lan("Sonos Roam")])
         vm.startScanIfAuthorized()
         factory.fake.subject.send(.sighting(H.sighting(name: "Sonos Roam", company: H.sonos, at: t0)))
         try await H.settle(vm)
         vm.addToDevices(try #require(vm.peripherals.first).id)
-        #expect(!vm.suggestedLANDeviceIDs.isEmpty)
         vm.stopScan(reason: .user)
         clock.value = t0 + 400
         vm.scenePhaseChanged(isActive: false)
         vm.scenePhaseChanged(isActive: true)
         #expect(vm.peripherals.count == 1)
-        #expect(vm.suggestedLANDeviceIDs.isEmpty)
-        #expect(vm.matches == .empty)
-    }
-
-    @Test func suggestionDuringFirstScanReachesDeviceDetail() async throws {
-        let (vm, factory, _) = H.makeVM()
-        let lan = H.lan("Sonos Roam")
-        vm.updateLANDevices([lan])
-        vm.startScanIfAuthorized()
         #expect(vm.hasScannedThisSession)
-        factory.fake.subject.send(.sighting(H.sighting(name: "Sonos Roam", company: H.sonos)))
-        try await H.settle(vm)
-        #expect(vm.isScanning)
-        let lines = BLERelationshipText.forLANDevice(deviceID: lan.id, table: vm.matches, peripheralName: { _ in "Sonos Roam" },
-                                                     deviceName: { _ in "" }, scanRanThisSession: vm.hasScannedThisSession)
-        #expect(lines?.first?.peripheralID != nil)
-        #expect(vm.seenThisScanSuggestedCount == 1)
     }
 
     @Test func timeoutEndsScanAndFreezesSummary() async throws {
@@ -477,49 +454,6 @@ enum BLEVMHarness {
         #expect(p.markedStale)
         #expect(p.lifecycle(now: t0 + 1010) == .dim)
         #expect(p.lastSeen == t0)
-    }
-
-    @Test func matcherSuggestsAndBadgesLANDevice() async throws {
-        let (vm, factory, _) = H.makeVM()
-        let lan = H.lan("Sonos Roam")
-        vm.updateLANDevices([lan])
-        vm.startScanIfAuthorized()
-        factory.fake.subject.send(.sighting(H.sighting(name: "Sonos Roam", company: H.sonos)))
-        try await H.settle(vm)
-        #expect(vm.suggestedLANDeviceIDs == [lan.id])
-        let row = try #require(vm.peripherals.first)
-        #expect(vm.matches.suggestion(forPeripheral: row.id)?.tier == .strong)
-        #expect(vm.matches.suggestion(forPeripheral: row.id)?.deviceID == lan.id)
-    }
-
-    @Test func tieIsNotCountedAsSuggested() async throws {
-        let (vm, factory, _) = H.makeVM()
-        vm.updateLANDevices([H.lan("Sonos Roam"), H.lan("Sonos Roam (2)")])
-        vm.startScanIfAuthorized()
-        factory.fake.subject.send(.sighting(H.sighting(name: "Roam", company: H.sonos)))
-        try await H.settle(vm)
-        #expect(vm.suggestedLANDeviceIDs.isEmpty)
-        #expect(vm.matches.ties.count == 1)
-        vm.stopScan(reason: .user)
-        #expect(vm.lastScanSummary?.suggested == 0)
-        #expect(vm.lastScanSummary?.nearby == 1)
-    }
-
-    @Test func matterVPReadFromTXT() throws {
-        let matter = H.lan("Plug", manufacturer: nil, services: [
-            BonjourService(serviceType: "_matterc._udp", serviceName: "8E4F", port: 5540, txtRecords: ["VP": "65521+32769"])])
-        let speaker = H.lan("Speaker", services: [
-            BonjourService(serviceType: "_raop._tcp", serviceName: "AA@Speaker", port: 7000),
-            BonjourService(serviceType: "_hap._tcp", serviceName: "Speaker", port: 8080)])
-        let candidates = BluetoothViewModel.candidates(from: [matter, speaker])
-        try #require(candidates.count == 2)
-        #expect(candidates[0].id == matter.id)
-        #expect(candidates[0].matterVendorID == 65521)
-        #expect(candidates[0].matterProductID == 32769)
-        #expect(candidates[0].hasAirPlay == false && candidates[0].hasHomeKit == false)
-        #expect(candidates[1].name == "Speaker" && candidates[1].manufacturer == "Sonos, Inc.")
-        #expect(candidates[1].matterVendorID == nil)
-        #expect(candidates[1].hasAirPlay && candidates[1].hasHomeKit)
     }
 
     @Test func addToDevicesSavesStableFieldsAndMarksRow() async throws {

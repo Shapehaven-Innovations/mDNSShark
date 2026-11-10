@@ -20,42 +20,33 @@ import DeviceFingerprint
 
     func saved(_ name: String) -> BLESavedDevice { BLESavedDevice(peripheral: peripheral(name), now: now) }
 
-    /// d1, d2 on the LAN; p1 suggested for d1; p2 unmatched; p3 a tie between d1 and d2; s1 saved with no live row.
+    /// d1, d2 on the LAN; p1, p2 live and unsaved; s1 saved with no live row.
     struct Fixture {
         var d1: DiscoveredDevice, d2: DiscoveredDevice
-        var p1: BLEPeripheral, p2: BLEPeripheral, p3: BLEPeripheral
+        var p1: BLEPeripheral, p2: BLEPeripheral
         var s1: BLESavedDevice
-        var table: BLEMatchTable
     }
 
     func fixture() -> Fixture {
-        let d1 = lan("tv"), d2 = lan("speaker")
-        let p1 = peripheral("TV"), p2 = peripheral("Watch"), p3 = peripheral("Roam")
-        let table = BLEMatchTable(
-            suggestions: [BLESuggestion(peripheralID: p1.id, deviceID: d1.id, tier: .strong, caption: "Inferred, not confirmed: same name, same vendor.")],
-            ties: [BLETie(peripheralID: p3.id, deviceIDs: [d1.id, d2.id], tier: .possible)])
-        return Fixture(d1: d1, d2: d2, p1: p1, p2: p2, p3: p3, s1: saved("Old lamp"), table: table)
+        Fixture(d1: lan("tv"), d2: lan("speaker"), p1: peripheral("TV"), p2: peripheral("Watch"), s1: saved("Old lamp"))
     }
 
-    func plan(_ filter: DevicesFilter, _ f: Fixture, peripherals: [BLEPeripheral]? = nil, saved: [BLESavedDevice]? = nil,
-              table: BLEMatchTable? = nil) -> DevicesListPlan {
-        DevicesListPlan.make(filter: filter, devices: [f.d1, f.d2], peripherals: peripherals ?? [f.p1, f.p2, f.p3],
-                             saved: saved ?? [f.s1], matches: table ?? f.table, now: now)
+    func plan(_ filter: DevicesFilter, _ f: Fixture, peripherals: [BLEPeripheral]? = nil, saved: [BLESavedDevice]? = nil) -> DevicesListPlan {
+        DevicesListPlan.make(filter: filter, devices: [f.d1, f.d2], peripherals: peripherals ?? [f.p1, f.p2],
+                             saved: saved ?? [f.s1], now: now)
     }
 
-    @Test func allAttachesSuggestedAndListsTheRest() {
+    @Test func allListsLANThenLiveThenSaved() {
         let f = fixture()
         let p = plan(.all, f)
         #expect(p.sections.count == 1 && p.sections[0].title == "")
-        #expect(p.sections.flatMap(\.rows) == [.lan(f.d1, bluetoothSuggested: true), .lan(f.d2, bluetoothSuggested: false),
-                                               .peripheral(f.p2), .peripheral(f.p3), .saved(f.s1)])
-        #expect(!p.sections.flatMap(\.rows).contains(.peripheral(f.p1)))
+        #expect(p.sections.flatMap(\.rows) == [.lan(f.d1), .lan(f.d2), .peripheral(f.p1), .peripheral(f.p2), .saved(f.s1)])
         #expect(!p.isEmpty)
     }
 
-    @Test func lanFilterKeepsFlagOnly() {
+    @Test func lanFilterListsLANOnly() {
         let f = fixture()
-        #expect(plan(.lan, f).sections.flatMap(\.rows) == [.lan(f.d1, bluetoothSuggested: true), .lan(f.d2, bluetoothSuggested: false)])
+        #expect(plan(.lan, f).sections.flatMap(\.rows) == [.lan(f.d1), .lan(f.d2)])
     }
 
     @Test func bluetoothSectionsAndTitles() {
@@ -63,23 +54,18 @@ import DeviceFingerprint
         var s4 = saved("Desk lamp")
         s4.id = UUID()
         let p4 = peripheral("Desk lamp", savedID: s4.id)
-        let p = plan(.bluetooth, f, peripherals: [f.p1, f.p2, f.p3, p4], saved: [f.s1, s4])
-        #expect(p.sections.map(\.title) == ["Suggested on your network", "Not on network", "Saved"])
-        #expect(p.sections[0].rows == [.peripheral(f.p1)])
-        #expect(p.sections[1].rows == [.peripheral(f.p2), .peripheral(f.p3)])
-        #expect(p.sections[2].rows == [.peripheral(p4), .saved(f.s1)])
-    }
-
-    @Test func emptySuggestedSectionIsOmitted() {
-        let f = fixture()
-        #expect(plan(.bluetooth, f, table: .empty).sections.map(\.title) == ["Not on network", "Saved"])
+        let p = plan(.bluetooth, f, peripherals: [f.p1, f.p2, p4], saved: [f.s1, s4])
+        // The live rows carry no header; only Saved is titled.
+        #expect(p.sections.map(\.title) == ["", "Saved"])
+        #expect(p.sections[0].rows == [.peripheral(f.p1), .peripheral(f.p2)])
+        #expect(p.sections[1].rows == [.peripheral(p4), .saved(f.s1)])
     }
 
     @Test func expiredPeripheralsAreHidden() {
         let f = fixture()
         let old = peripheral("Gone", lastSeen: now.addingTimeInterval(-121))
         for filter in DevicesFilter.allCases {
-            let rows = plan(filter, f, peripherals: [f.p1, f.p2, f.p3, old]).sections.flatMap(\.rows)
+            let rows = plan(filter, f, peripherals: [f.p1, f.p2, old]).sections.flatMap(\.rows)
             #expect(!rows.contains(.peripheral(old)), "\(filter)")
         }
     }
@@ -87,48 +73,38 @@ import DeviceFingerprint
     @Test func savedLiveRowIsNotDuplicated() {
         let f = fixture()
         let p4 = peripheral("Old lamp", savedID: f.s1.id)
-        let rows = plan(.all, f, peripherals: [f.p1, f.p2, f.p3, p4]).sections.flatMap(\.rows)
+        let rows = plan(.all, f, peripherals: [f.p1, f.p2, p4]).sections.flatMap(\.rows)
         #expect(rows.filter { $0 == .peripheral(p4) }.count == 1)
         #expect(!rows.contains(.saved(f.s1)))
     }
 
-    /// Every kind of row at once: suggested, suggested and saved, tied, unsuggested, saved and live, saved only,
-    /// and a saved row that has expired.
+    /// Every kind of row at once: unsaved, saved and live, saved only, and a saved row that has expired.
     @Test func noDuplicatesForEveryFilter() {
         let f = fixture()
         var s4 = saved("Desk lamp"); s4.id = UUID()
         var s5 = saved("Garage"); s5.id = UUID()
-        var s6 = saved("Speaker"); s6.id = UUID()
         let p4 = peripheral("Desk lamp", savedID: s4.id)
         let p5 = peripheral("Garage", savedID: s5.id, lastSeen: now.addingTimeInterval(-400))
-        let p6 = peripheral("Speaker", savedID: s6.id)
-        let table = BLEMatchTable(
-            suggestions: f.table.suggestions + [BLESuggestion(peripheralID: p6.id, deviceID: f.d2.id, tier: .possible, caption: "Inferred: similar name, same vendor.")],
-            ties: f.table.ties)
-        let peripherals = [f.p1, f.p2, f.p3, p4, p5, p6]
-        let savedEntries = [f.s1, s4, s5, s6]
+        let peripherals = [f.p1, f.p2, p4, p5]
+        let savedEntries = [f.s1, s4, s5]
         let nearby = BluetoothViewModel.nearbyCount(peripherals: peripherals, now: now)
-        #expect(nearby == 5)
+        #expect(nearby == 3)
 
         for filter in DevicesFilter.allCases {
-            let rows = plan(filter, f, peripherals: peripherals, saved: savedEntries, table: table).sections.flatMap(\.rows)
+            let rows = plan(filter, f, peripherals: peripherals, saved: savedEntries).sections.flatMap(\.rows)
             // (a) Row ids are unique.
             #expect(Set(rows.map(\.id)).count == rows.count, "\(filter)")
             // (b) A saved entry is never drawn beside its live row.
             for case .saved(let entry) in rows {
                 #expect(!rows.contains { if case .peripheral(let p) = $0 { return p.savedID == entry.id } else { return false } }, "\(filter)")
             }
-            // (d) The tied peripheral appears at most once, and exactly once wherever peripherals are listed.
-            let tied = rows.filter { $0 == .peripheral(f.p3) }.count
-            #expect(tied == (filter == .lan ? 0 : 1), "\(filter)")
             let peripheralRows = rows.filter { if case .peripheral = $0 { return true } else { return false } }
             switch filter {
             case .all:
-                // (c) A suggested peripheral is a line on its LAN row, never an extra row.
-                #expect(!peripheralRows.contains { if case .peripheral(let p) = $0 { return table.suggestedPeripheralIDs.contains(p.id) } else { return false } })
                 #expect(rows.filter { if case .lan = $0 { return true } else { return false } }.count == 2)
+                #expect(peripheralRows.count == nearby)
             case .bluetooth:
-                // (e) Every non-expired peripheral is listed exactly once, matching the header count.
+                // (c) Every non-expired peripheral is listed exactly once, matching the status line count.
                 #expect(peripheralRows.count == nearby)
                 #expect(Set(peripheralRows.map(\.id)).count == nearby)
             case .lan:
@@ -176,5 +152,14 @@ import DeviceFingerprint
         #expect(BLEPeripheralRowView.companyLine(company: nil, typeLabel: "Unknown") == "Unknown type")
         #expect(BLEPeripheralRowView.companyLine(company: "Apple, Inc.", typeLabel: "Earbuds") == "Apple, Inc. · Earbuds")
         #expect(BLEPeripheralRowView.companyLine(company: nil, typeLabel: "Speaker") == "Speaker")
+    }
+}
+
+@Suite("Bluetooth scan status line") struct BLEScanStatusLineTests {
+    @Test func wording() {
+        #expect(DevicesView.scanningText(found: 12) == "Scanning · 12 found")
+        let idle = DevicesView.idleText(nearby: 40, scannedAt: Date(timeIntervalSince1970: 1_800_000_000))
+        #expect(idle.hasPrefix("40 nearby · Last scan "))
+        #expect(idle.count > "40 nearby · Last scan ".count)
     }
 }

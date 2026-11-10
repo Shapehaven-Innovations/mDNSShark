@@ -3,74 +3,44 @@ import SwiftUI
 import DeviceFingerprint
 
 /// One live Bluetooth peripheral in the Devices list.
+/// `now` comes from the list's single TimelineView: a TimelineView inside every List cell kept the main thread busy, so the list could not scroll.
 struct BLEPeripheralRowView: View {
     let peripheral: BLEPeripheral
-    let status: BLERelationshipText.Line
+    let now: Date
+    /// Nil for a row that is already saved.
     var onAdd: (() -> Void)?
-    var onOpenDevice: ((UUID) -> Void)?
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 5)) { context in
-            let dim = peripheral.lifecycle(now: context.date) == .dim
-            CardView {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 12) {
-                        // Only the icon dims, so the text keeps full contrast.
-                        Image(systemName: peripheral.icon).font(.title3).foregroundColor(AppColors.info).frame(width: 28)
-                            .opacity(dim ? Self.dimmedIconOpacity : 1)
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 6) {
-                                Text(peripheral.displayName).font(.body.weight(.semibold)).lineLimit(1)
-                                Image(systemName: BluetoothSymbol.name).font(.caption).foregroundColor(AppColors.info)
-                                    .accessibilityLabel("Bluetooth")
-                            }
-                            Text(Self.detailLine(company: peripheral.parsed.companyName, typeLabel: peripheral.typeLabel,
-                                                 rssi: peripheral.rssi, distance: peripheral.distance.label,
-                                                 lastSeenSeconds: dim ? max(0, Int(context.date.timeIntervalSince(peripheral.lastSeen))) : nil))
-                                .font(.caption).foregroundColor(.secondary).lineLimit(2)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right").font(.caption).foregroundColor(.secondary).accessibilityHidden(true)
+        let dim = peripheral.lifecycle(now: now) == .dim
+        CardView {
+            HStack(spacing: 12) {
+                // Only the icon dims, so the text keeps full contrast.
+                Image(systemName: peripheral.icon).font(.title3).foregroundColor(AppColors.info).frame(width: 28)
+                    .opacity(dim ? Self.dimmedIconOpacity : 1)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(peripheral.displayName).font(.body.weight(.semibold)).lineLimit(1)
+                        Image(systemName: BluetoothSymbol.name).font(.caption).foregroundColor(AppColors.info)
+                            .accessibilityLabel("Bluetooth")
                     }
-                    // "Not on network" is the section title, so only a suggestion or match needs a line here.
-                    if status.title != BLERelationshipText.notOnNetwork { statusLine }
+                    Text(Self.detailLine(company: peripheral.parsed.companyName, typeLabel: peripheral.typeLabel,
+                                         rssi: peripheral.rssi, distance: peripheral.distance.label,
+                                         lastSeenSeconds: dim ? max(0, Int(now.timeIntervalSince(peripheral.lastSeen))) : nil))
+                        .font(.caption).foregroundColor(.secondary).lineLimit(2)
                 }
-            }
-            .accessibilityElement(children: .combine)
-            // Same action as the leading swipe, for rows reached some other way.
-            .contextMenu {
-                if status.title == BLERelationshipText.notOnNetwork, let onAdd {
-                    Button("Add to devices", systemImage: "plus.circle", action: onAdd)
-                }
-            }
-            .accessibilityActions {
-                // The combined element hides the inner buttons from VoiceOver, so they come back as named actions.
-                if status.title == BLERelationshipText.notOnNetwork, let onAdd {
-                    Button("Add to devices", action: onAdd)
-                }
-                if let deviceID = status.deviceID, let onOpenDevice {
-                    Button("Open network device") { onOpenDevice(deviceID) }
-                }
+                Spacer()
+                Image(systemName: "chevron.right").font(.caption).foregroundColor(.secondary).accessibilityHidden(true)
             }
         }
-    }
-
-    @ViewBuilder private var statusLine: some View {
-        let label = HStack(alignment: .firstTextBaseline, spacing: 6) {
-            if status.deviceID != nil {
-                Image(systemName: "link.badge.plus").accessibilityHidden(true)
-            }
-            Text(status.title).font(.subheadline).multilineTextAlignment(.leading)
+        .accessibilityElement(children: .combine)
+        // Same action as the leading swipe, for rows reached some other way.
+        .contextMenu {
+            if let onAdd { Button("Add to devices", systemImage: "plus.circle", action: onAdd) }
         }
-        .foregroundColor(status.deviceID != nil ? AppColors.info : .secondary)
-
-        if let deviceID = status.deviceID, let onOpenDevice {
-            Button { onOpenDevice(deviceID) } label: { label }
-                .buttonStyle(.plain)
-                .accessibilityHint("Opens the network device")
-        } else {
-            label
+        .accessibilityActions {
+            // The combined element hides the inner buttons from VoiceOver, so Add comes back as a named action.
+            if let onAdd { Button("Add to devices", action: onAdd) }
         }
     }
 
@@ -99,6 +69,8 @@ struct BLESavedDeviceRowView: View {
     var onMerge: (UUID) -> Void
     @State private var confirmingForget = false
 
+    static let notSeenText = "Saved, not seen now"
+
     var body: some View {
         CardView {
             HStack(spacing: 12) {
@@ -114,7 +86,7 @@ struct BLESavedDeviceRowView: View {
                     }
                     Text(BLEPeripheralRowView.companyLine(company: device.companyName, typeLabel: device.typeLabel))
                         .font(.subheadline).foregroundColor(.secondary)
-                    Text(BLERelationshipText.savedNotSeen).font(.subheadline).foregroundColor(.secondary)
+                    Text(Self.notSeenText).font(.subheadline).foregroundColor(.secondary)
                 }
                 Spacer()
             }

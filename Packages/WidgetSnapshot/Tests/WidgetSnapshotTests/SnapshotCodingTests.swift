@@ -60,7 +60,7 @@ struct SnapshotCodingTests {
     @Test("a snapshot with a Bluetooth summary round trips")
     func roundTripWithBluetooth() throws {
         var s = Self.sample
-        s.bluetooth = BluetoothSummary(scannedAt: Date(timeIntervalSince1970: 1_000_400), nearby: 7, suggested: 2)
+        s.bluetooth = BluetoothSummary(scannedAt: Date(timeIntervalSince1970: 1_000_400), nearby: 7)
         let data = try SnapshotCoding.encode(s)
         #expect(SnapshotCoding.decodeVersioned(WidgetSnapshot.self, from: data, supported: WidgetSnapshot.schemaVersion) == .loaded(s))
     }

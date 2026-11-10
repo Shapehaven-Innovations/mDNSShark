@@ -2,20 +2,10 @@
 import SwiftUI
 import DeviceFingerprint
 
-/// The Bluetooth card on both detail screens. With no peripheral it draws only the heading and relationship lines.
+/// The Bluetooth card on the peripheral detail screen: advertised facts, inferences and the on-request device information.
 struct BluetoothCardView: View {
-    /// A peripheral the LAN-side card lists as a link below the relationship lines.
-    struct PeripheralLink: Identifiable, Equatable {
-        let id: UUID
-        let name: String
-    }
-
-    let peripheral: BLEPeripheral?
-    let relationship: [BLERelationshipText.Line]
-    var onOpenDevice: ((UUID) -> Void)? = nil
-    var onOpenPeripheral: ((UUID) -> Void)? = nil
+    let peripheral: BLEPeripheral
     var onReadInfo: (() -> Void)? = nil
-    var peripheralLinks: [PeripheralLink] = []
 
     static let inferredCaption = "inferred, not confirmed"
 
@@ -29,73 +19,12 @@ struct BluetoothCardView: View {
                 .font(.headline)
                 .accessibilityAddTraits(.isHeader)
                 Divider()
-                relationshipSection
-                if let p = peripheral {
-                    Divider()
-                    facts(p)
-                    Divider()
-                    inferred(p)
-                    Divider()
-                    deviceInformation(p)
-                }
+                facts(peripheral)
+                Divider()
+                inferred(peripheral)
+                Divider()
+                deviceInformation(peripheral)
             }
-        }
-    }
-
-    // MARK: Relationship
-
-    @ViewBuilder private var relationshipSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(BLERelationshipText.heading).font(.subheadline).foregroundColor(.secondary)
-                .accessibilityAddTraits(.isHeader)
-            let lines = relationship.isEmpty ? [BLERelationshipText.Line(title: BLERelationshipText.noSuggestion)] : relationship
-            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                // The peripheral side always shows its tier; the LAN side only when several lines compete.
-                lineView(line, showBadge: peripheral != nil || lines.count > 1)
-            }
-            ForEach(peripheralLinks) { link in
-                NavigationLink(destination: BLEPeripheralDetailView(peripheralID: link.id)) {
-                    HStack {
-                        Image(systemName: BluetoothSymbol.name).foregroundColor(AppColors.info).accessibilityHidden(true)
-                        Text(link.name).font(.subheadline.weight(.medium))
-                        Spacer()
-                        Image(systemName: "chevron.right").font(.caption).foregroundColor(.secondary).accessibilityHidden(true)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Bluetooth details for \(link.name)")
-                .accessibilityHint("Opens what this Bluetooth device advertises")
-            }
-        }
-    }
-
-    @ViewBuilder private func lineView(_ line: BLERelationshipText.Line, showBadge: Bool) -> some View {
-        let content = VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                if onOpenDevice != nil, line.deviceID != nil {
-                    Image(systemName: "link.badge.plus").foregroundColor(AppColors.info).accessibilityHidden(true)
-                }
-                Text(line.title).font(.subheadline.weight(.medium)).multilineTextAlignment(.leading)
-                Spacer(minLength: 0)
-                if showBadge, let tier = line.tier { AppBadge(text: BLERelationshipText.badge(tier), color: AppColors.info) }
-            }
-            if let caption = line.caption { Text(caption).font(.caption).foregroundColor(.secondary) }
-        }
-        .contentShape(Rectangle())
-
-        if let onOpenDevice, let deviceID = line.deviceID {
-            Button { onOpenDevice(deviceID) } label: { content }
-                .buttonStyle(.plain)
-                .accessibilityElement(children: .combine)
-                .accessibilityHint("Opens the network device")
-        } else if let onOpenPeripheral, let peripheralID = line.peripheralID {
-            Button { onOpenPeripheral(peripheralID) } label: { content }
-                .buttonStyle(.plain)
-                .accessibilityElement(children: .combine)
-                .accessibilityHint("Opens the Bluetooth device")
-        } else {
-            content.accessibilityElement(children: .combine)
         }
     }
 
@@ -121,6 +50,8 @@ struct BluetoothCardView: View {
                 DetailRow(label: "Service data \(BLEServiceNameTable.shortForm(key))", value: Self.hex(data), selectable: true)
             }
         }
+        DetailRow(label: "Fingerprint", value: Self.fingerprintText(p.fingerprint), selectable: true)
+        DetailRow(label: "Identifiers", value: Self.identifiersText(p), selectable: true)
         DetailRow(label: "First seen", value: p.firstSeen.formatted(date: .omitted, time: .standard))
         DetailRow(label: "Last seen", value: p.lastSeen.formatted(date: .omitted, time: .standard))
     }
@@ -133,6 +64,10 @@ struct BluetoothCardView: View {
         if !p.parsed.continuity.isEmpty {
             let labels = p.parsed.continuity.map { $0.type?.label ?? String(format: "Type 0x%02X", $0.rawType) }
             inferredRow("Apple Continuity: \(labels.joined(separator: ", "))", detail: nil)
+        }
+        if let cdp = p.parsed.cdp {
+            let kind = cdp.deviceTypeLabel ?? "device type \(cdp.deviceType)"
+            inferredRow("Microsoft beacon: \(kind)", detail: "Its address and hash change constantly, so it cannot be tied to one device across rotations")
         }
         if let hint = p.parsed.continuityModelHint { inferredRow("Model hint: \(hint)", detail: nil) }
         if let model = p.parsed.fastPair?.modelID { inferredRow(String(format: "Fast Pair model ID: 0x%06X", model), detail: nil) }
@@ -157,12 +92,13 @@ struct BluetoothCardView: View {
         if let info = p.deviceInfo {
             Text("Device information (read on request)").font(.subheadline.weight(.semibold)).accessibilityAddTraits(.isHeader)
             if info.isEmpty {
-                Text("The device returned no Device Information or Battery values.").font(.caption).foregroundColor(.secondary)
+                Text("The device returned no Device Information, Battery or Heart Rate values.").font(.caption).foregroundColor(.secondary)
             }
             if let v = info.manufacturer { DetailRow(label: "Manufacturer", value: v, selectable: true) }
             if let v = info.model { DetailRow(label: "Model", value: v, selectable: true) }
             if let v = info.firmware { DetailRow(label: "Firmware", value: v, selectable: true) }
             if let v = info.batteryPercent { DetailRow(label: "Battery", value: "\(v)%") }
+            if let v = info.heartRateBPM { DetailRow(label: "Heart rate", value: "\(v) bpm") }
         } else if !p.parsed.kind.offersDeviceInfoRead {
             Text("Read device info is not offered for trackers or Find My beacons.").font(.caption).foregroundColor(.secondary)
         } else if p.fields.isConnectable != false, let onReadInfo {
@@ -175,7 +111,7 @@ struct BluetoothCardView: View {
             }
             .buttonStyle(.bordered)
             .disabled(p.readState == .reading)
-            .accessibilityHint("Asks before connecting once to read Device Information and Battery")
+            .accessibilityHint("Asks before connecting once to read Device Information, Battery and one heart rate measurement")
             if case .failed(let error) = p.readState {
                 Text(Self.failureText(error)).font(.caption).foregroundColor(.secondary)
             }
@@ -183,6 +119,26 @@ struct BluetoothCardView: View {
     }
 
     // MARK: Formatting
+
+    /// What this row merges on, or why it cannot merge when a rotated address arrives.
+    static func fingerprintText(_ fingerprint: BLEFingerprint?) -> String {
+        guard let key = fingerprint?.key else { return "None (no name, Matter or Fast Pair data, so a new address becomes a new row)" }
+        switch key {
+        case let .matter(vendor, product, discriminator):
+            return String(format: "Matter 0x%04X / 0x%04X / %d", vendor, product, discriminator)
+        case let .fastPair(model):
+            return String(format: "Fast Pair model 0x%06X", model)
+        case let .name(name, company):
+            return "Name \(name), company \(company.map { String(format: "0x%04X", $0) } ?? "none")"
+        }
+    }
+
+    /// One line per CoreBluetooth identifier the row holds, newest first, so a split or merge can be traced.
+    static func identifiersText(_ p: BLEPeripheral) -> String {
+        p.identifierTraces.sorted { $0.value.joinedAt > $1.value.joinedAt }.map { id, trace in
+            "\(id.uuidString.prefix(8)) joined \(trace.joinedAt.formatted(date: .omitted, time: .standard)), \(trace.lastRSSI) dBm"
+        }.joined(separator: "\n")
+    }
 
     static func companyText(_ parsed: BLEParsedAdvertisement) -> String {
         guard let id = parsed.companyID else { return "None" }

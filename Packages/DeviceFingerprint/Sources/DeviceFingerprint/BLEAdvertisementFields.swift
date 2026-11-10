@@ -10,8 +10,11 @@ public struct BLEAdvertisementFields: Equatable, Sendable {
     public var isConnectable: Bool?
     /// The name the OS cached for the peripheral, kept apart from `localName` so the advertisement log stays literal.
     public var cachedName: String?
+    /// Services the peripheral asks a central to host (short form), for example the Apple Notification Center Service.
+    public var solicitedServiceUUIDs: [String]
 
-    public init(localName: String? = nil, manufacturerData: Data? = nil, serviceUUIDs: [String] = [], serviceData: [String: Data] = [:], txPower: Int? = nil, isConnectable: Bool? = nil, cachedName: String? = nil) {
+    public init(localName: String? = nil, manufacturerData: Data? = nil, serviceUUIDs: [String] = [], serviceData: [String: Data] = [:], txPower: Int? = nil, isConnectable: Bool? = nil, cachedName: String? = nil, solicitedServiceUUIDs: [String] = []) {
+        self.solicitedServiceUUIDs = solicitedServiceUUIDs
         self.cachedName = cachedName
         self.localName = localName
         self.manufacturerData = manufacturerData

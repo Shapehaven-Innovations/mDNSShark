@@ -5,11 +5,11 @@ import Foundation
 @Suite("Bluetooth indicator")
 struct BluetoothIndicatorTests {
     let scan = Date(timeIntervalSince1970: 3_000_000)
-    func summary(_ nearby: Int = 7, _ suggested: Int = 2) -> BluetoothSummary {
-        BluetoothSummary(scannedAt: scan, nearby: nearby, suggested: suggested)
+    func summary(_ nearby: Int = 7) -> BluetoothSummary {
+        BluetoothSummary(scannedAt: scan, nearby: nearby)
     }
-    func model(_ nearby: Int = 7, _ suggested: Int = 2, after: Double = 720) -> BluetoothIndicatorModel? {
-        BluetoothIndicatorModel.make(summary(nearby, suggested), now: scan.addingTimeInterval(after))
+    func model(_ nearby: Int = 7, after: Double = 720) -> BluetoothIndicatorModel? {
+        BluetoothIndicatorModel.make(summary(nearby), now: scan.addingTimeInterval(after))
     }
 
     @Test("no summary draws nothing")
@@ -19,7 +19,7 @@ struct BluetoothIndicatorTests {
 
     @Test("zero nearby draws nothing")
     func zeroNearbyIsNil() {
-        #expect(model(0, 0) == nil)
+        #expect(model(0) == nil)
     }
 
     @Test("a Bluetooth scan 24 h or older is omitted")
@@ -40,29 +40,19 @@ struct BluetoothIndicatorTests {
         let m = model()!
         #expect(m.pillText == "7")
         #expect(m.ageText == "12 min ago")
-        #expect(m.lineText == "7 nearby · 2 suggested? · 12 min ago")
+        #expect(m.lineText == "7 nearby · 12 min ago")
         #expect(m.securityLineText == "7 nearby · not assessed · 12 min ago")
-        #expect(m.accessibilityClause == "7 Bluetooth devices nearby, 2 suggested as network devices, inferred, Bluetooth scanned 12 minutes ago")
+        #expect(m.accessibilityClause == "7 Bluetooth devices nearby, Bluetooth scanned 12 minutes ago")
         #expect(m.securityAccessibilityClause == m.accessibilityClause + ", not security assessed")
-        #expect(m.lineTextWithoutAge == "7 nearby · 2 suggested?")
-        #expect(m.lineTextNearbyAndAge == "7 nearby · 12 min ago")
+        #expect(m.lineTextWithoutAge == "7 nearby")
         #expect(m.securityLineTextWithoutAge == "7 nearby · not assessed")
-        #expect(m.lineTextCompact == "7 · 2 suggested?")
         #expect(m.securityLineTextCompact == "7 · not assessed")
         #expect(m.pillCountText == "7")
-        #expect(model(7, 0)!.lineTextCompact == "7 nearby")
-    }
-
-    @Test("the suggested part is omitted when nothing is suggested")
-    func suggestedPartOmittedWhenZero() {
-        let m = model(7, 0)!
-        #expect(m.lineText == "7 nearby · 12 min ago")
-        #expect(m.accessibilityClause == "7 Bluetooth devices nearby, none suggested, Bluetooth scanned 12 minutes ago")
     }
 
     @Test("one device reads singular")
     func singularClause() {
-        #expect(model(1, 1)!.accessibilityClause == "1 Bluetooth device nearby, 1 suggested as a network device, inferred, Bluetooth scanned 12 minutes ago")
+        #expect(model(1)!.accessibilityClause == "1 Bluetooth device nearby, Bluetooth scanned 12 minutes ago")
     }
 
     @Test("stale prefixes the clause and puts the age in the pill")
@@ -71,7 +61,7 @@ struct BluetoothIndicatorTests {
         #expect(m.isStale)
         #expect(m.pillText == "7 · 3 hr ago")
         #expect(m.pillCountText == "7")
-        #expect(m.accessibilityClause == "Bluetooth out of date, 7 Bluetooth devices nearby, 2 suggested as network devices, inferred, Bluetooth scanned 3 hours ago")
+        #expect(m.accessibilityClause == "Bluetooth out of date, 7 Bluetooth devices nearby, Bluetooth scanned 3 hours ago")
     }
 
     @Test("between 30 and 60 minutes the age reads 30+ min so it is never under-reported before the hour mark",
@@ -81,9 +71,9 @@ struct BluetoothIndicatorTests {
         #expect(m.isStale)
         #expect(m.ageText == "30+ min ago")
         #expect(m.pillText == "7 · 30+ min ago")
-        #expect(m.lineText == "7 nearby · 2 suggested? · 30+ min ago")
+        #expect(m.lineText == "7 nearby · 30+ min ago")
         #expect(m.securityLineText == "7 nearby · not assessed · 30+ min ago")
-        #expect(m.accessibilityClause == "Bluetooth out of date, 7 Bluetooth devices nearby, 2 suggested as network devices, inferred, Bluetooth scanned over 30 minutes ago")
+        #expect(m.accessibilityClause == "Bluetooth out of date, 7 Bluetooth devices nearby, Bluetooth scanned over 30 minutes ago")
     }
 
     @Test("from the hour mark the age is the ordinary hourly one")
@@ -92,11 +82,6 @@ struct BluetoothIndicatorTests {
         #expect(m.pillText == "7 · 1 hr ago")
         #expect(m.accessibilityClause.hasSuffix("Bluetooth scanned 1 hour ago"))
         #expect(model(after: 29 * 60)!.ageText == "29 min ago")
-    }
-
-    @Test("the suggested count carries a question mark")
-    func questionMarkOnSuggested() {
-        #expect(WidgetCopy.suggested(2) == "2 suggested?")
     }
 
     @Test("the symbol is the app's")

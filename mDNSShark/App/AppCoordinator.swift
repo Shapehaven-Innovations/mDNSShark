@@ -137,12 +137,6 @@ final class AppCoordinator: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // A LAN scan republishes devices many times a second; the matcher needs at most four runs a second, always with the newest list.
-        networkScanViewModel.$devices
-            .throttle(for: .milliseconds(250), scheduler: DispatchQueue.main, latest: true)
-            .sink { [weak self] in self?.bluetoothViewModel.updateLANDevices($0) }
-            .store(in: &cancellables)
-
         packetCaptureManager.$packets
             .sink { [weak self] packets in
                 self?.analysisViewModel.ingest(packets: packets)

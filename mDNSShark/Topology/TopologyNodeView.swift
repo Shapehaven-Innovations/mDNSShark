@@ -34,7 +34,6 @@ struct ServicesGroupNodeView: View {
 
 struct TopologyNodeView: View {
     let node: TopologyNode
-    var onBluetoothBadgeTap: () -> Void = {}
 
     private var borderColor: Color { node.securityStatus.color }
 
@@ -68,24 +67,6 @@ struct TopologyNodeView: View {
                         .offset(x: -6, y: 6)
                 }
             }
-            .overlay(alignment: .bottomTrailing) {
-                // Mirrors the off-network badge; VoiceOver hears it through the node label and a custom action instead.
-                if node.hasBluetoothSuggestion {
-                    Button(action: onBluetoothBadgeTap) {
-                        Image(systemName: BluetoothSymbol.name)
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(3)
-                            .background(Circle().fill(AppColors.info))
-                    }
-                    .buttonStyle(.plain)
-                    .contentShape(Circle().inset(by: -6))
-                    .offset(x: 6, y: 6)
-                    .transition(.scale.combined(with: .opacity))
-                    .accessibilityHidden(true)
-                }
-            }
-            .animation(.snappy, value: node.hasBluetoothSuggestion)
             Text(node.device.hostname)
                 .font(.system(size: 9, weight: .medium))
                 .lineLimit(1).frame(maxWidth: 72)
@@ -95,11 +76,5 @@ struct TopologyNodeView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(node.accessibilityLabel)
-        // Built conditionally inside the actions block so the node keeps its identity when a suggestion appears.
-        .accessibilityActions {
-            if node.hasBluetoothSuggestion {
-                Button { onBluetoothBadgeTap() } label: { Text(TopologyNode.bluetoothActionName) }
-            }
-        }
     }
 }

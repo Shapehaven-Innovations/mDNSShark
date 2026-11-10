@@ -26,6 +26,14 @@ struct BLEFingerprint: Hashable {
 
     let key: Key
 
+    /// Equal keys match; a name key with no company also matches the same name with any company, because one device
+    /// advertises the company only in some frames (Bose: manufacturer data under one identifier, Fast Pair under another).
+    func matches(_ other: BLEFingerprint) -> Bool {
+        if key == other.key { return true }
+        if case let .name(a, ca) = key, case let .name(b, cb) = other.key { return a == b && (ca == nil || cb == nil) }
+        return false
+    }
+
     /// Matter IDs with the discriminator first, then a Fast Pair model, then the sanitized name; nil when none exists.
     init?(parsed: BLEParsedAdvertisement) {
         if let m = parsed.matter {
@@ -99,8 +107,10 @@ struct BLEDeviceInfo: Equatable, Codable {
     var model: String?
     var firmware: String?
     var batteryPercent: Int?
+    /// One Heart Rate Measurement heard during the read; nil when the device has none or reports 0 (not worn).
+    var heartRateBPM: Int?
 
-    var isEmpty: Bool { manufacturer == nil && model == nil && firmware == nil && batteryPercent == nil }
+    var isEmpty: Bool { manufacturer == nil && model == nil && firmware == nil && batteryPercent == nil && heartRateBPM == nil }
 }
 
 enum BLEReadError: Error, Equatable {
@@ -116,6 +126,8 @@ struct IdentifierTrace: Equatable {
     var joinedAt: Date
     var lastSeen: Date
     var lastRSSI: Int
+    /// True once a frame under this identifier carried a company ID.
+    var hadCompany: Bool = false
 }
 
 struct BLEPeripheral: Identifiable, Equatable {
@@ -149,12 +161,43 @@ struct BLEPeripheral: Identifiable, Equatable {
 
     var displayName: String {
         if let name = parsed.displayName { return name }
-        return BLEDisplayName.fallbackTitle(company: parsed.companyName, typeLabel: typeLabel, isTyped: parsed.kind != .unknown)
+        if let model = deviceInfo?.model, !model.isEmpty {
+            if let marketing = BLEServiceNameTable.bundledAppleModels.name(forUUID: model) { return marketing }
+            let maker = deviceInfo?.manufacturer.flatMap(BLEDisplayName.shortCompany)
+            return [maker, model].compactMap { $0 }.joined(separator: " ")
+        }
+        // Not part of the fingerprint: two PCs of one type must stay two rows.
+        if let label = parsed.cdp?.deviceTypeLabel { return label }
+        if let model = parsed.continuityModelHint { return model }
+        if let hint = parsed.hint { return hint.label }
+        let chipVendor = parsed.companyID.map(BLEFrameHint.chipVendorCompanyIDs.contains) ?? false
+        let title = BLEDisplayName.fallbackTitle(company: chipVendor ? nil : parsed.companyName, typeLabel: typeLabel,
+                                                 isTyped: kind != .unknown)
+        guard title.hasPrefix(BLEDisplayName.unnamed) else { return title }
+        let suffix = newestIdentifier.map { String($0.uuidString.prefix(4)) } ?? ""
+        if kind != .unknown { return "Bluetooth \(typeLabel.lowercased()) \(suffix)".trimmingCharacters(in: .whitespaces) }
+        // Connectable, no company, no data, TX power 12 or 24 dBm: the pattern iPhones and iPads showed (inferred, weak).
+        if fields.isConnectable == true, parsed.companyID == nil, parsed.serviceUUIDs.isEmpty, fields.serviceData.isEmpty,
+           [12, 24].contains(fields.txPower ?? 0) {
+            return "Possibly Apple device"
+        }
+        return "Bluetooth device \(suffix)".trimmingCharacters(in: .whitespaces)
     }
     var fingerprint: BLEFingerprint? { BLEFingerprint(parsed: parsed) }
     var distance: BLEDistance { BLEDistance.from(rssi: rssi) }
-    var icon: String { parsed.kind.deviceType?.symbol ?? parsed.kind.symbol }
-    var typeLabel: String { parsed.kind.deviceType?.label ?? parsed.kind.label }
+    /// The advertised kind, or the kind of an Apple model read from the device when the advertisement named none.
+    var kind: BLEKind {
+        if parsed.kind != .unknown { return parsed.kind }
+        let model = deviceInfo?.model ?? ""
+        if model.hasPrefix("iPhone") || model.hasPrefix("iPad") { return .phone }
+        if model.hasPrefix("Mac") { return .computer }
+        if model.hasPrefix("Watch") { return .wearable }
+        if model.hasPrefix("AppleTV") { return .tv }
+        if model.hasPrefix("AudioAccessory") { return .audio }
+        return .unknown
+    }
+    var icon: String { kind.deviceType?.symbol ?? kind.symbol }
+    var typeLabel: String { kind.deviceType?.label ?? kind.label }
 
     func lifecycle(now: Date) -> BLELifecycle {
         BLELifecycle.of(lastSeen: agingAnchor, now: now, markedStale: markedStale)

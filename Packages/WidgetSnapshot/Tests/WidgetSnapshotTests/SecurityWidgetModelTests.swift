@@ -110,10 +110,10 @@ struct SecurityWidgetModelTests {
 
     func btSnap(_ counts: StatusCounts) -> SnapshotDecodeResult<WidgetSnapshot> {
         guard case .loaded(var s) = snap(counts) else { return .missing }
-        s.bluetooth = BluetoothSummary(scannedAt: scan.addingTimeInterval(-600), nearby: 7, suggested: 2)
+        s.bluetooth = BluetoothSummary(scannedAt: scan.addingTimeInterval(-600), nearby: 7)
         return .loaded(s)
     }
-    let btClause = ". 7 Bluetooth devices nearby, 2 suggested as network devices, inferred, Bluetooth scanned 12 minutes ago, not security assessed"
+    let btClause = ". 7 Bluetooth devices nearby, Bluetooth scanned 12 minutes ago, not security assessed"
 
     @Test("small, medium and large labels carry the Bluetooth clause ending not security assessed, before scan running")
     func securitySmallMediumLargeClauseEndsNotSecurityAssessed() {

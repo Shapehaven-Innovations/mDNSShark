@@ -34,7 +34,7 @@ struct BLEPeripheralSet: Equatable {
             return updateHeldRow(at: index, sighting, parsed: parsed)
         }
         if let fingerprint = BLEFingerprint(parsed: parsed) {
-            let same = peripherals.indices.filter { peripherals[$0].fingerprint == fingerprint }
+            let same = peripherals.indices.filter { peripherals[$0].fingerprint.map(fingerprint.matches) ?? false }
             if same.count == 1 {
                 Self.apply(sighting, parsed: parsed, to: &peripherals[same[0]])
                 return IngestResult(rowID: peripherals[same[0]].id)
@@ -45,7 +45,7 @@ struct BLEPeripheralSet: Equatable {
         if valid { history.append(sighting.rssi) }
         let rssi = valid ? sighting.rssi : Self.noReadingFloor
         let row = BLEPeripheral(id: UUID(),
-                                identifierTraces: [sighting.identifier: IdentifierTrace(joinedAt: sighting.at, lastSeen: sighting.at, lastRSSI: rssi)],
+                                identifierTraces: [sighting.identifier: IdentifierTrace(joinedAt: sighting.at, lastSeen: sighting.at, lastRSSI: rssi, hadCompany: parsed.companyID != nil)],
                                 parsed: parsed, fields: sighting.fields, rssi: rssi, rssiHistory: history,
                                 firstSeen: sighting.at, lastSeen: sighting.at, agingAnchor: sighting.at,
                                 markedStale: false, savedID: nil, deviceInfo: nil, readState: .idle)
@@ -58,7 +58,9 @@ struct BLEPeripheralSet: Equatable {
         var splitOff: (rowID: UUID, identifier: UUID, lastSeen: Date)?
         let row = peripherals[index]
         if let newest = row.newestIdentifier, newest != sighting.identifier, let trace = row.identifierTraces[newest],
-           sighting.at >= trace.joinedAt.addingTimeInterval(Self.splitGrace) {
+           sighting.at >= trace.joinedAt.addingTimeInterval(Self.splitGrace),
+           // Identifiers whose frames differ on carrying a company ID are two frame types of one device, not two devices.
+           row.identifierTraces[sighting.identifier]?.hadCompany == trace.hadCompany {
             var history = RSSIRingBuffer()
             if trace.lastRSSI != Self.noReadingFloor { history.append(trace.lastRSSI) }
             let off = BLEPeripheral(id: UUID(), identifierTraces: [newest: trace], parsed: row.parsed, fields: row.fields,
@@ -75,7 +77,7 @@ struct BLEPeripheralSet: Equatable {
         guard before == nil, let after = peripherals[index].fingerprint else {
             return IngestResult(rowID: rowID, splitOff: splitOff)
         }
-        let others = peripherals.indices.filter { $0 != index && peripherals[$0].fingerprint == after }
+        let others = peripherals.indices.filter { $0 != index && peripherals[$0].fingerprint.map(after.matches) ?? false }
         guard others.count == 1 else { return IngestResult(rowID: rowID, splitOff: splitOff) }
         let donor = peripherals[index]
         let survivor = others[0]
@@ -98,7 +100,7 @@ struct BLEPeripheralSet: Equatable {
             }
             let bornAfter = quietRow.lastSeen.addingTimeInterval(-Self.splitGrace)
             let successors = peripherals.indices.filter {
-                $0 != i && peripherals[$0].fingerprint == fingerprint && peripherals[$0].firstSeen >= bornAfter
+                $0 != i && (peripherals[$0].fingerprint.map(fingerprint.matches) ?? false) && peripherals[$0].firstSeen >= bornAfter
             }
             guard let j = successors.min(by: { peripherals[$0].firstSeen < peripherals[$1].firstSeen }) else {
                 i += 1
@@ -140,6 +142,7 @@ struct BLEPeripheralSet: Equatable {
     private static func apply(_ sighting: BLESighting, parsed: BLEParsedAdvertisement, to row: inout BLEPeripheral) {
         let valid = sighting.rssi <= maxValidRSSI
         var fields = sighting.fields
+        let frameHasCompany = parsed.companyID != nil
         var parsed = parsed
         if fields.localName == nil { fields.localName = row.fields.localName }
         if parsed.displayName == nil { parsed.displayName = row.parsed.displayName }
@@ -152,10 +155,12 @@ struct BLEPeripheralSet: Equatable {
         if var trace = row.identifierTraces[sighting.identifier] {
             trace.lastSeen = sighting.at
             if valid { trace.lastRSSI = sighting.rssi }
+            trace.hadCompany = trace.hadCompany || frameHasCompany
             row.identifierTraces[sighting.identifier] = trace
         } else {
             row.identifierTraces[sighting.identifier] = IdentifierTrace(joinedAt: sighting.at, lastSeen: sighting.at,
-                                                                        lastRSSI: valid ? sighting.rssi : row.rssi)
+                                                                        lastRSSI: valid ? sighting.rssi : row.rssi,
+                                                                        hadCompany: frameHasCompany)
             row.lastJoined = sighting.identifier
         }
         row.fields = fields

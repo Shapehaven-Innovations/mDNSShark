@@ -124,8 +124,7 @@ struct BLEPeripheralSetRefreshTests {
         await vm.readDeviceInfo(old.id)
         #expect(factory.fake.readCalls.isEmpty)
         // Every peripheral is listed once and the saved entry is drawn as its live row only.
-        let plan = DevicesListPlan.make(filter: .bluetooth, devices: [], peripherals: vm.peripherals, saved: vm.saved,
-                                        matches: vm.matches, now: clock.value)
+        let plan = DevicesListPlan.make(filter: .bluetooth, devices: [], peripherals: vm.peripherals, saved: vm.saved, now: clock.value)
         let rows = plan.sections.flatMap(\.rows)
         #expect(rows.count == 2)
         #expect(Set(rows.map(\.id)).count == rows.count)
@@ -146,32 +145,24 @@ struct BLEPeripheralSetRefreshTests {
         #expect(factory.fake.startCalls == [true])
     }
 
-    @Test func rematchAfterPruneDropsTheSuggestion() async throws {
+    @Test func pruneDimmedUnsavedKeepsTheFrozenSummary() async throws {
         let t0 = Date(timeIntervalSince1970: 1_800_000_000)
         let clock = Box(t0)
         let (vm, factory, _) = H.makeVM(now: { clock.value })
-        vm.updateLANDevices([H.lan("Sonos Roam")])
         vm.startScanIfAuthorized()
         factory.fake.subject.send(.sighting(H.sighting(name: "Sonos Roam", company: H.sonos, at: t0)))
         try await settle(vm, rows: 1)
         vm.stopScan(reason: .user)
-        #expect(!vm.suggestedLANDeviceIDs.isEmpty)
-        #expect(vm.lastScanSummary?.suggested == 1)
         clock.value = t0 + 70
         vm.pruneDimmedUnsaved()
         #expect(vm.peripherals.isEmpty)
-        #expect(vm.matches == .empty)
-        // The Topology badge reads this set, so no stale badge is left behind.
-        #expect(vm.suggestedLANDeviceIDs.isEmpty)
         #expect(vm.lastScanSummary?.nearby == 1)
-        #expect(vm.lastScanSummary?.suggested == 0)
     }
 
-    @Test func pruneDimmedUnsavedKeepsADimSavedSuggestion() async throws {
+    @Test func pruneDimmedUnsavedKeepsADimSavedRow() async throws {
         let t0 = Date(timeIntervalSince1970: 1_800_000_000)
         let clock = Box(t0)
         let (vm, factory, _) = H.makeVM(now: { clock.value })
-        vm.updateLANDevices([H.lan("Sonos Roam")])
         vm.startScanIfAuthorized()
         factory.fake.subject.send(.sighting(H.sighting(name: "Sonos Roam", company: H.sonos, at: t0)))
         try await settle(vm, rows: 1)
@@ -180,6 +171,5 @@ struct BLEPeripheralSetRefreshTests {
         clock.value = t0 + 70
         vm.pruneDimmedUnsaved()
         #expect(vm.peripherals.count == 1)
-        #expect(!vm.suggestedLANDeviceIDs.isEmpty)
     }
 }

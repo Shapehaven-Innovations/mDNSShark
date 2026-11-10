@@ -9,8 +9,6 @@ struct DevicesView: View {
     @EnvironmentObject var bluetoothVM: BluetoothViewModel
     @EnvironmentObject var coordinator: AppCoordinator
     @State private var filter: DevicesFilter = .all
-    /// A LAN device opened from a Bluetooth status line, shown scrolled to its Bluetooth card.
-    @State private var openBluetoothDeviceID: UUID?
 
     private var accessState: BluetoothAccessState {
         BluetoothAccessState.from(authorization: bluetoothVM.authorization, power: bluetoothVM.powerState)
@@ -23,8 +21,8 @@ struct DevicesView: View {
                     bluetoothList
                 } else {
                     ScrollView {
-                        // The periodic tick drops rows that expire while nothing else publishes.
-                        TimelineView(.periodic(from: .now, by: 15)) { context in
+                        // The one tick for every row: it ages the rows and drops those that expire while nothing else publishes.
+                        TimelineView(.periodic(from: .now, by: 5)) { context in
                             content(now: context.date)
                         }
                     }
@@ -35,9 +33,6 @@ struct DevicesView: View {
             }
             .navigationDestination(item: $deepLinks.deviceLinkID) { id in
                 if let device = scanVM.devices.first(where: { $0.id == id }) { DeviceDetailView(device: device) }
-            }
-            .navigationDestination(item: $openBluetoothDeviceID) { id in
-                if let device = scanVM.devices.first(where: { $0.id == id }) { DeviceDetailView(device: device, scrollTo: .bluetooth) }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .navigationBar)
@@ -51,7 +46,7 @@ struct DevicesView: View {
 
     @ViewBuilder private func content(now: Date) -> some View {
         let plan = DevicesListPlan.make(filter: filter, devices: scanVM.devices, peripherals: bluetoothVM.peripherals,
-                                        saved: bluetoothVM.saved, matches: bluetoothVM.matches, now: now)
+                                        saved: bluetoothVM.saved, now: now)
         let state = accessState
         VStack(spacing: 12) {
             Picker("Show", selection: $filter) {
@@ -74,7 +69,7 @@ struct DevicesView: View {
                                 .padding(.top, 4)
                                 .accessibilityAddTraits(.isHeader)
                         }
-                        ForEach(section.rows) { row in rowView(row) }
+                        ForEach(section.rows) { row in rowView(row, now: now) }
                     }
                 }
             }
@@ -90,34 +85,22 @@ struct DevicesView: View {
 
     // MARK: Rows
 
-    @ViewBuilder private func rowView(_ row: DevicesListPlan.Row) -> some View {
+    @ViewBuilder private func rowView(_ row: DevicesListPlan.Row, now: Date) -> some View {
         switch row {
-        case .lan(let device, let suggested):
+        case .lan(let device):
             let findings = securityVM.findings.filter { $0.deviceID == device.id }
             let badgeColor = SecurityStatus.of(findings: findings, settled: device.probesSettled, probed: device.wasProbed).color
             NavigationLink(destination: DeviceDetailView(device: device)) {
-                DeviceCardView(device: device, issueCount: findings.count, badgeColor: badgeColor, bluetoothSuggested: suggested)
+                DeviceCardView(device: device, issueCount: findings.count, badgeColor: badgeColor)
             }
             .buttonStyle(.plain)
         case .peripheral(let p):
-            let rowView = BLEPeripheralRowView(
-                peripheral: p, status: status(for: p),
-                onAdd: p.savedID == nil ? { bluetoothVM.addToDevices(p.id) } : nil,
-                onOpenDevice: { id in if scanVM.devices.contains(where: { $0.id == id }) { openBluetoothDeviceID = id } })
-            NavigationLink(destination: peripheralDestination(p)) { rowView }
-                .buttonStyle(.plain)
+            NavigationLink(destination: BLEPeripheralDetailView(peripheralID: p.id)) {
+                BLEPeripheralRowView(peripheral: p, now: now, onAdd: p.savedID == nil ? { bluetoothVM.addToDevices(p.id) } : nil)
+            }
+            .buttonStyle(.plain)
         case .saved(let entry):
             savedRow(entry)
-        }
-    }
-
-    /// A suggested row opens the LAN device it is suggested for, at its Bluetooth card.
-    @ViewBuilder private func peripheralDestination(_ p: BLEPeripheral) -> some View {
-        if let deviceID = bluetoothVM.matches.suggestion(forPeripheral: p.id)?.deviceID,
-           let device = scanVM.devices.first(where: { $0.id == deviceID }) {
-            DeviceDetailView(device: device, scrollTo: .bluetooth)
-        } else {
-            BLEPeripheralDetailView(peripheralID: p.id)
         }
     }
 
@@ -129,22 +112,14 @@ struct DevicesView: View {
             onMerge: { target in bluetoothVM.mergeSaved(entry.id, into: target) })
     }
 
-    private func status(for p: BLEPeripheral) -> BLERelationshipText.Line {
-        let devices = scanVM.devices
-        return BLERelationshipText.forPeripheral(
-            peripheralID: p.id, table: bluetoothVM.matches, isSaved: p.savedID != nil,
-            deviceName: { id in devices.first { $0.id == id }?.hostname ?? "Unknown device" },
-            deviceIP: { id in devices.first { $0.id == id }?.ipAddress })
-    }
-
-    // MARK: Bluetooth header and prompts
+    // MARK: Bluetooth list, status line and prompts
 
     /// The Bluetooth filter is a List so rows can swipe: right adds to Devices, left removes from the list.
     @ViewBuilder private var bluetoothList: some View {
-        // The periodic tick drops rows that expire while nothing else publishes.
-        TimelineView(.periodic(from: .now, by: 15)) { context in
+        // The one tick for every row; a TimelineView inside each List cell kept the main thread busy, so the list could not scroll.
+        TimelineView(.periodic(from: .now, by: 5)) { context in
             let plan = DevicesListPlan.make(filter: .bluetooth, devices: scanVM.devices, peripherals: bluetoothVM.peripherals,
-                                            saved: bluetoothVM.saved, matches: bluetoothVM.matches, now: context.date)
+                                            saved: bluetoothVM.saved, now: context.date)
             let state = accessState
             List {
                 Picker("Show", selection: $filter) {
@@ -155,7 +130,7 @@ struct DevicesView: View {
                 .plainListRow()
 
                 if state == .ready {
-                    if bluetoothVM.isScanning { scanStatusLine.plainListRow() }
+                    scanStatusLine(now: context.date).plainListRow()
                 } else {
                     BluetoothAccessView(state: state, onAllow: { bluetoothVM.allowAndScan() }).plainListRow()
                 }
@@ -166,10 +141,12 @@ struct DevicesView: View {
                     ForEach(plan.sections) { section in
                         if !section.rows.isEmpty {
                             Section {
-                                ForEach(section.rows) { row in bluetoothRow(row) }
+                                ForEach(section.rows) { row in bluetoothRow(row, now: context.date) }
                             } header: {
-                                Text(section.title).font(.headline).foregroundColor(.primary).textCase(nil)
-                                    .accessibilityAddTraits(.isHeader)
+                                if !section.title.isEmpty {
+                                    Text(section.title).font(.headline).foregroundColor(.primary).textCase(nil)
+                                        .accessibilityAddTraits(.isHeader)
+                                }
                             }
                             .listSectionSeparator(.hidden)
                         }
@@ -189,18 +166,14 @@ struct DevicesView: View {
         }
     }
 
-    @ViewBuilder private func bluetoothRow(_ row: DevicesListPlan.Row) -> some View {
+    @ViewBuilder private func bluetoothRow(_ row: DevicesListPlan.Row, now: Date) -> some View {
         switch row {
         case .peripheral(let p):
-            let line = status(for: p)
-            let canAdd = p.savedID == nil && line.title == BLERelationshipText.notOnNetwork
+            let canAdd = p.savedID == nil
             ZStack {
-                BLEPeripheralRowView(
-                    peripheral: p, status: line,
-                    onAdd: canAdd ? { bluetoothVM.addToDevices(p.id) } : nil,
-                    onOpenDevice: { id in if scanVM.devices.contains(where: { $0.id == id }) { openBluetoothDeviceID = id } })
+                BLEPeripheralRowView(peripheral: p, now: now, onAdd: canAdd ? { bluetoothVM.addToDevices(p.id) } : nil)
                 // The system chevron is hidden; the row draws its own.
-                NavigationLink(destination: peripheralDestination(p)) { EmptyView() }.opacity(0)
+                NavigationLink(destination: BLEPeripheralDetailView(peripheralID: p.id)) { EmptyView() }.opacity(0)
             }
             .plainListRow()
             .swipeActions(edge: .leading, allowsFullSwipe: true) {
@@ -210,7 +183,7 @@ struct DevicesView: View {
                 }
             }
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                if p.savedID == nil {
+                if canAdd {
                     Button(role: .destructive) { bluetoothVM.removeFromList(p.id) } label: { Label("Remove", systemImage: "trash") }
                 }
             }
@@ -221,12 +194,30 @@ struct DevicesView: View {
         }
     }
 
-    /// Counts only rows heard in this scan, so rows kept from an earlier scan are not "found" again.
-    private var scanStatusLine: some View {
-        Text("Scanning nearby\u{2026} Bluetooth LE · \(bluetoothVM.seenThisScanCount) found · \(bluetoothVM.seenThisScanSuggestedCount) suggested")
-            .font(.caption).foregroundColor(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
+    /// A spinner with the running scan's count; after a scan, the listed count and the scan time. Nothing before the first scan.
+    @ViewBuilder private func scanStatusLine(now: Date) -> some View {
+        if bluetoothVM.isScanning {
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text(Self.scanningText(found: bluetoothVM.seenThisScanCount))
+            }
+            .font(.subheadline).foregroundColor(.secondary)
             .accessibilityElement(children: .combine)
+        } else if let summary = bluetoothVM.lastScanSummary {
+            let nearby = BluetoothViewModel.nearbyCount(peripherals: bluetoothVM.peripherals, now: now)
+            // Zero is said by the empty state instead.
+            if nearby > 0 {
+                Text(Self.idleText(nearby: nearby, scannedAt: summary.scannedAt))
+                    .font(.subheadline).foregroundColor(.secondary)
+            }
+        }
+    }
+
+    /// Counts only rows heard in this scan, so rows kept from an earlier scan are not "found" again.
+    static func scanningText(found: Int) -> String { "Scanning · \(found) found" }
+
+    static func idleText(nearby: Int, scannedAt: Date) -> String {
+        "\(nearby) nearby · Last scan \(scannedAt.formatted(date: .omitted, time: .shortened))"
     }
 
     /// Floating scan control: starts a 25 second scan, or stops the running one.
