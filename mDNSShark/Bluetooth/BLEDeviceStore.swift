@@ -47,7 +47,7 @@ struct BLESavedDevice: Codable, Identifiable, Equatable {
 
     var displayName: String {
         if let name { return name }
-        return kind == .unknown ? BLEDisplayName.unnamed : "\(BLEDisplayName.unnamed) \(typeLabel)"
+        return BLEDisplayName.fallbackTitle(company: companyName, typeLabel: typeLabel, isTyped: kind != .unknown)
     }
     var icon: String { kind.deviceType?.symbol ?? kind.symbol }
     var typeLabel: String { kind.deviceType?.label ?? kind.label }

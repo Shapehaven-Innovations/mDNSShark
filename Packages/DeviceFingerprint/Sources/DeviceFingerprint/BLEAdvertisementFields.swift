@@ -8,8 +8,11 @@ public struct BLEAdvertisementFields: Equatable, Sendable {
     public var serviceData: [String: Data]
     public var txPower: Int?
     public var isConnectable: Bool?
+    /// The name the OS cached for the peripheral, kept apart from `localName` so the advertisement log stays literal.
+    public var cachedName: String?
 
-    public init(localName: String? = nil, manufacturerData: Data? = nil, serviceUUIDs: [String] = [], serviceData: [String: Data] = [:], txPower: Int? = nil, isConnectable: Bool? = nil) {
+    public init(localName: String? = nil, manufacturerData: Data? = nil, serviceUUIDs: [String] = [], serviceData: [String: Data] = [:], txPower: Int? = nil, isConnectable: Bool? = nil, cachedName: String? = nil) {
+        self.cachedName = cachedName
         self.localName = localName
         self.manufacturerData = manufacturerData
         self.serviceUUIDs = serviceUUIDs

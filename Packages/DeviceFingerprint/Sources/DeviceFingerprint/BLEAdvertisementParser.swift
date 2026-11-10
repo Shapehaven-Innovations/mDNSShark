@@ -51,7 +51,7 @@ public struct BLEAdvertisementParser: Sendable {
         let (kind, reason) = Self.classify(serviceUUIDs: uuids, matter: matter, eddystone: eddystone, fastPair: fastPair,
                                            swiftPair: swiftPair, continuity: continuity, homeKit: homeKit)
         return BLEParsedAdvertisement(
-            displayName: BLEDisplayName.sanitized(fields.localName) ?? swiftPair?.displayName,
+            displayName: BLEDisplayName.sanitized(fields.localName) ?? swiftPair?.displayName ?? BLEDisplayName.sanitized(fields.cachedName),
             companyID: companyID, companyName: companyID.flatMap { companies.name(for: $0) },
             serviceUUIDs: uuids, serviceNames: names, matter: matter, eddystone: eddystone, fastPair: fastPair,
             swiftPair: swiftPair, continuity: continuity, continuityModelHint: hint, homeKit: homeKit,

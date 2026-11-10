@@ -88,7 +88,7 @@ final class CoreBluetoothCentral: NSObject, BLECentral, CBCentralManagerDelegate
     }
 
     /// Maps CoreBluetooth's advertisement dictionary; values of the wrong type are dropped.
-    nonisolated static func sighting(identifier: UUID, advertisement: [String: Any], rssi: NSNumber, at: Date) -> BLESighting {
+    nonisolated static func sighting(identifier: UUID, advertisement: [String: Any], rssi: NSNumber, at: Date, cachedName: String? = nil) -> BLESighting {
         let uuids = (advertisement[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? [])
             + (advertisement[CBAdvertisementDataOverflowServiceUUIDsKey] as? [CBUUID] ?? [])
         var serviceData: [String: Data] = [:]
@@ -101,7 +101,8 @@ final class CoreBluetoothCentral: NSObject, BLECentral, CBCentralManagerDelegate
             serviceUUIDs: uuids.map(\.uuidString),
             serviceData: serviceData,
             txPower: (advertisement[CBAdvertisementDataTxPowerLevelKey] as? NSNumber)?.intValue,
-            isConnectable: (advertisement[CBAdvertisementDataIsConnectable] as? NSNumber)?.boolValue)
+            isConnectable: (advertisement[CBAdvertisementDataIsConnectable] as? NSNumber)?.boolValue,
+            cachedName: cachedName)
         return BLESighting(identifier: identifier, fields: fields, rssi: rssi.intValue, at: at)
     }
 
@@ -148,7 +149,7 @@ final class CoreBluetoothCentral: NSObject, BLECentral, CBCentralManagerDelegate
 
     nonisolated func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
                                     advertisementData: [String: Any], rssi RSSI: NSNumber) {
-        let s = Self.sighting(identifier: peripheral.identifier, advertisement: advertisementData, rssi: RSSI, at: Date())
+        let s = Self.sighting(identifier: peripheral.identifier, advertisement: advertisementData, rssi: RSSI, at: Date(), cachedName: peripheral.name)
         MainActor.assumeIsolated { subject.send(.sighting(s)) }
     }
 

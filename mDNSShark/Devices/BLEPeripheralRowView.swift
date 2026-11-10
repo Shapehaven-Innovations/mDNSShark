@@ -82,10 +82,11 @@ struct BLEPeripheralRowView: View {
         return "\(companyLine(company: company, typeLabel: typeLabel)) · \(rssi) dBm · \(tail)"
     }
 
-    /// "<company> · <type>", or the type alone when nothing names a company.
+    /// "<company> · <type>"; an unknown type is left out when a company is shown, and reads "Unknown type" alone.
     static func companyLine(company: String?, typeLabel: String) -> String {
-        guard let company, !company.isEmpty else { return typeLabel }
-        return "\(company) · \(typeLabel)"
+        let typeKnown = typeLabel != BLEKind.unknown.label
+        guard let company, !company.isEmpty else { return typeKnown ? typeLabel : "Unknown type" }
+        return typeKnown ? "\(company) · \(typeLabel)" : company
     }
 }
 

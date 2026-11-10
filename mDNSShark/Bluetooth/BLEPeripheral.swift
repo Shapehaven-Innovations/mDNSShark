@@ -149,7 +149,7 @@ struct BLEPeripheral: Identifiable, Equatable {
 
     var displayName: String {
         if let name = parsed.displayName { return name }
-        return parsed.kind == .unknown ? BLEDisplayName.unnamed : "\(BLEDisplayName.unnamed) \(typeLabel)"
+        return BLEDisplayName.fallbackTitle(company: parsed.companyName, typeLabel: typeLabel, isTyped: parsed.kind != .unknown)
     }
     var fingerprint: BLEFingerprint? { BLEFingerprint(parsed: parsed) }
     var distance: BLEDistance { BLEDistance.from(rssi: rssi) }

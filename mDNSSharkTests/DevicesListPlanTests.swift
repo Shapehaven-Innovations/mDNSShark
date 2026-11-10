@@ -169,3 +169,12 @@ import DeviceFingerprint
         }
     }
 }
+
+@Suite("Bluetooth row detail line") struct BLERowDetailLineTests {
+    @Test func unknownTypeIsNotRepeated() {
+        #expect(BLEPeripheralRowView.companyLine(company: "Garmin", typeLabel: "Unknown") == "Garmin")
+        #expect(BLEPeripheralRowView.companyLine(company: nil, typeLabel: "Unknown") == "Unknown type")
+        #expect(BLEPeripheralRowView.companyLine(company: "Apple, Inc.", typeLabel: "Earbuds") == "Apple, Inc. · Earbuds")
+        #expect(BLEPeripheralRowView.companyLine(company: nil, typeLabel: "Speaker") == "Speaker")
+    }
+}

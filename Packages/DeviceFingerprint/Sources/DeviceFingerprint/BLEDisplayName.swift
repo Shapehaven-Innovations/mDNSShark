@@ -21,4 +21,26 @@ public enum BLEDisplayName {
         while result.hasSuffix(" ") { result.removeLast() }
         return result.isEmpty ? nil : result
     }
+
+    /// The row title when nothing advertises a name: "Samsung device", "Apple Earbuds", else "Unnamed".
+    public static func fallbackTitle(company: String?, typeLabel: String, isTyped: Bool) -> String {
+        guard let short = company.flatMap(shortCompany) else {
+            return isTyped ? "\(unnamed) \(typeLabel)" : unnamed
+        }
+        return "\(short) \(isTyped ? typeLabel : "device")"
+    }
+
+    private static let legalSuffixes: Set<String> = ["inc", "ltd", "llc", "co", "corp", "corporation", "gmbh", "limited", "ag", "ab", "bv", "sa", "plc", "kg", "oy"]
+
+    /// A company name without legal suffixes, for the fallback title only. The literal name stays in the subtitle.
+    static func shortCompany(_ name: String) -> String? {
+        var words = name.split(separator: " ").map(String.init)
+        func trimmed(_ s: String) -> String { String(s.drop { ",. ".contains($0) }.reversed().drop { ",. ".contains($0) }.reversed()) }
+        while words.count > 1 {
+            let last = trimmed(words[words.count - 1]).lowercased()
+            if legalSuffixes.contains(last) || last.isEmpty { words.removeLast() } else { break }
+        }
+        let result = trimmed(words.joined(separator: " "))
+        return result.isEmpty ? nil : result
+    }
 }

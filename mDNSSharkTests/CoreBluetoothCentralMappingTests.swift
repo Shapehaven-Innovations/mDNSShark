@@ -15,6 +15,11 @@ import DeviceFingerprint
         #expect(s.fields.manufacturerData == Data([0x4C, 0x00]))
     }
 
+    @Test func cachedNameStaysSeparateFromLocalName() {
+        let s = CoreBluetoothCentral.sighting(identifier: UUID(), advertisement: [CBAdvertisementDataLocalNameKey: "Adv"], rssi: NSNumber(value: -60), at: Date(), cachedName: "Cached")
+        #expect(s.fields.localName == "Adv" && s.fields.cachedName == "Cached")
+    }
+
     @Test func missingKeysAreNil() {
         let id = UUID()
         let at = Date(timeIntervalSince1970: 1_800_000_000)

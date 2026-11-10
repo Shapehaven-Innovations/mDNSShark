@@ -20,6 +20,11 @@ final class BLEAdvertisementParserTests: XCTestCase {
         let p = parser.parse(BLEAdvertisementFields(manufacturerData: Data([0x99, 0x09, 0x01])))
         XCTAssertEqual(p.kind, .unknown); XCTAssertNil(p.kindReason); XCTAssertNil(p.companyName); XCTAssertEqual(p.companyID, 0x0999)
     }
+    func test_cachedNameIsUsedOnlyWhenNothingIsAdvertised() {
+        XCTAssertEqual(parser.parse(BLEAdvertisementFields(cachedName: "Alex\u{2019}s Watch")).displayName, "Alex\u{2019}s Watch")
+        XCTAssertEqual(parser.parse(BLEAdvertisementFields(localName: "Live", cachedName: "Old")).displayName, "Live")
+        XCTAssertNil(parser.parse(BLEAdvertisementFields(cachedName: "\u{202E}  ")).displayName)
+    }
     func test_displayNameIsSanitized() { XCTAssertEqual(parser.parse(BLEAdvertisementFields(localName: "\u{202E}Tile")).displayName, "Tile") }
     func test_tileServicesAreTrackers() {
         for uuid in ["FEED", "FEEC", "0000FEEC-0000-1000-8000-00805F9B34FB"] {
