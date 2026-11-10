@@ -49,7 +49,7 @@ public struct BLEAdvertisementParser: Sendable {
         let hint = continuity.first { $0.type == .proximityPairing }.flatMap { AppleContinuity.proximityPairingModelHint($0.payload) }
 
         let (kind, reason) = Self.classify(serviceUUIDs: uuids, matter: matter, eddystone: eddystone, fastPair: fastPair,
-                                           swiftPair: swiftPair, continuity: continuity, homeKit: homeKit)
+                                           swiftPair: swiftPair, continuity: continuity, homeKit: homeKit, companyID: companyID)
         return BLEParsedAdvertisement(
             displayName: BLEDisplayName.sanitized(fields.localName) ?? swiftPair?.displayName ?? BLEDisplayName.sanitized(fields.cachedName),
             companyID: companyID, companyName: companyID.flatMap { companies.name(for: $0) },
@@ -59,7 +59,7 @@ public struct BLEAdvertisementParser: Sendable {
     }
 
     /// First hit wins; `.unknown` carries no reason.
-    public static func classify(serviceUUIDs: [String], matter: MatterBLEAdvertisement?, eddystone: EddystoneFrame?, fastPair: FastPairAdvertisement?, swiftPair: SwiftPairAdvertisement?, continuity: [AppleContinuityMessage], homeKit: HomeKitBLEAdvertisement?) -> (kind: BLEKind, reason: String?) {
+    public static func classify(serviceUUIDs: [String], matter: MatterBLEAdvertisement?, eddystone: EddystoneFrame?, fastPair: FastPairAdvertisement?, swiftPair: SwiftPairAdvertisement?, continuity: [AppleContinuityMessage], homeKit: HomeKitBLEAdvertisement?, companyID: UInt16? = nil) -> (kind: BLEKind, reason: String?) {
         if matter != nil { return (.smartHome, "Advertises a Matter commissioning service") }
         if let homeKit {
             switch homeKit.categoryKind {
@@ -88,6 +88,7 @@ public struct BLEAdvertisementParser: Sendable {
         if uuids.contains("1810") { return (.health, "Advertises the Blood Pressure service") }
         if uuids.contains("181D") { return (.health, "Advertises the Weight Scale service") }
         if uuids.contains("FEED") || uuids.contains("FEEC") { return (.tracker, "Advertises the Tile tracker service") }
+        if let companyID, let hint = BLECompanyKindHints.hint(for: companyID) { return hint }
         return (.unknown, nil)
     }
 }

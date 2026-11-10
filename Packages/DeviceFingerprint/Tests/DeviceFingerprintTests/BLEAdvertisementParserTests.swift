@@ -37,5 +37,12 @@ final class BLEAdvertisementParserTests: XCTestCase {
         XCTAssertEqual(p.kind, .findMy); XCTAssertEqual(p.kindReason, "Sends an Apple Find My message")
         XCTAssertFalse(BLEKind.findMy.offersDeviceInfoRead); XCTAssertFalse(BLEKind.tracker.offersDeviceInfoRead); XCTAssertTrue(BLEKind.phone.offersDeviceInfoRead)
     }
+    func test_companyOnlyHintIsALastResort() {
+        let garmin = parser.parse(BLEAdvertisementFields(manufacturerData: Data([0x87, 0x00, 0x01])))
+        XCTAssertEqual(garmin.kind, .wearable); XCTAssertEqual(garmin.kindReason, "Advertised company mostly makes wearables")
+        let withService = parser.parse(BLEAdvertisementFields(manufacturerData: Data([0x87, 0x00, 0x01]), serviceUUIDs: ["1812"]))
+        XCTAssertEqual(withService.kind, .inputDevice)
+        XCTAssertEqual(parser.parse(BLEAdvertisementFields(manufacturerData: Data([0x99, 0x09, 0x01]))).kind, .unknown)
+    }
     func test_everyKindHasLabelAndSymbol() { for k in BLEKind.allCases { XCTAssertFalse(k.label.isEmpty); XCTAssertFalse(k.symbol.isEmpty) } }
 }
