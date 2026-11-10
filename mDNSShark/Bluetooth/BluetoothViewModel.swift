@@ -132,6 +132,13 @@ final class BluetoothViewModel: ObservableObject {
         publishNow()
     }
 
+    /// Swipe to remove: clears one unsaved row from the list; saved rows are forgotten through their own confirmation.
+    func removeFromList(_ peripheralID: UUID) {
+        guard rows.removeUnsaved(peripheralID) else { return }
+        forgetRemoved([peripheralID])
+        publishNow()
+    }
+
     func stopScan(reason: BLEScanEndReason) {
         requestedDuration = nil
         if reason == .powerLost { readTask?.cancel() }

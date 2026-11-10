@@ -192,6 +192,13 @@ struct BLEPeripheralSet: Equatable {
         return removed
     }
 
+    /// Removes one unsaved row; a device that is still advertising comes back with its next sighting.
+    mutating func removeUnsaved(_ id: UUID) -> Bool {
+        guard let i = peripherals.firstIndex(where: { $0.id == id && $0.savedID == nil }) else { return false }
+        peripherals.remove(at: i)
+        return true
+    }
+
     /// Applies `body` to the row with this id, if it is still held.
     mutating func update(_ id: UUID, _ body: (inout BLEPeripheral) -> Void) {
         guard let i = peripherals.firstIndex(where: { $0.id == id }) else { return }

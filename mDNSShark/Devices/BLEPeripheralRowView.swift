@@ -38,7 +38,7 @@ struct BLEPeripheralRowView: View {
                 }
             }
             .accessibilityElement(children: .combine)
-            // Temporary add path until swipe actions land.
+            // Same action as the leading swipe, for rows reached some other way.
             .contextMenu {
                 if status.title == BLERelationshipText.notOnNetwork, let onAdd {
                     Button("Add to devices", systemImage: "plus.circle", action: onAdd)

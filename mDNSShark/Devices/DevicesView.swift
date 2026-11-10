@@ -18,13 +18,21 @@ struct DevicesView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                // The periodic tick drops rows that expire while nothing else publishes.
-                TimelineView(.periodic(from: .now, by: 15)) { context in
-                    content(now: context.date)
+            Group {
+                if filter == .bluetooth {
+                    bluetoothList
+                } else {
+                    ScrollView {
+                        // The periodic tick drops rows that expire while nothing else publishes.
+                        TimelineView(.periodic(from: .now, by: 15)) { context in
+                            content(now: context.date)
+                        }
+                    }
                 }
             }
-            .modifier(BluetoothPullToRefresh(isEnabled: filter == .bluetooth) { _ = bluetoothVM.refreshFromPull() })
+            .overlay(alignment: .bottomTrailing) {
+                if filter == .bluetooth, accessState == .ready { scanButton }
+            }
             .navigationDestination(item: $deepLinks.deviceLinkID) { id in
                 if let device = scanVM.devices.first(where: { $0.id == id }) { DeviceDetailView(device: device) }
             }
@@ -52,10 +60,7 @@ struct DevicesView: View {
             .pickerStyle(.segmented)
             .accessibilityLabel("Device filter")
 
-            if filter == .bluetooth {
-                if state == .ready { bluetoothHeader }
-                if state != .ready { BluetoothAccessView(state: state, onAllow: { bluetoothVM.allowAndScan() }) }
-            } else if filter == .all, state == .undetermined, !bluetoothVM.hasScannedThisSession {
+            if filter == .all, state == .undetermined, !bluetoothVM.hasScannedThisSession {
                 allBluetoothPrompt
             }
 
@@ -74,13 +79,9 @@ struct DevicesView: View {
                 }
             }
 
-            if filter != .bluetooth, !scanVM.unattachedServices.isEmpty {
+            if !scanVM.unattachedServices.isEmpty {
                 UnattachedServicesSection(services: scanVM.unattachedServices)
                     .padding(.top, 8)
-            }
-            if filter == .bluetooth, state == .ready {
-                // Draws only the footer in the ready state, so the privacy note shows in every state.
-                BluetoothAccessView(state: .ready, onAllow: {})
             }
         }
         .padding(.horizontal).padding(.top, 8)
@@ -103,22 +104,29 @@ struct DevicesView: View {
                 peripheral: p, status: status(for: p),
                 onAdd: p.savedID == nil ? { bluetoothVM.addToDevices(p.id) } : nil,
                 onOpenDevice: { id in if scanVM.devices.contains(where: { $0.id == id }) { openBluetoothDeviceID = id } })
-            // A suggested row opens the LAN device it is suggested for, at its Bluetooth card.
-            if let deviceID = bluetoothVM.matches.suggestion(forPeripheral: p.id)?.deviceID,
-               let device = scanVM.devices.first(where: { $0.id == deviceID }) {
-                NavigationLink(destination: DeviceDetailView(device: device, scrollTo: .bluetooth)) { rowView }
-                    .buttonStyle(.plain)
-            } else {
-                NavigationLink(destination: BLEPeripheralDetailView(peripheralID: p.id)) { rowView }
-                    .buttonStyle(.plain)
-            }
+            NavigationLink(destination: peripheralDestination(p)) { rowView }
+                .buttonStyle(.plain)
         case .saved(let entry):
-            BLESavedDeviceRowView(
-                device: entry,
-                mergeTargets: bluetoothVM.saved.filter { $0.id != entry.id },
-                onForget: { bluetoothVM.forgetSaved(entry.id) },
-                onMerge: { target in bluetoothVM.mergeSaved(entry.id, into: target) })
+            savedRow(entry)
         }
+    }
+
+    /// A suggested row opens the LAN device it is suggested for, at its Bluetooth card.
+    @ViewBuilder private func peripheralDestination(_ p: BLEPeripheral) -> some View {
+        if let deviceID = bluetoothVM.matches.suggestion(forPeripheral: p.id)?.deviceID,
+           let device = scanVM.devices.first(where: { $0.id == deviceID }) {
+            DeviceDetailView(device: device, scrollTo: .bluetooth)
+        } else {
+            BLEPeripheralDetailView(peripheralID: p.id)
+        }
+    }
+
+    private func savedRow(_ entry: BLESavedDevice) -> some View {
+        BLESavedDeviceRowView(
+            device: entry,
+            mergeTargets: bluetoothVM.saved.filter { $0.id != entry.id },
+            onForget: { bluetoothVM.forgetSaved(entry.id) },
+            onMerge: { target in bluetoothVM.mergeSaved(entry.id, into: target) })
     }
 
     private func status(for p: BLEPeripheral) -> BLERelationshipText.Line {
@@ -131,32 +139,120 @@ struct DevicesView: View {
 
     // MARK: Bluetooth header and prompts
 
-    @ViewBuilder private var bluetoothHeader: some View {
-        if bluetoothVM.isScanning {
-            // Counts only rows heard in this scan, so rows kept from an earlier scan are not "found" again.
-            HStack(spacing: 8) {
-                ProgressView()
-                Text("Scanning nearby\u{2026} Bluetooth LE · \(bluetoothVM.seenThisScanCount) found · \(bluetoothVM.seenThisScanSuggestedCount) suggested")
-                    .font(.caption).foregroundColor(.secondary)
-                Spacer()
-                Button { bluetoothVM.stopScan(reason: .user) } label: {
-                    Text("Stop").frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+    /// The Bluetooth filter is a List so rows can swipe: right adds to Devices, left removes from the list.
+    @ViewBuilder private var bluetoothList: some View {
+        // The periodic tick drops rows that expire while nothing else publishes.
+        TimelineView(.periodic(from: .now, by: 15)) { context in
+            let plan = DevicesListPlan.make(filter: .bluetooth, devices: scanVM.devices, peripherals: bluetoothVM.peripherals,
+                                            saved: bluetoothVM.saved, matches: bluetoothVM.matches, now: context.date)
+            let state = accessState
+            List {
+                Picker("Show", selection: $filter) {
+                    ForEach(DevicesFilter.allCases) { Text($0.rawValue).tag($0) }
                 }
-                .font(.caption)
-            }
-            .accessibilityElement(children: .combine)
-        } else {
-            HStack {
-                Button {
-                    bluetoothVM.startScanIfAuthorized()
-                } label: {
-                    Label("Scan Bluetooth", systemImage: BluetoothSymbol.name)
+                .pickerStyle(.segmented)
+                .accessibilityLabel("Device filter")
+                .plainListRow()
+
+                if state == .ready {
+                    if bluetoothVM.isScanning { scanStatusLine.plainListRow() }
+                } else {
+                    BluetoothAccessView(state: state, onAllow: { bluetoothVM.allowAndScan() }).plainListRow()
                 }
-                .buttonStyle(.bordered)
-                .accessibilityHint("Listens for nearby Bluetooth advertisements for 25 seconds")
-                Spacer()
+
+                if plan.isEmpty {
+                    emptyState.plainListRow()
+                } else {
+                    ForEach(plan.sections) { section in
+                        if !section.rows.isEmpty {
+                            Section {
+                                ForEach(section.rows) { row in bluetoothRow(row) }
+                            } header: {
+                                Text(section.title).font(.headline).foregroundColor(.primary).textCase(nil)
+                                    .accessibilityAddTraits(.isHeader)
+                            }
+                            .listSectionSeparator(.hidden)
+                        }
+                    }
+                }
+
+                if state == .ready {
+                    // Draws only the footer in the ready state, so the privacy note shows in every state.
+                    BluetoothAccessView(state: .ready, onAllow: {}).plainListRow()
+                }
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .contentMargins(.bottom, 88, for: .scrollContent)
+            .refreshable { _ = bluetoothVM.refreshFromPull() }
+            .animation(.default, value: plan.sections.flatMap(\.rows).map(\.id))
         }
+    }
+
+    @ViewBuilder private func bluetoothRow(_ row: DevicesListPlan.Row) -> some View {
+        switch row {
+        case .peripheral(let p):
+            let line = status(for: p)
+            let canAdd = p.savedID == nil && line.title == BLERelationshipText.notOnNetwork
+            ZStack {
+                BLEPeripheralRowView(
+                    peripheral: p, status: line,
+                    onAdd: canAdd ? { bluetoothVM.addToDevices(p.id) } : nil,
+                    onOpenDevice: { id in if scanVM.devices.contains(where: { $0.id == id }) { openBluetoothDeviceID = id } })
+                // The system chevron is hidden; the row draws its own.
+                NavigationLink(destination: peripheralDestination(p)) { EmptyView() }.opacity(0)
+            }
+            .plainListRow()
+            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                if canAdd {
+                    Button { bluetoothVM.addToDevices(p.id) } label: { Label("Add", systemImage: "plus.circle") }
+                        .tint(AppColors.info)
+                }
+            }
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                if p.savedID == nil {
+                    Button(role: .destructive) { bluetoothVM.removeFromList(p.id) } label: { Label("Remove", systemImage: "trash") }
+                }
+            }
+        case .saved(let entry):
+            savedRow(entry).plainListRow()
+        case .lan:
+            EmptyView()
+        }
+    }
+
+    /// Counts only rows heard in this scan, so rows kept from an earlier scan are not "found" again.
+    private var scanStatusLine: some View {
+        Text("Scanning nearby\u{2026} Bluetooth LE · \(bluetoothVM.seenThisScanCount) found · \(bluetoothVM.seenThisScanSuggestedCount) suggested")
+            .font(.caption).foregroundColor(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+    }
+
+    /// Floating scan control: starts a 25 second scan, or stops the running one.
+    private var scanButton: some View {
+        let scanning = bluetoothVM.isScanning
+        return Button {
+            if scanning { bluetoothVM.stopScan(reason: .user) } else { bluetoothVM.startScanIfAuthorized() }
+        } label: {
+            ZStack {
+                if scanning {
+                    ProgressView().tint(.white).scaleEffect(1.5)
+                    Image(systemName: "stop.fill").font(.caption.weight(.bold))
+                } else {
+                    Image(systemName: BluetoothSymbol.name).font(.title2.weight(.semibold))
+                }
+            }
+            .foregroundColor(.white)
+            .frame(width: 56, height: 56)
+            .background(Circle().fill(AppColors.info))
+            .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+        }
+        .padding(.trailing, 20).padding(.bottom, 16)
+        .sensoryFeedback(.impact, trigger: scanning)
+        .accessibilityLabel(scanning ? "Stop Bluetooth scan" : "Scan Bluetooth")
+        .accessibilityValue(scanning ? "Scanning, \(bluetoothVM.seenThisScanCount) found" : "")
+        .accessibilityHint(scanning ? "" : "Listens for nearby Bluetooth advertisements for 25 seconds")
     }
 
     private var allBluetoothPrompt: some View {
@@ -183,24 +279,18 @@ struct DevicesView: View {
             }.padding(scanVM.unattachedServices.isEmpty ? 40 : 20)
         case .bluetooth:
             if accessState == .ready, !bluetoothVM.isScanning {
-                Text(bluetoothVM.hasScannedThisSession ? "No Bluetooth devices nearby." : "Tap Scan Bluetooth to list nearby devices.")
+                Text(bluetoothVM.hasScannedThisSession ? "No Bluetooth devices nearby." : "Tap the Bluetooth button to list nearby devices.")
                     .foregroundColor(.secondary).padding(20)
             }
         }
     }
 }
 
-/// Pull to refresh for the Bluetooth filter only; All and LAN keep a plain scroll view.
-private struct BluetoothPullToRefresh: ViewModifier {
-    let isEnabled: Bool
-    let action: @MainActor () -> Void
-
-    func body(content: Content) -> some View {
-        if isEnabled {
-            // The scan runs on after the spinner ends; its progress shows in the Bluetooth header.
-            content.refreshable { action() }
-        } else {
-            content
-        }
+private extension View {
+    /// A List row drawn like the card layout: no separator, no row background, card spacing.
+    func plainListRow() -> some View {
+        listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
     }
 }

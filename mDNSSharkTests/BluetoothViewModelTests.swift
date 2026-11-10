@@ -346,6 +346,21 @@ enum BLEVMHarness {
         #expect(factory.fake.readCalls == [c])
     }
 
+    @Test func removeFromListDropsOnlyUnsavedRows() async throws {
+        let (vm, factory, _) = H.makeVM()
+        vm.startScanIfAuthorized()
+        factory.fake.subject.send(.sighting(H.sighting(name: "Lamp")))
+        factory.fake.subject.send(.sighting(H.sighting(name: "Desk")))
+        try await H.settle(vm)
+        let lamp = try #require(vm.peripherals.first { $0.displayName == "Lamp" })
+        let desk = try #require(vm.peripherals.first { $0.displayName == "Desk" })
+        vm.addToDevices(desk.id)
+        vm.removeFromList(desk.id)
+        #expect(vm.peripherals.contains { $0.id == desk.id })
+        vm.removeFromList(lamp.id)
+        #expect(!vm.peripherals.contains { $0.id == lamp.id })
+    }
+
     @Test func findMyBeaconIsNeverConnectedTo() async throws {
         let (vm, factory, _) = H.makeVM()
         vm.startScanIfAuthorized()
