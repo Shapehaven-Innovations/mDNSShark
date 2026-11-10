@@ -457,6 +457,11 @@ final class BluetoothViewModel: ObservableObject {
             publishNow()
             return
         }
+        guard row.parsed.kind.offersDeviceInfoRead else {
+            rows.update(peripheralID) { $0.readState = .failed(.notOffered) }
+            publishNow()
+            return
+        }
         guard let central, powerState == .poweredOn else {
             rows.update(peripheralID) { $0.readState = .failed(.poweredOff) }
             publishNow()

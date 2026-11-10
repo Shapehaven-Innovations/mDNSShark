@@ -163,8 +163,8 @@ struct BluetoothCardView: View {
             if let v = info.model { DetailRow(label: "Model", value: v, selectable: true) }
             if let v = info.firmware { DetailRow(label: "Firmware", value: v, selectable: true) }
             if let v = info.batteryPercent { DetailRow(label: "Battery", value: "\(v)%") }
-        } else if p.parsed.kind == .tracker {
-            Text("Read device info is not offered for trackers.").font(.caption).foregroundColor(.secondary)
+        } else if !p.parsed.kind.offersDeviceInfoRead {
+            Text("Read device info is not offered for trackers or Find My beacons.").font(.caption).foregroundColor(.secondary)
         } else if p.fields.isConnectable != false, let onReadInfo {
             Button(action: onReadInfo) {
                 if p.readState == .reading {
@@ -201,6 +201,7 @@ struct BluetoothCardView: View {
         case .noServices: return "The device does not offer Device Information or Battery."
         case .poweredOff: return "Bluetooth is off or unavailable."
         case .busy: return "Another read is running."
+        case .notOffered: return "Read device info is not offered for this kind of device."
         }
     }
 }

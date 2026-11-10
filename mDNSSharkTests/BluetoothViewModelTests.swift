@@ -346,6 +346,19 @@ enum BLEVMHarness {
         #expect(factory.fake.readCalls == [c])
     }
 
+    @Test func findMyBeaconIsNeverConnectedTo() async throws {
+        let (vm, factory, _) = H.makeVM()
+        vm.startScanIfAuthorized()
+        let fields = BLEAdvertisementFields(manufacturerData: Data([0x4C, 0x00, 0x12, 0x02, 0x00, 0x00]), isConnectable: true)
+        factory.fake.subject.send(.sighting(BLESighting(identifier: UUID(), fields: fields, rssi: -60, at: Date())))
+        try await H.settle(vm)
+        let row = try #require(vm.peripherals.first)
+        #expect(row.parsed.kind == .findMy)
+        await vm.readDeviceInfo(row.id)
+        #expect(vm.peripheral(id: row.id)?.readState == .failed(.notOffered))
+        #expect(factory.fake.readCalls.isEmpty)
+    }
+
     @Test func secondReadIsBusyAndLeavesTheFirstRunning() async throws {
         let (vm, factory, _) = H.makeVM()
         factory.fake.readDelay = .seconds(30)

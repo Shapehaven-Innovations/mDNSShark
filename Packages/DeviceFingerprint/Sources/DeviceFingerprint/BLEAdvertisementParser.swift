@@ -73,7 +73,7 @@ public struct BLEAdvertisementParser: Sendable {
         if types.contains(.proximityPairing) { return (.earbuds, "Sends Apple Proximity Pairing data") }
         if types.contains(.magicSwitch) { return (.wearable, "Sends Apple Magic Switch data") }
         if types.contains(.airPlayTarget) { return (.tv, "Sends an Apple AirPlay target message") }
-        if types.contains(.findMy) { return (.tracker, "Sends an Apple Find My message") }
+        if types.contains(.findMy) { return (.findMy, "Sends an Apple Find My message") }
         if let t = [AppleContinuityType.handoff, .nearbyInfo, .nearbyAction, .airDrop, .airPlaySource, .tetheringSource].first(where: types.contains) {
             return (.phone, "Sends an Apple \(t.label) message")
         }

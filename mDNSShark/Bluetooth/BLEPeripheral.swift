@@ -104,7 +104,7 @@ struct BLEDeviceInfo: Equatable, Codable {
 }
 
 enum BLEReadError: Error, Equatable {
-    case notFound, connectFailed, timedOut, noServices, poweredOff, busy
+    case notFound, connectFailed, timedOut, noServices, poweredOff, busy, notOffered
 }
 
 enum BLEReadState: Equatable {

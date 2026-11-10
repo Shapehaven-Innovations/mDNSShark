@@ -32,5 +32,10 @@ final class BLEAdvertisementParserTests: XCTestCase {
             XCTAssertEqual(p.kind, .tracker, uuid); XCTAssertEqual(p.kindReason, "Advertises the Tile tracker service", uuid)
         }
     }
+    func test_appleFindMyIsFindMyNotTracker() {
+        let p = parser.parse(BLEAdvertisementFields(manufacturerData: Data([0x4C, 0x00, 0x12, 0x02, 0x00, 0x00])))
+        XCTAssertEqual(p.kind, .findMy); XCTAssertEqual(p.kindReason, "Sends an Apple Find My message")
+        XCTAssertFalse(BLEKind.findMy.offersDeviceInfoRead); XCTAssertFalse(BLEKind.tracker.offersDeviceInfoRead); XCTAssertTrue(BLEKind.phone.offersDeviceInfoRead)
+    }
     func test_everyKindHasLabelAndSymbol() { for k in BLEKind.allCases { XCTAssertFalse(k.label.isEmpty); XCTAssertFalse(k.symbol.isEmpty) } }
 }
