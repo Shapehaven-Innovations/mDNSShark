@@ -18,7 +18,7 @@ final class NetworkScanViewModel: ObservableObject {
     @Published private(set) var isLocalNetworkDenied = false
     /// True once the launch Local Network check was granted; until then every foreground retries it so the system alert can never be lost.
     private(set) var launchGateSettled = false
-    private var launchGateInFlight = false
+    private(set) var launchGateInFlight = false
     /// Set when the first scan ran before permission was granted, so granting later restarts it instead of leaving it near empty.
     private var autoScanNeedsRedo = false
     /// The current scan's own Local Network check, nil until it resolves; the widget writer reads it to keep a denied result out.

@@ -7,6 +7,10 @@ import StoreKit
 struct SettingsView: View {
     @EnvironmentObject var securityVM: SecurityViewModel
     @EnvironmentObject var bluetoothVM: BluetoothViewModel
+    // The coordinator publishes only the tab and the Devices filter request, so reading scan and capture state through it adds no scan or packet re-renders.
+    @EnvironmentObject private var coordinator: AppCoordinator
+    @Environment(\.requestReview) private var requestReview
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var purchase = PurchaseManager.shared
     @State private var showManageSubscriptions = false
 
@@ -76,6 +80,7 @@ struct SettingsView: View {
                 purchase.lastError = nil
                 lastTLSError = SharedSettings.tlsInterceptorLastError
             }
+            .task { await requestReviewIfAllowed() }
             .alert("Import Error", isPresented: Binding(
                 get: { showImportError != nil },
                 set: { if !$0 { showImportError = nil } }
@@ -610,10 +615,39 @@ struct SettingsView: View {
 
     // MARK: - About
 
+    private static let writeReviewURL = URL(string: "https://apps.apple.com/app/id6741874026?action=write-review")!
+
+    /// Asks for a rating when Settings opens, only with nothing running; `ReviewRequestPolicy` holds the launch and throttle rules.
+    private func requestReviewIfAllowed() async {
+        let policy = ReviewRequestPolicy()
+        // Checked first so the tunnel status lookup below runs only on the rare visit that could ask.
+        guard policy.isDue(), scenePhase == .active else { return }
+        let capture = coordinator.packetCaptureManager
+        let scan = coordinator.networkScanViewModel
+        // Also sees a tunnel that is still connecting or was left running by an earlier process.
+        let tunnelActive = await capture.isTunnelActive()
+        // Every flag is read after the await, and leaving Settings cancels the task.
+        guard !Task.isCancelled else { return }
+        let isQuiet = ReviewRequestPolicy.isQuiet(
+            scanning: scan.isScanning || scan.scanner.isScanning,
+            bluetoothScanning: bluetoothVM.isScanning,
+            readingDeviceInfo: bluetoothVM.peripherals.contains { $0.readState == .reading },
+            tunnelActive: tunnelActive || !capture.isTunnelDisconnected,
+            capturing: capture.isCapturing,
+            gateInFlight: scan.launchGateInFlight,
+            securityRefreshing: securityVM.isRefreshing,
+            sceneActive: UIApplication.shared.applicationState == .active)
+        guard policy.consumeRequest(isQuiet: isQuiet) else { return }
+        requestReview()
+    }
+
     private var aboutSection: some View {
         Section("About") {
             Link(destination: URL(string: "https://github.com/Shapehaven-Innovations/mDNSShark#setting-up-tls-inspection")!) {
                 Label("Setup guide", systemImage: "arrow.up.right.square")
+            }
+            Link(destination: Self.writeReviewURL) {
+                Label("Rate mDNSShark", systemImage: "star")
             }
             NavigationLink {
                 LegalAdvisoriesView(viewModel: securityVM)

@@ -10,6 +10,7 @@ struct ContentView: View {
     @State private var showBanner = false
     @State private var showSplash = !UIAccessibility.isVoiceOverRunning
     @State private var tlsError: String = ""
+    @State private var launchCounted = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -42,6 +43,11 @@ struct ContentView: View {
         // The one trigger for the Local Network alert: splash gone and app active. It re-fires on every return to the foreground until granted, so the alert is never lost.
         .onChange(of: scenePhase == .active && !showSplash, initial: true) { _, ready in
             if ready {
+                // One count per foreground launch, for the rating prompt's new-user threshold.
+                if !launchCounted {
+                    launchCounted = true
+                    ReviewRequestPolicy().noteLaunch()
+                }
                 scanVM.startLaunchGateIfNeeded(isActive: true)
                 coordinator.consumeWidgetScanRequest()
             }
