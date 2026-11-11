@@ -16,13 +16,13 @@ final class PacketCaptureManager: ObservableObject {
     private var statusObserver: NSObjectProtocol?
     private var logOffset: UInt64 = 0
 
-    // Shared formatters so polling doesn't allocate two per decoded packet.
-    private nonisolated static let fractionalISO8601: ISO8601DateFormatter = {
+    // Shared formatters so polling does not allocate two per decoded packet. ISO8601DateFormatter is documented thread safe and these are never mutated.
+    private nonisolated(unsafe) static let fractionalISO8601: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return f
     }()
-    private nonisolated static let wholeSecondISO8601 = ISO8601DateFormatter()
+    private nonisolated(unsafe) static let wholeSecondISO8601 = ISO8601DateFormatter()
 
     private let sharedFileURL: URL = {
         let base = FileManager.default

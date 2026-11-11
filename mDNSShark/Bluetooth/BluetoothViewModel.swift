@@ -10,8 +10,8 @@ enum BLEScanEndReason: Equatable {
 /// App-scoped owner of Bluetooth scanning. Bluetooth rows never flow into `DiscoveredDevice` and are never matched to LAN devices.
 @MainActor
 final class BluetoothViewModel: ObservableObject {
-    static let scanDuration: TimeInterval = 25
-    static let publishInterval: Duration = .milliseconds(500)
+    nonisolated static let scanDuration: TimeInterval = 25
+    nonisolated static let publishInterval: Duration = .milliseconds(500)
     static let readTimeout: Duration = .seconds(5)
     static let logCapacity = 5000
 
