@@ -125,7 +125,6 @@ struct ProbeGateTests {
         #expect(log.ips == ["10.10.30.87"])
         #expect(devices.map(\.probesSettled) == [false])
         #expect(devices.map(\.probeRefused) == [false])
-        #expect(devices.map(\.wasProbed) == [true])
     }
 
     @Test("an off-subnet first IPv4 that sorts above a later on-subnet one is still un-skipped")
@@ -156,8 +155,6 @@ struct ProbeGateTests {
 
         #expect(log.ips.isEmpty)
         #expect(devices.map(\.probesSettled) == [true])
-        #expect(devices.map(\.wasProbed) == [false])
-        #expect(devices.map(\.noOpenPortsText) == ["Not probed"])
     }
 
     @Test("a non-LAN address with no known subnet is refused, settled, and reads Not probed")
@@ -170,8 +167,6 @@ struct ProbeGateTests {
 
         #expect(log.ips.isEmpty)
         #expect(devices.map(\.probesSettled) == [true])
-        #expect(devices.map(\.wasProbed) == [false])
-        #expect(devices.map(\.noOpenPortsText) == ["Not probed"])
     }
 
     @Test("an IPv4 group is still probed and reads None until ports are found")
@@ -182,8 +177,6 @@ struct ProbeGateTests {
         let devices = vm.merge(raw: [bonjourRow(name: "Printer", ip: "10.10.30.41", host: "p.local.")])
 
         #expect(log.ips == ["10.10.30.41"])
-        #expect(devices.map(\.wasProbed) == [true])
-        #expect(devices.map(\.noOpenPortsText) == ["None"])
     }
 
     @Test("a Hue row without a TXT vendor leaves the manufacturer nil so the OUI lookup can fill it")

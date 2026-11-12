@@ -126,7 +126,7 @@ final class WidgetSnapshotWriter {
     static func makeSnapshot(input: Input, previous: WidgetSnapshot?, seen: [String: Date], now: Date,
                              newScan: Bool) -> (snapshot: WidgetSnapshot, seen: [String: Date]) {
         let devices = input.devices
-        var counts = StatusCounts(total: devices.count, secure: 0, warning: 0, critical: 0, notProbed: 0, pending: 0)
+        var counts = StatusCounts(total: devices.count, secure: 0, warning: 0, critical: 0, pending: 0)
         var typeCounts: [String: Int] = [:]
         var briefs: [DeviceBrief] = []
         let keys = devices.map { DeviceBrief.key(mac: $0.macAddress, ip: $0.ipAddress) }
@@ -138,7 +138,6 @@ final class WidgetSnapshotWriter {
             case .secure: counts.secure += 1
             case .warning: counts.warning += 1
             case .critical: counts.critical += 1
-            case .notProbed: counts.notProbed += 1
             case .pending: counts.pending += 1
             }
             typeCounts[device.deviceType.label, default: 0] += 1

@@ -3,7 +3,7 @@ import WidgetSnapshot
 
 /// Sample values for previews and the placeholder only; never written anywhere.
 enum WidgetSamples {
-    static let counts = StatusCounts(total: 14, secure: 9, warning: 2, critical: 1, notProbed: 2, pending: 0)
+    static let counts = StatusCounts(total: 14, secure: 9, warning: 2, critical: 1, pending: 0)
 
     static let sixTypes = ["Smart Home": 4, "Camera": 3, "TV": 2, "Computer": 2, "NAS": 1, "Unknown": 2]
     static let tenTypeCounts = ["Smart Home": 3, "Camera": 2, "TV": 2, "Computer": 1, "NAS": 1, "Unknown": 1, "Router": 1,
@@ -59,15 +59,15 @@ enum WidgetSamples {
     static let securityHistory = [(0, 1), (0, 1), (1, 1), (1, 2), (0, 2), (0, 2), (0, 1), (1, 1), (1, 2), (1, 2), (1, 2), (1, 2)]
     static let busyHistory = [(2, 6), (3, 9), (1, 4), (5, 14), (4, 12), (8, 20), (6, 18), (10, 30)]
 
-    private static func counts(_ s: Int, _ w: Int, _ c: Int, _ np: Int, _ p: Int) -> StatusCounts {
-        StatusCounts(total: s + w + c + np + p, secure: s, warning: w, critical: c, notProbed: np, pending: p)
+    private static func counts(_ s: Int, _ w: Int, _ c: Int, _ p: Int) -> StatusCounts {
+        StatusCounts(total: s + w + c + p, secure: s, warning: w, critical: c, pending: p)
     }
 
     /// Ten minutes between scans, the newest at the snapshot's scan time.
     private static func history(_ pairs: [(Int, Int)], endingAt end: Date) -> [ScanSample] {
         pairs.enumerated().map { i, p in
             ScanSample(at: end.addingTimeInterval(Double(i - pairs.count + 1) * 600),
-                       counts: StatusCounts(total: 14, secure: 14 - p.0 - p.1, warning: p.1, critical: p.0, notProbed: 0, pending: 0))
+                       counts: StatusCounts(total: 14, secure: 14 - p.0 - p.1, warning: p.1, critical: p.0, pending: 0))
         }
     }
 
@@ -82,22 +82,21 @@ enum WidgetSamples {
         return SnapshotEntry(date: now, result: .loaded(snapshot), isScanRunning: running)
     }
 
-    static var securityIssues: SnapshotEntry { security(counts(9, 2, 1, 3, 0), securityHistory) }
-    static var securityAllClear: SnapshotEntry { security(counts(12, 0, 0, 2, 0), Array(repeating: (0, 0), count: 12), ago: 300) }
-    static var securityChecking: SnapshotEntry { security(counts(9, 0, 0, 3, 2), [(0, 0), (0, 0), (0, 0)]) }
-    static var securityNotProbed: SnapshotEntry { security(counts(0, 0, 0, 3, 0), [(0, 0)]) }
-    static var securityFew: SnapshotEntry { security(counts(9, 2, 1, 3, 0), [(1, 2)]) }
-    static var securityBusy: SnapshotEntry { security(counts(20, 30, 10, 3, 0), busyHistory) }
-    static var securityStale: SnapshotEntry { security(counts(9, 2, 1, 3, 0), securityHistory, ago: 3 * 3600) }
-    static var securityRunning: SnapshotEntry { security(counts(9, 2, 1, 3, 0), securityHistory, running: true) }
-    static var securityNoDevices: SnapshotEntry { security(counts(0, 0, 0, 0, 0), []) }
+    static var securityIssues: SnapshotEntry { security(counts(9, 2, 1, 0), securityHistory) }
+    static var securityAllClear: SnapshotEntry { security(counts(12, 0, 0, 0), Array(repeating: (0, 0), count: 12), ago: 300) }
+    static var securityChecking: SnapshotEntry { security(counts(9, 0, 0, 2), [(0, 0), (0, 0), (0, 0)]) }
+    static var securityFew: SnapshotEntry { security(counts(9, 2, 1, 0), [(1, 2)]) }
+    static var securityBusy: SnapshotEntry { security(counts(20, 30, 10, 0), busyHistory) }
+    static var securityStale: SnapshotEntry { security(counts(9, 2, 1, 0), securityHistory, ago: 3 * 3600) }
+    static var securityRunning: SnapshotEntry { security(counts(9, 2, 1, 0), securityHistory, running: true) }
+    static var securityNoDevices: SnapshotEntry { security(counts(0, 0, 0, 0), []) }
     static var securityBluetooth: SnapshotEntry {
-        security(counts(9, 2, 1, 3, 0), securityHistory, bluetooth: bluetooth(nearby: 7, ago: 720))
+        security(counts(9, 2, 1, 0), securityHistory, bluetooth: bluetooth(nearby: 7, ago: 720))
     }
     static var securityStaleBluetooth: SnapshotEntry {
-        security(counts(9, 2, 1, 3, 0), securityHistory, bluetooth: bluetooth(nearby: 7, ago: 3 * 3600))
+        security(counts(9, 2, 1, 0), securityHistory, bluetooth: bluetooth(nearby: 7, ago: 3 * 3600))
     }
     static var securityBothStaleBluetooth: SnapshotEntry {
-        security(counts(9, 2, 1, 3, 0), securityHistory, ago: 3 * 3600, bluetooth: bluetooth(nearby: 17, ago: 23 * 3600))
+        security(counts(9, 2, 1, 0), securityHistory, ago: 3 * 3600, bluetooth: bluetooth(nearby: 17, ago: 23 * 3600))
     }
 }

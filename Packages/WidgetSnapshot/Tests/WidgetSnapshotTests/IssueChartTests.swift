@@ -8,7 +8,7 @@ struct IssueChartTests {
     func h(_ pairs: [(Int, Int)]) -> [ScanSample] {   // (critical, warning), oldest first
         pairs.enumerated().map { i, p in
             ScanSample(at: t.addingTimeInterval(Double(i) * 600),
-                       counts: StatusCounts(total: 20, secure: 20 - p.0 - p.1, warning: p.1, critical: p.0, notProbed: 0, pending: 0))
+                       counts: StatusCounts(total: 20, secure: 20 - p.0 - p.1, warning: p.1, critical: p.0, pending: 0))
         }
     }
     let mockup: [(Int, Int)] = [(0, 1), (0, 1), (1, 1), (1, 2), (0, 2), (0, 2), (0, 1), (1, 1), (1, 2), (1, 2), (1, 2), (1, 2)]

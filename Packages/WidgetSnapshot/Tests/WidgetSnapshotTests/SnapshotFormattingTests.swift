@@ -36,19 +36,19 @@ struct SnapshotFormattingTests {
         #expect(SnapshotFormatting.wholePercents([:]) == [:])
     }
     @Test("All clear only with zero warning, critical and pending") func allClear() {
-        #expect(StatusCounts(total: 5, secure: 2, warning: 0, critical: 0, notProbed: 3, pending: 0).isAllClear)
-        #expect(!StatusCounts(total: 5, secure: 4, warning: 0, critical: 0, notProbed: 0, pending: 1).isAllClear)
-        #expect(!StatusCounts(total: 5, secure: 4, warning: 1, critical: 0, notProbed: 0, pending: 0).isAllClear)
+        #expect(StatusCounts(total: 5, secure: 2, warning: 0, critical: 0, pending: 0).isAllClear)
+        #expect(!StatusCounts(total: 5, secure: 4, warning: 0, critical: 0, pending: 1).isAllClear)
+        #expect(!StatusCounts(total: 5, secure: 4, warning: 1, critical: 0, pending: 0).isAllClear)
         #expect(!StatusCounts.zero.isAllClear)
-        #expect(!StatusCounts(total: 3, secure: 0, warning: 0, critical: 0, notProbed: 3, pending: 0).isAllClear)
-        #expect(StatusCounts(total: 5, secure: 0, warning: 2, critical: 1, notProbed: 2, pending: 0).issues == 3)
+        #expect(!StatusCounts(total: 3, secure: 0, warning: 0, critical: 0, pending: 0).isAllClear)
+        #expect(StatusCounts(total: 5, secure: 0, warning: 2, critical: 1, pending: 0).issues == 3)
     }
     @Test("VoiceOver label") func label() {
-        let c = StatusCounts(total: 14, secure: 9, warning: 2, critical: 1, notProbed: 3, pending: 0)
+        let c = StatusCounts(total: 14, secure: 9, warning: 2, critical: 1, pending: 0)
         #expect(SnapshotFormatting.accessibilityLabel(counts: c, scannedAt: t0, now: t0 + 12 * 60)
-                == "14 devices, 9 secure, 2 warning, 1 critical, 3 not probed, scanned 12 minutes ago")
-        let one = StatusCounts(total: 1, secure: 0, warning: 0, critical: 0, notProbed: 0, pending: 1)
+                == "14 devices, 9 secure, 2 warning, 1 critical, scanned 12 minutes ago")
+        let one = StatusCounts(total: 1, secure: 0, warning: 0, critical: 0, pending: 1)
         #expect(SnapshotFormatting.accessibilityLabel(counts: one, scannedAt: t0, now: t0)
-                == "1 device, 0 secure, 0 warning, 0 critical, 0 not probed, 1 pending, scanned just now")
+                == "1 device, 0 secure, 0 warning, 0 critical, 1 pending, scanned just now")
     }
 }

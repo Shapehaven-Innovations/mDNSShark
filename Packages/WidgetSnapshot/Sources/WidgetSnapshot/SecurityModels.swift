@@ -3,7 +3,6 @@ import Foundation
 extension WidgetCopy {
     public static let security = "Security"
     public static let allClear = "All clear"
-    public static let notProbedTitle = "Not probed"
     public static let noDevices = "No devices"
     public static let issuesPerScan = "Issues per scan"
     public static let critical = "Critical"
@@ -17,16 +16,14 @@ extension WidgetCopy {
 
     public static func checking(_ n: Int) -> String { "\(n) checking" }
     public static func issueUnit(_ n: Int) -> String { n == 1 ? "issue" : "issues" }
-    public static func notProbedCount(_ n: Int) -> String { "\(n) not probed" }
 }
 
-/// The headline state of the Security widget; pending and not probed never count as secure.
+/// The headline state of the Security widget; pending never counts as secure.
 public enum SecurityVerdict: Equatable, Sendable {
     case noDevices
     case issues(Int)
     case checking(pending: Int)
     case allClear
-    case nothingProbed
 }
 
 extension StatusCounts {
@@ -34,18 +31,17 @@ extension StatusCounts {
         if total == 0 { return .noDevices }
         if issues > 0 { return .issues(issues) }
         if pending > 0 { return .checking(pending: pending) }
-        if secure > 0 { return .allClear }
-        return .nothingProbed
+        return .allClear
     }
 
-    /// The first nonzero of critical, warning, pending, secure and not probed.
+    /// The first nonzero of critical, warning, pending and secure.
     public var worstKind: StatusKind? {
-        [StatusKind.critical, .warning, .pending, .secure, .notProbed].first { count(of: $0) > 0 }
+        [StatusKind.critical, .warning, .pending, .secure].first { count(of: $0) > 0 }
     }
 
-    /// Secure through not probed with zeros kept, then pending only when above zero.
+    /// Secure, warning and critical with zeros kept, then pending only when above zero.
     public var legend: [CapsuleSegment] {
-        var items = [StatusKind.secure, .warning, .critical, .notProbed].map { CapsuleSegment(kind: $0, count: count(of: $0)) }
+        var items = [StatusKind.secure, .warning, .critical].map { CapsuleSegment(kind: $0, count: count(of: $0)) }
         if pending > 0 { items.append(CapsuleSegment(kind: .pending, count: pending)) }
         return items
     }
@@ -62,7 +58,6 @@ extension SecurityVerdict {
         case .issues(let n): .count(n, unit: WidgetCopy.issueUnit(n))
         case .checking: .count(0, unit: WidgetCopy.issueUnit(0))
         case .allClear: .title(WidgetCopy.allClear)
-        case .nothingProbed: .title(WidgetCopy.notProbedTitle)
         case .noDevices: .title(WidgetCopy.noDevices)
         }
     }
@@ -74,7 +69,7 @@ extension SecurityVerdict {
         case .issues: return "exclamationmark.shield"
         case .allClear: return "checkmark.shield"
         case .checking: return "hourglass"
-        case .nothingProbed, .noDevices: return "questionmark.circle"
+        case .noDevices: return "questionmark.circle"
         }
     }
 }
@@ -85,7 +80,7 @@ public struct SecurityWidgetModel: Equatable, Sendable {
     public var hero: SecurityHero
     public var headerSymbol: StatusKind?
     public var segments: [CapsuleSegment]
-    /// Secure, warning, critical and not probed with zeros kept, for the medium 2x2 grid.
+    /// Secure, warning and critical with zeros kept, for the medium 2x2 grid.
     public var grid: [CapsuleSegment]
     public var legend: [CapsuleSegment]
     public var checkingNote: String?
@@ -107,7 +102,6 @@ public struct SecurityWidgetModel: Equatable, Sendable {
             let stale = !Staleness.isFresh(scannedAt: s.scannedAt, now: now)
             let age = SnapshotFormatting.shortAge(since: s.scannedAt, now: now)
             let ageText = WidgetCopy.scanned + " " + age
-            let notProbed = WidgetCopy.notProbedCount(counts.notProbed)
             let base = SnapshotFormatting.securityAccessibilityLabel(counts: counts, scannedAt: s.scannedAt, now: now,
                                                                      isStale: stale, isScanRunning: false)
             let bluetooth = BluetoothIndicatorModel.make(s.bluetooth, now: now)
@@ -118,8 +112,8 @@ public struct SecurityWidgetModel: Equatable, Sendable {
                 verdict: verdict, hero: verdict.hero, headerSymbol: counts.worstKind, segments: counts.capsuleSegments,
                 grid: Array(counts.legend.prefix(4)), legend: counts.legend,
                 checkingNote: counts.pending > 0 ? WidgetCopy.checking(counts.pending) : nil,
-                smallCaption: notProbed + WidgetCopy.captionSeparator + age, ageText: ageText,
-                largeCaption: notProbed + WidgetCopy.captionSeparator + ageText, chart: chart,
+                smallCaption: age, ageText: ageText,
+                largeCaption: ageText, chart: chart,
                 isStale: stale, isScanRunning: isScanRunning, bluetooth: bluetooth, accessibilityLabel: label,
                 largeAccessibilityLabel: base + ". " + chart.accessibilityLabel + running)
         }
@@ -128,7 +122,7 @@ public struct SecurityWidgetModel: Equatable, Sendable {
 
 /// The lock screen Security shapes (circular, rectangular, inline); they carry status by symbol and position only.
 public struct SecurityAccessoryModel: Equatable, Sendable {
-    /// Secure over probed (secure, warning, critical, pending), or 0 when nothing was probed.
+    /// Secure over all devices (secure, warning, critical, pending), or 0 when there are none.
     public var gaugeFraction: Double
     public var gaugeValue: Int
     public var stateSymbol: String
@@ -147,7 +141,7 @@ public struct SecurityAccessoryModel: Equatable, Sendable {
             let counts = s.counts, verdict = counts.securityVerdict
             let stale = !Staleness.isFresh(scannedAt: s.scannedAt, now: now)
             let probed = counts.secure + counts.issues + counts.pending
-            var secondary = [CapsuleSegment(kind: .secure, count: counts.secure), CapsuleSegment(kind: .notProbed, count: counts.notProbed)]
+            var secondary = [CapsuleSegment(kind: .secure, count: counts.secure)]
             if counts.pending > 0 { secondary.append(CapsuleSegment(kind: .pending, count: counts.pending)) }
             let symbol = verdict.stateSymbol(isStale: stale)
             let bluetooth = BluetoothIndicatorModel.make(s.bluetooth, now: now)
@@ -165,15 +159,13 @@ public struct SecurityAccessoryModel: Equatable, Sendable {
         }
     }
 
-    /// Stale never says All clear; fresh always states the not probed count when there is one to state.
+    /// Stale never says All clear; fresh states the issue count.
     static func inlineText(_ counts: StatusCounts, stale: Bool) -> String {
         if stale { return WidgetCopy.outOfDate + ", " + SnapshotFormatting.issuePhrase(counts.issues) }
-        let notProbed = WidgetCopy.notProbedCount(counts.notProbed)
         switch counts.securityVerdict {
-        case .issues(let n): return SnapshotFormatting.issuePhrase(n) + ", " + notProbed
-        case .allClear: return WidgetCopy.allClear + ", " + notProbed
+        case .issues(let n): return SnapshotFormatting.issuePhrase(n)
+        case .allClear: return WidgetCopy.allClear
         case .checking(let p): return SnapshotFormatting.issuePhrase(0) + ", " + WidgetCopy.checking(p)
-        case .nothingProbed: return WidgetCopy.notProbedTitle + ", \(counts.total) " + WidgetCopy.deviceUnit(counts.total)
         case .noDevices: return WidgetCopy.noDevices
         }
     }

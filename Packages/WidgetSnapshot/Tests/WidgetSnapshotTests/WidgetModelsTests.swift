@@ -5,19 +5,19 @@ import Foundation
 @Suite("Widget models")
 struct WidgetModelsTests {
     let scan = Date(timeIntervalSince1970: 2_000_000)
-    let counts = StatusCounts(total: 14, secure: 9, warning: 2, critical: 1, notProbed: 2, pending: 0)
+    let counts = StatusCounts(total: 14, secure: 9, warning: 2, critical: 1, pending: 0)
 
     func snapshot(_ c: StatusCounts? = nil, history: [ScanSample] = [], subnet: String? = "192.168.1.0/24") -> WidgetSnapshot {
         WidgetSnapshot(version: 1, scannedAt: scan, subnet: subnet, counts: c ?? counts, typeCounts: [:], history: history,
                        newDevices: [], topology: [], topologyOverflow: 0, ownDeviceKey: nil)
     }
 
-    @Test("capsule keeps status order, omits zeros, and outlines not probed and pending")
+    @Test("capsule keeps status order, omits zeros, and outlines pending")
     func capsuleSegmentsInOrder() {
-        let c = StatusCounts(total: 6, secure: 0, warning: 2, critical: 1, notProbed: 2, pending: 1)
-        #expect(c.capsuleSegments.map(\.kind) == [.warning, .critical, .notProbed, .pending])
-        #expect(c.capsuleSegments.map(\.count) == [2, 1, 2, 1])
-        #expect(c.capsuleSegments.filter(\.kind.isOutlined).map(\.kind) == [.notProbed, .pending])
+        let c = StatusCounts(total: 6, secure: 0, warning: 2, critical: 1, pending: 1)
+        #expect(c.capsuleSegments.map(\.kind) == [.warning, .critical, .pending])
+        #expect(c.capsuleSegments.map(\.count) == [2, 1, 1])
+        #expect(c.capsuleSegments.filter(\.kind.isOutlined).map(\.kind) == [.pending])
         #expect(StatusCounts.zero.capsuleSegments.isEmpty)
     }
 
@@ -32,12 +32,12 @@ struct WidgetModelsTests {
         guard case .loaded(let m) = DevicesWidgetModel.make(.loaded(snapshot()), now: scan.addingTimeInterval(720), isScanRunning: false) else { Issue.record("not loaded"); return }
         #expect(m.total == 14 && m.unit == "devices" && !m.isStale)
         #expect(m.ageText == "Scanned 12 minutes ago")
-        #expect(m.accessibilityLabel == "14 devices, 9 secure, 2 warning, 1 critical, 2 not probed, scanned 12 minutes ago")
+        #expect(m.accessibilityLabel == "14 devices, 9 secure, 2 warning, 1 critical, scanned 12 minutes ago")
     }
 
     @Test("one device is singular")
     func singular() {
-        let one = StatusCounts(total: 1, secure: 1, warning: 0, critical: 0, notProbed: 0, pending: 0)
+        let one = StatusCounts(total: 1, secure: 1, warning: 0, critical: 0, pending: 0)
         guard case .loaded(let m) = DevicesWidgetModel.make(.loaded(snapshot(one)), now: scan, isScanRunning: false) else { Issue.record("not loaded"); return }
         #expect(m.unit == "device")
     }
@@ -56,12 +56,12 @@ struct WidgetModelsTests {
         #expect(abs(m.ringFraction - 0.8) < 1e-9)
         #expect(m.ringValue == 12 && m.ringUnit == "min")
         #expect(m.title == "Last scan" && m.smallCaption == "devices" && m.mediumCaption == "192.168.1.0/24")
-        #expect(m.accessibilityLabel == "Last scan 12 minutes ago, 14 devices, 9 secure, 2 warning, 1 critical, 2 not probed, 192.168.1.0/24")
+        #expect(m.accessibilityLabel == "Last scan 12 minutes ago, 14 devices, 9 secure, 2 warning, 1 critical, 192.168.1.0/24")
     }
 
     @Test("scan now small caption is singular for one device")
     func scanNowSingular() {
-        let one = StatusCounts(total: 1, secure: 1, warning: 0, critical: 0, notProbed: 0, pending: 0)
+        let one = StatusCounts(total: 1, secure: 1, warning: 0, critical: 0, pending: 0)
         guard case .loaded(let m) = ScanNowWidgetModel.make(.loaded(snapshot(one)), now: scan.addingTimeInterval(60), isScanRunning: false) else { Issue.record("not loaded"); return }
         #expect(m.smallCaption == "device")
     }
@@ -80,7 +80,7 @@ struct WidgetModelsTests {
         #expect(m.isStale && m.ringFraction == 0.08)
         #expect(m.ringValue == 3 && m.ringUnit == "hr")
         #expect(m.title == "Out of date" && m.smallCaption == "may differ" && m.mediumCaption == "Network may have changed")
-        #expect(m.accessibilityLabel == "Out of date, scanned 3 hours ago, 14 devices, 9 secure, 2 warning, 1 critical, 2 not probed, may differ")
+        #expect(m.accessibilityLabel == "Out of date, scanned 3 hours ago, 14 devices, 9 secure, 2 warning, 1 critical, may differ")
     }
 
     @Test("ring age units", arguments: [(0.0, 0, "min"), (59, 0, "min"), (60, 1, "min"), (720, 12, "min"), (3600, 1, "hr"), (86_399, 23, "hr"), (172_800, 2, "d")])
@@ -93,7 +93,7 @@ struct WidgetModelsTests {
     func nilSubnet() {
         guard case .loaded(let m) = ScanNowWidgetModel.make(.loaded(snapshot(subnet: nil)), now: scan, isScanRunning: false) else { Issue.record("not loaded"); return }
         #expect(m.mediumCaption == "Subnet unknown")
-        #expect(m.accessibilityLabel == "Last scan just now, 14 devices, 9 secure, 2 warning, 1 critical, 2 not probed")
+        #expect(m.accessibilityLabel == "Last scan just now, 14 devices, 9 secure, 2 warning, 1 critical")
     }
 
     func devicesModel(_ typeCounts: [String: Int], now: Date? = nil, running: Bool = false) -> DevicesWidgetModel? {
@@ -184,9 +184,9 @@ struct WidgetModelsTests {
     @Test("medium VoiceOver label is count, subnet, status counts, age, then the type breakdown")
     func mediumLabel() {
         let m = devicesModel(["Smart Home": 4, "Camera": 3, "TV": 1], now: scan.addingTimeInterval(720))
-        #expect(m?.mediumAccessibilityLabel == "14 devices, 192.168.1.0/24, 9 secure, 2 warning, 1 critical, 2 not probed, scanned 12 minutes ago. By device type: 4 smart home, 3 cameras, 1 TV")
+        #expect(m?.mediumAccessibilityLabel == "14 devices, 192.168.1.0/24, 9 secure, 2 warning, 1 critical, scanned 12 minutes ago. By device type: 4 smart home, 3 cameras, 1 TV")
         let none = devicesModel([:], running: true)
-        #expect(none?.mediumAccessibilityLabel == "14 devices, 192.168.1.0/24, 9 secure, 2 warning, 1 critical, 2 not probed, scanned just now. No type data, scan running")
+        #expect(none?.mediumAccessibilityLabel == "14 devices, 192.168.1.0/24, 9 secure, 2 warning, 1 critical, scanned just now. No type data, scan running")
         let stale = devicesModel(["TV": 2], now: scan.addingTimeInterval(3 * 3600))
         #expect(stale?.mediumAccessibilityLabel.hasPrefix("Out of date. 14 devices, 192.168.1.0/24") == true)
         #expect(stale?.isStale == true)
@@ -202,7 +202,7 @@ struct WidgetModelsTests {
 
     @Test("the small widget label is unchanged")
     func smallLabelUnchanged() {
-        #expect(devicesModel(["TV": 2])?.accessibilityLabel == "14 devices, 9 secure, 2 warning, 1 critical, 2 not probed, scanned just now")
+        #expect(devicesModel(["TV": 2])?.accessibilityLabel == "14 devices, 9 secure, 2 warning, 1 critical, scanned just now")
     }
 
     func withBluetooth(ago: Double = 120) -> WidgetSnapshot {
@@ -216,8 +216,8 @@ struct WidgetModelsTests {
     func devicesSmallAndMediumLabelsInsertClauseBeforeRunning() {
         guard case .loaded(let m) = DevicesWidgetModel.make(.loaded(withBluetooth()), now: scan.addingTimeInterval(720), isScanRunning: true) else { Issue.record("not loaded"); return }
         #expect(m.bluetooth?.nearby == 7)
-        #expect(m.accessibilityLabel == "14 devices, 9 secure, 2 warning, 1 critical, 2 not probed, scanned 12 minutes ago. " + clause + ", scan running")
-        #expect(m.mediumAccessibilityLabel == "14 devices, 192.168.1.0/24, 9 secure, 2 warning, 1 critical, 2 not probed, scanned 12 minutes ago. No type data. " + clause + ", scan running")
+        #expect(m.accessibilityLabel == "14 devices, 9 secure, 2 warning, 1 critical, scanned 12 minutes ago. " + clause + ", scan running")
+        #expect(m.mediumAccessibilityLabel == "14 devices, 192.168.1.0/24, 9 secure, 2 warning, 1 critical, scanned 12 minutes ago. No type data. " + clause + ", scan running")
         guard case .loaded(let idle) = DevicesWidgetModel.make(.loaded(withBluetooth()), now: scan.addingTimeInterval(720), isScanRunning: false) else { Issue.record("not loaded"); return }
         #expect(idle.accessibilityLabel.hasSuffix(". " + clause))
         #expect(devicesModel([:])?.bluetooth == nil)
@@ -226,11 +226,11 @@ struct WidgetModelsTests {
     @Test("scan now fresh and stale labels insert the Bluetooth clause before scan running")
     func scanNowFreshAndStaleInsertClause() {
         guard case .loaded(let fresh) = ScanNowWidgetModel.make(.loaded(withBluetooth()), now: scan.addingTimeInterval(720), isScanRunning: true) else { Issue.record("not loaded"); return }
-        #expect(fresh.accessibilityLabel == "Last scan 12 minutes ago, 14 devices, 9 secure, 2 warning, 1 critical, 2 not probed, 192.168.1.0/24. " + clause + ", scan running")
+        #expect(fresh.accessibilityLabel == "Last scan 12 minutes ago, 14 devices, 9 secure, 2 warning, 1 critical, 192.168.1.0/24. " + clause + ", scan running")
         var s = snapshot()
         s.bluetooth = BluetoothSummary(scannedAt: scan.addingTimeInterval(3 * 3600 - 600), nearby: 7)
         guard case .loaded(let stale) = ScanNowWidgetModel.make(.loaded(s), now: scan.addingTimeInterval(3 * 3600 + 5), isScanRunning: false) else { Issue.record("not loaded"); return }
         #expect(stale.isStale && stale.bluetooth?.isStale == false)
-        #expect(stale.accessibilityLabel == "Out of date, scanned 3 hours ago, 14 devices, 9 secure, 2 warning, 1 critical, 2 not probed, may differ. 7 Bluetooth devices nearby, Bluetooth scanned 10 minutes ago")
+        #expect(stale.accessibilityLabel == "Out of date, scanned 3 hours ago, 14 devices, 9 secure, 2 warning, 1 critical, may differ. 7 Bluetooth devices nearby, Bluetooth scanned 10 minutes ago")
     }
 }

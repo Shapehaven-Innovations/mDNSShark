@@ -28,19 +28,17 @@ public struct StatusCounts: Codable, Equatable, Sendable {
     public var secure: Int
     public var warning: Int
     public var critical: Int
-    public var notProbed: Int
     public var pending: Int
 
-    public init(total: Int, secure: Int, warning: Int, critical: Int, notProbed: Int, pending: Int) {
+    public init(total: Int, secure: Int, warning: Int, critical: Int, pending: Int) {
         self.total = total
         self.secure = secure
         self.warning = warning
         self.critical = critical
-        self.notProbed = notProbed
         self.pending = pending
     }
 
-    public static let zero = StatusCounts(total: 0, secure: 0, warning: 0, critical: 0, notProbed: 0, pending: 0)
+    public static let zero = StatusCounts(total: 0, secure: 0, warning: 0, critical: 0, pending: 0)
 }
 
 public struct ScanSample: Codable, Equatable, Sendable {

@@ -45,7 +45,6 @@ struct OffNetworkProbeTests {
         let r = row(name: "Cam", ip: "10.10.10.87", host: "cam.local.")
         vm.apply(raw: [r])
         #expect(rec.probes.isEmpty)
-        #expect(vm.devices.first?.wasProbed == false)
 
         #expect(vm.probeAnyway(ip: "10.10.10.87"))
         vm.apply(raw: [r])
@@ -53,7 +52,6 @@ struct OffNetworkProbeTests {
         #expect(rec.probes == ["10.10.10.87"])
         #expect(rec.lookups.isEmpty && rec.triggers.isEmpty)
         #expect(vm.devices.first?.probesSettled == false)
-        #expect(vm.devices.first?.wasProbed == true)
         #expect(vm.devices.first?.probeRequested == true)
     }
 
@@ -71,7 +69,6 @@ struct OffNetworkProbeTests {
         let devices = vm.merge(raw: [r])
 
         #expect(rec.probes == ["10.10.10.87"])
-        #expect(devices.first?.wasProbed == false)
         #expect(devices.first?.probesSettled == true)
     }
 
@@ -88,7 +85,6 @@ struct OffNetworkProbeTests {
         vm.apply(raw: [far, v6])
 
         #expect(rec.probes.isEmpty)
-        #expect(vm.devices.allSatisfy { !$0.wasProbed })
     }
 
     @Test("a request for an on-subnet IP does not probe twice")
@@ -115,7 +111,6 @@ struct OffNetworkProbeTests {
 
         #expect(rec.probes.isEmpty)
         #expect(vm.devices.first?.paymentVendorSkip != nil)
-        #expect(vm.devices.first?.wasProbed == false)
     }
 
     @Test("the description fetch and Google Wifi probe follow the request")
@@ -149,7 +144,7 @@ struct OffNetworkProbeTests {
     @Test("networkNote: same network, probed")
     func noteSame() {
         let d = device(ip: "10.10.30.9", onLocal: true, types: ["_http._tcp"])
-        #expect(d.networkNote(ownCIDRs: ["10.10.30.0/24"]) == ["Same network as this phone (10.10.30.0/24)", "Bonjour advertisement (_http._tcp)", "Probed"])
+        #expect(d.networkNote(ownCIDRs: ["10.10.30.0/24"]) == ["Same network as this phone (10.10.30.0/24)", "Bonjour advertisement (_http._tcp)"])
     }
 
     @Test("networkNote: outside via Bonjour only adds the repeater note and Not probed")
@@ -158,7 +153,7 @@ struct OffNetworkProbeTests {
         let lines = d.networkNote(ownCIDRs: ["10.10.30.0/24"])
         #expect(lines.first == "Outside this phone's network (device 10.10.10.87, outside: 10.10.30.0/24)")
         #expect(lines.contains("Your router may be repeating this advertisement from another network (not confirmed)."))
-        #expect(lines.last == "Not probed: on another network")
+        #expect(lines.last == "Skipped: on another network")
     }
 
     @Test("networkNote: SSDP reply drops the repeater note, a request reads Probes pending, then Probed on request")
@@ -168,9 +163,9 @@ struct OffNetworkProbeTests {
         let lines = d.networkNote(ownCIDRs: ["10.10.30.0/24"])
         #expect(lines.contains("SSDP reply"))
         #expect(!lines.contains { $0.hasPrefix("Your router") })
-        #expect(lines.last == "Probes pending")
+        #expect(lines.last == "Requested probes pending")
         d.probesSettled = true
-        #expect(d.networkNote(ownCIDRs: ["10.10.30.0/24"]).last == "Probed on request")
+        #expect(d.networkNote(ownCIDRs: ["10.10.30.0/24"]).last == "Requested probes finished")
     }
 
     @Test("networkNote: unknown network, payment skip and refused probe lines")
@@ -179,11 +174,10 @@ struct OffNetworkProbeTests {
         var pay = device(ip: "10.10.10.9", onLocal: false)
         pay.paymentVendorSkip = PaymentVendorSkip(vendor: "PAX", inferred: false, sentARPTrigger: false)
         pay.probeRequested = true
-        #expect(pay.wasProbed == false)
-        #expect(pay.networkNote(ownCIDRs: ["10.10.30.0/24"]).last == "Not probed: payment or roadside vendor")
+        #expect(pay.networkNote(ownCIDRs: ["10.10.30.0/24"]).last == "Skipped: payment or roadside vendor")
         var v6 = device(ip: "fd12::1", onLocal: nil)
         v6.probeRefused = true
-        #expect(v6.networkNote(ownCIDRs: []).last == "Not probed: IPv6 only or non-local address")
+        #expect(v6.networkNote(ownCIDRs: []).last == "Skipped: IPv6 only or non-local address")
     }
 
     // MARK: layout and label

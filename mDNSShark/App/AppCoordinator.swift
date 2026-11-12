@@ -77,13 +77,9 @@ final class AppCoordinator: ObservableObject {
         selectedTab = .devices
     }
 
-    /// The header Scan: always the LAN scan, plus Bluetooth when it is already allowed and the setting is on. Never prompts.
+    /// The header Scan is the LAN scan only; Bluetooth scans only from its own button in Devices.
     func startHeaderScan() {
         networkScanViewModel.startScan()
-        if BluetoothScanPolicy.headerScanStartsBluetooth(authorization: bluetoothViewModel.authorization,
-                                                         includeSetting: SharedSettings.includeBluetoothInScan) {
-            bluetoothViewModel.startScanIfAuthorized()
-        }
     }
 
     var isAnyScanRunning: Bool { networkScanViewModel.isScanning || bluetoothViewModel.isScanning }

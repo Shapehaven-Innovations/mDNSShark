@@ -219,12 +219,12 @@ final class SecurityViewModel: ObservableObject {
     /// One device's status from the current findings; the header chips and the widget snapshot share it.
     func status(of device: DiscoveredDevice) -> SecurityStatus {
         let own = findings.filter { $0.deviceID == device.id }
-        return SecurityStatus.of(findings: own, settled: device.probesSettled, probed: device.wasProbed)
+        return SecurityStatus.of(findings: own, settled: device.probesSettled)
     }
 
     /// Devices whose probes have settled and that carry no finding of vulnerable severity.
     func secureDeviceCount(among devices: [DiscoveredDevice]) -> Int {
-        devices.filter { $0.probesSettled && $0.wasProbed && !vulnerableDeviceIDs.contains($0.id) }.count
+        devices.filter { $0.probesSettled && !vulnerableDeviceIDs.contains($0.id) }.count
     }
 
     var allFindingsSorted: [SecurityFinding] {

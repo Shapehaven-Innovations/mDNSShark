@@ -3,26 +3,13 @@ import Testing
 import Foundation
 @testable import mDNSShark
 
-@Suite("Not probed text, real CIDR in the header, and a sweep that stays inside the subnet")
+@Suite("Real CIDR in the header, and a sweep that stays inside the subnet")
 struct SubnetHeaderSweepTests {
     typealias Subnet = LocalInterfaces.IPv4Subnet
 
     private func subnet(_ ip: String, _ prefix: Int) -> Subnet {
         let mask = prefix == 0 ? 0 : ~UInt32(0) << UInt32(32 - prefix)
         return Subnet(network: LocalInterfaces.ipv4Value(ip)! & mask, prefixLength: prefix)
-    }
-
-    @Test("open-ports text is Not probed for an off-subnet row and a payment skip, None for a probed row")
-    func noOpenPortsText() {
-        var off = DiscoveredDevice(hostname: "cam", ipAddress: "10.10.10.87")
-        off.isOnLocalSubnet = false
-        var skipped = DiscoveredDevice(hostname: "pos", ipAddress: "10.10.30.40")
-        skipped.paymentVendorSkip = PaymentVendorSkip(vendor: "PAX", inferred: false, sentARPTrigger: false)
-        var probed = DiscoveredDevice(hostname: "tv", ipAddress: "10.10.30.41")
-        probed.isOnLocalSubnet = true
-        #expect(off.noOpenPortsText == "Not probed")
-        #expect(skipped.noOpenPortsText == "Not probed")
-        #expect(probed.noOpenPortsText == "None")
     }
 
     @Test("cidr prints the dotted network and the prefix length")

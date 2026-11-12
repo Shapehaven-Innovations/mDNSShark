@@ -185,6 +185,12 @@ struct BLEPeripheral: Identifiable, Equatable {
     }
     var fingerprint: BLEFingerprint? { BLEFingerprint(parsed: parsed) }
     var distance: BLEDistance { BLEDistance.from(rssi: rssi) }
+
+    /// Mean of the recent readings, so the closest-first order does not jump on every advertisement; a row with no reading uses its floor value.
+    var smoothedRSSI: Double {
+        let samples = rssiHistory.samples
+        return samples.isEmpty ? Double(rssi) : Double(samples.reduce(0, +)) / Double(samples.count)
+    }
     /// The advertised kind, or the kind of an Apple model read from the device when the advertisement named none.
     var kind: BLEKind {
         if parsed.kind != .unknown { return parsed.kind }

@@ -30,7 +30,7 @@ enum WidgetPalette {
         case .secure: return tinted ? .white : secure
         case .warning: return tinted ? .white.opacity(0.72) : warning
         case .critical: return tinted ? .white.opacity(0.5) : critical
-        case .notProbed, .pending: return tertiary
+        case .pending: return tertiary
         }
     }
 

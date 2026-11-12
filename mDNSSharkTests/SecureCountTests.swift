@@ -48,16 +48,4 @@ struct SecureCountTests {
         #expect(vm.vulnerableDeviceCount == 1)
         #expect(vm.secureDeviceCount(among: [telnet]) == 0)
     }
-
-    @Test("a settled host that was never probed is neither secure nor pending in the header counts")
-    func neverProbedCountsAsNotProbed() {
-        let vm = makeViewModel()
-        var skipped = device("pos", ip: "10.10.30.40", settled: true)
-        skipped.paymentVendorSkip = PaymentVendorSkip(vendor: "PAX", inferred: false, sentARPTrigger: false)
-        let normal = device("tv", ip: "10.10.30.41", settled: true)
-
-        #expect(vm.secureDeviceCount(among: [skipped, normal]) == 1)
-        let counts = vm.statusCounts(among: [skipped, normal])
-        #expect(counts[.notProbed] == 1 && counts[.secure] == 1 && counts[.pending] == nil)
-    }
 }

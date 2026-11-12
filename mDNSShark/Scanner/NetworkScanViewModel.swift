@@ -72,7 +72,7 @@ final class NetworkScanViewModel: ObservableObject {
     private var skippedOffSubnetIPs = Set<String>()
     // Off-network addresses the user asked to probe, this scan only; cleared at every new scan.
     private var probeRequestedIPs = Set<String>()
-    // Addresses whose probes were refused (no IPv4 address in the group, or not LAN-local), so the row says Not probed instead of None.
+    // Addresses whose probes were refused (no IPv4 address in the group, or not LAN-local), so their open ports are unknown.
     private var refusedProbeIPs = Set<String>()
     // The payment-vendor gate per probed address this scan: ARP is read and the vendor decided before any probe, fetch or Google Wifi send.
     private enum VendorGateState { case waiting, passed, skipped }

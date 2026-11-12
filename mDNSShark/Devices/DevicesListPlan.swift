@@ -38,9 +38,6 @@ struct DevicesListPlan: Equatable {
         let lanRows = devices.map(Row.lan)
 
         switch filter {
-        case .all:
-            let rows = lanRows + live.map(Row.peripheral) + savedOnly.map(Row.saved)
-            return DevicesListPlan(sections: rows.isEmpty ? [] : [Section(title: "", rows: rows)])
         case .lan:
             return DevicesListPlan(sections: lanRows.isEmpty ? [] : [Section(title: "", rows: lanRows)])
         case .bluetooth:

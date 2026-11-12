@@ -9,7 +9,6 @@ extension StatusKind {
         case .secure: WidgetCopy.secure
         case .warning: WidgetCopy.warning
         case .critical: WidgetCopy.critical
-        case .notProbed: WidgetCopy.notProbedTitle
         case .pending: "Pending"
         }
     }

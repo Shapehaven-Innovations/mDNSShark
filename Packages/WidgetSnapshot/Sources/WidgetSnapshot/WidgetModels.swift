@@ -29,20 +29,19 @@ public enum WidgetCopy {
 }
 
 public enum StatusKind: String, CaseIterable, Sendable {
-    case secure, warning, critical, notProbed, pending
+    case secure, warning, critical, pending
 
     public var symbol: String {
         switch self {
         case .secure: "checkmark.shield.fill"
         case .warning: "exclamationmark.triangle.fill"
         case .critical: "xmark.shield.fill"
-        case .notProbed: "questionmark.circle"
         case .pending: "hourglass"
         }
     }
 
-    /// Not probed and pending are drawn as outlines so they never read as a status fill.
-    public var isOutlined: Bool { self == .notProbed || self == .pending }
+    /// Pending is drawn as an outline so it never reads as a status fill.
+    public var isOutlined: Bool { self == .pending }
 }
 
 public struct CapsuleSegment: Equatable, Sendable {
@@ -61,7 +60,6 @@ extension StatusCounts {
         case .secure: secure
         case .warning: warning
         case .critical: critical
-        case .notProbed: notProbed
         case .pending: pending
         }
     }

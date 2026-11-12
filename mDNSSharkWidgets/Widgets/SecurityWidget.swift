@@ -50,7 +50,7 @@ struct SecurityWidgetView: View {
     @ViewBuilder private var accessory: some View {
         switch SecurityAccessoryModel.make(entry.result, now: entry.date, isScanRunning: entry.isScanRunning) {
         case .noScan:
-            AccessoryNotice(symbol: StatusKind.notProbed.symbol, text: WidgetCopy.noScan, label: WidgetCopy.emptyAccessibilityLabel)
+            AccessoryNotice(symbol: "questionmark.circle", text: WidgetCopy.noScan, label: WidgetCopy.emptyAccessibilityLabel)
         case .needsUpdate:
             AccessoryNotice(symbol: "arrow.down.app", text: WidgetCopy.updateApp, label: WidgetCopy.needsUpdateAccessibilityLabel)
         case .loaded(let model):
@@ -310,7 +310,6 @@ private struct AccessoryNotice: View {
     WidgetSamples.securityBluetooth
     WidgetSamples.securityAllClear
     WidgetSamples.securityChecking
-    WidgetSamples.securityNotProbed
     WidgetSamples.securityStale
     WidgetSamples.securityNoDevices
     WidgetSamples.empty
@@ -324,7 +323,6 @@ private struct AccessoryNotice: View {
     WidgetSamples.securityBluetooth
     WidgetSamples.securityAllClear
     WidgetSamples.securityChecking
-    WidgetSamples.securityNotProbed
     WidgetSamples.securityStale
     WidgetSamples.securityNoDevices
     WidgetSamples.empty
@@ -338,7 +336,6 @@ private struct AccessoryNotice: View {
     WidgetSamples.securityBluetooth
     WidgetSamples.securityAllClear
     WidgetSamples.securityChecking
-    WidgetSamples.securityNotProbed
     WidgetSamples.securityStale
     WidgetSamples.securityNoDevices
     WidgetSamples.securityFew

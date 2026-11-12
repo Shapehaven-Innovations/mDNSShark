@@ -112,16 +112,6 @@ enum SharedSettings {
         set { suite.set(newValue, forKey: "includeAllNetworksInCapture") }
     }
 
-    /// Whether the header Scan also listens for Bluetooth; absent reads as on.
-    static var includeBluetoothInScan: Bool {
-        get { includeBluetoothInScan(in: suite) }
-        set { suite.set(newValue, forKey: "includeBluetoothInScan") }
-    }
-
-    static func includeBluetoothInScan(in defaults: UserDefaults) -> Bool {
-        defaults.object(forKey: "includeBluetoothInScan") as? Bool ?? true
-    }
-
     static var tlsInterceptorLastError: String {
         get { suite.string(forKey: "tlsInterceptorLastError") ?? "" }
         set { suite.set(newValue, forKey: "tlsInterceptorLastError") }

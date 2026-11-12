@@ -36,14 +36,6 @@ import DeviceFingerprint
                              saved: saved ?? [f.s1], now: now)
     }
 
-    @Test func allListsLANThenLiveThenSaved() {
-        let f = fixture()
-        let p = plan(.all, f)
-        #expect(p.sections.count == 1 && p.sections[0].title == "")
-        #expect(p.sections.flatMap(\.rows) == [.lan(f.d1), .lan(f.d2), .peripheral(f.p1), .peripheral(f.p2), .saved(f.s1)])
-        #expect(!p.isEmpty)
-    }
-
     @Test func lanFilterListsLANOnly() {
         let f = fixture()
         #expect(plan(.lan, f).sections.flatMap(\.rows) == [.lan(f.d1), .lan(f.d2)])
@@ -73,7 +65,7 @@ import DeviceFingerprint
     @Test func savedLiveRowIsNotDuplicated() {
         let f = fixture()
         let p4 = peripheral("Old lamp", savedID: f.s1.id)
-        let rows = plan(.all, f, peripherals: [f.p1, f.p2, p4]).sections.flatMap(\.rows)
+        let rows = plan(.bluetooth, f, peripherals: [f.p1, f.p2, p4]).sections.flatMap(\.rows)
         #expect(rows.filter { $0 == .peripheral(p4) }.count == 1)
         #expect(!rows.contains(.saved(f.s1)))
     }
@@ -100,9 +92,6 @@ import DeviceFingerprint
             }
             let peripheralRows = rows.filter { if case .peripheral = $0 { return true } else { return false } }
             switch filter {
-            case .all:
-                #expect(rows.filter { if case .lan = $0 { return true } else { return false } }.count == 2)
-                #expect(peripheralRows.count == nearby)
             case .bluetooth:
                 // (c) Every non-expired peripheral is listed exactly once, matching the status line count.
                 #expect(peripheralRows.count == nearby)
@@ -117,7 +106,7 @@ import DeviceFingerprint
         let f = fixture()
         var s5 = saved("Garage"); s5.id = UUID()
         let p5 = peripheral("Garage", savedID: s5.id, lastSeen: now.addingTimeInterval(-400))
-        for filter in [DevicesFilter.all, .bluetooth] {
+        for filter in [DevicesFilter.bluetooth] {
             let rows = plan(filter, f, peripherals: [f.p1, p5], saved: [s5]).sections.flatMap(\.rows)
             #expect(rows.filter { $0 == .saved(s5) }.count == 1, "\(filter)")
             #expect(!rows.contains(.peripheral(p5)), "\(filter)")

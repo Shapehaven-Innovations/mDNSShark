@@ -189,7 +189,6 @@ struct PaymentVendorGateTests {
         #expect(rec.lookups.isEmpty)
         #expect(rec.probes.isEmpty)
         #expect(devices.first?.paymentVendorSkip == nil)
-        #expect(devices.first?.wasProbed == false)
     }
 
     @Test("an inferred vendor is badged with a question mark, a direct one is not")
@@ -211,12 +210,7 @@ struct PaymentVendorGateTests {
         normal.probesSettled = true
         normal.isOnLocalSubnet = true
 
-        #expect(!gated.wasProbed && !other.wasProbed && normal.wasProbed)
-        #expect(TopologyNode(device: gated).securityStatus == .notProbed)
-        #expect(TopologyNode(device: other).securityStatus == .notProbed)
         #expect(TopologyNode(device: normal).securityStatus == .secure)
-        #expect(SecurityStatus.notProbed.accessibilityName == "not probed")
-        #expect(!SecurityStatus.notProbed.accessibilityName.contains("secure"))
     }
 
     @Test("the phone's own row is never gated or hidden, even when its MAC reads as a payment vendor")
@@ -262,7 +256,6 @@ struct PaymentVendorGateTests {
         #expect(devices.first?.manufacturer == econolite)
         #expect(devices.first?.paymentVendorSkip == PaymentVendorSkip(category: .infrastructure, vendor: econolite, inferred: false, sentARPTrigger: false))
         #expect(devices.first?.paymentVendorSkip?.badgeText == "Roadside equipment")
-        #expect(devices.first?.noOpenPortsText == "Not probed")
         let sources = Set((vm.rawEnrichmentsByIP["10.10.30.50"] ?? []).map(\.source))
         #expect(!sources.isEmpty && sources.isSubset(of: [.arpTableLookup, .ouiLookup]))
 
@@ -306,16 +299,15 @@ struct PaymentVendorGateTests {
         #expect(both.contains("inferred"))
         let off = PaymentVendorSkip(category: .infrastructure, vendor: econolite, inferred: false, sentARPTrigger: false).note(offNetwork: true)
         #expect(!off.contains("port 80"))
-        #expect(PaymentVendorSkip.detail == "identified from MAC vendor only, not probed")
+        #expect(PaymentVendorSkip.detail == "identified from MAC vendor only")
     }
 
     @Test("label and note text are present for a payment device and absent for others")
     func labelAndNoteText() {
         #expect(PaymentVendorSkip.label == "Payment terminal")
-        #expect(PaymentVendorSkip.detail == "identified from MAC vendor only, not probed")
+        #expect(PaymentVendorSkip.detail == "identified from MAC vendor only")
         var device = DiscoveredDevice(hostname: "pos", ipAddress: "10.10.30.40")
         #expect(device.paymentVendorSkip == nil)
-        #expect(device.noOpenPortsText == "None")
 
         device.paymentVendorSkip = PaymentVendorSkip(vendor: pax, inferred: false, sentARPTrigger: false)
         let note = device.paymentVendorSkip?.note() ?? ""
@@ -323,7 +315,6 @@ struct PaymentVendorGateTests {
         #expect(note.contains(pax))
         #expect(note.contains("port 80 runs before any vendor is known"))
         #expect(!note.contains("NetBIOS") && !note.contains("inferred"))
-        #expect(device.noOpenPortsText == "Not probed")
 
         let both = PaymentVendorSkip(vendor: pax, inferred: true, sentARPTrigger: true).note()
         #expect(both.contains("One NetBIOS name query was sent before the vendor was known"))

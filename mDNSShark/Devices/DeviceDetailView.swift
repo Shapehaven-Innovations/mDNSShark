@@ -47,7 +47,7 @@ struct DeviceDetailView: View {
                 CardView {
                     HStack(spacing: 16) {
                         Image(systemName: device.deviceIcon).font(.system(size: 40))
-                            .foregroundColor(SecurityStatus.of(findings: device.securityFindings, settled: device.probesSettled, probed: device.wasProbed).color)
+                            .foregroundColor(SecurityStatus.of(findings: device.securityFindings, settled: device.probesSettled).color)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(device.hostname).font(.title2.bold())
                             Text(device.ipAddress).foregroundColor(.secondary)
@@ -78,7 +78,7 @@ struct DeviceDetailView: View {
                         if device.isApplianceMaker { AppBadge(text: "Appliance maker (vendor name is on the appliance list)", color: AppColors.pending) }
                         DetailRow(label: "Inferred OS", value: device.displayInferredOS ?? "Unknown")
                         if let server = device.ssdpServer { DetailRow(label: "Server header", value: server, selectable: true) }
-                        DetailRow(label: "Open Ports", value: device.openPorts.isEmpty ? device.noOpenPortsText : device.openPorts.map { String($0) }.joined(separator: ", "))
+                        DetailRow(label: "Open Ports", value: device.openPorts.isEmpty ? "None" : device.openPorts.map { String($0) }.joined(separator: ", "))
                         if let skip = device.paymentVendorSkip {
                             Text(skip.note(offNetwork: device.isOnLocalSubnet == false)).font(.caption).foregroundColor(.secondary)
                         }

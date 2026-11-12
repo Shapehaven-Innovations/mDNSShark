@@ -8,7 +8,7 @@ struct DevicesView: View {
     @EnvironmentObject var deepLinks: DeepLinkRouter
     @EnvironmentObject var bluetoothVM: BluetoothViewModel
     @EnvironmentObject var coordinator: AppCoordinator
-    @State private var filter: DevicesFilter = .all
+    @State private var filter: DevicesFilter = .lan
 
     private var accessState: BluetoothAccessState {
         BluetoothAccessState.from(authorization: bluetoothVM.authorization, power: bluetoothVM.powerState)
@@ -47,17 +47,12 @@ struct DevicesView: View {
     @ViewBuilder private func content(now: Date) -> some View {
         let plan = DevicesListPlan.make(filter: filter, devices: scanVM.devices, peripherals: bluetoothVM.peripherals,
                                         saved: bluetoothVM.saved, now: now)
-        let state = accessState
         VStack(spacing: 12) {
             Picker("Show", selection: $filter) {
                 ForEach(DevicesFilter.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
             .accessibilityLabel("Device filter")
-
-            if filter == .all, state == .undetermined, !bluetoothVM.hasScannedThisSession {
-                allBluetoothPrompt
-            }
 
             if plan.isEmpty {
                 emptyState
@@ -89,7 +84,7 @@ struct DevicesView: View {
         switch row {
         case .lan(let device):
             let findings = securityVM.findings.filter { $0.deviceID == device.id }
-            let badgeColor = SecurityStatus.of(findings: findings, settled: device.probesSettled, probed: device.wasProbed).color
+            let badgeColor = SecurityStatus.of(findings: findings, settled: device.probesSettled).color
             NavigationLink(destination: DeviceDetailView(device: device)) {
                 DeviceCardView(device: device, issueCount: findings.count, badgeColor: badgeColor)
             }
@@ -161,7 +156,6 @@ struct DevicesView: View {
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .contentMargins(.bottom, 88, for: .scrollContent)
-            .refreshable { _ = bluetoothVM.refreshFromPull() }
             .animation(.default, value: plan.sections.flatMap(\.rows).map(\.id))
         }
     }
@@ -246,24 +240,9 @@ struct DevicesView: View {
         .accessibilityHint(scanning ? "" : "Listens for nearby Bluetooth advertisements for 25 seconds")
     }
 
-    private var allBluetoothPrompt: some View {
-        Button { filter = .bluetooth } label: {
-            HStack(spacing: 6) {
-                Image(systemName: BluetoothSymbol.name).foregroundColor(AppColors.info).accessibilityHidden(true)
-                Text("Nearby Bluetooth devices are not listed yet.").font(.caption).foregroundColor(.secondary)
-                Spacer()
-                Text("Set up").font(.caption)
-            }
-            .frame(minHeight: 44)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint("Shows the Bluetooth filter, where you can allow Bluetooth")
-    }
-
     @ViewBuilder private var emptyState: some View {
         switch filter {
-        case .all, .lan:
+        case .lan:
             VStack(spacing: 12) {
                 Image(systemName: "magnifyingglass").font(.system(size: 48)).foregroundColor(.secondary)
                 Text("No devices discovered yet.").foregroundColor(.secondary)

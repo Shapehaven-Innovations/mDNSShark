@@ -15,7 +15,7 @@ final class BluetoothViewModel: ObservableObject {
     static let readTimeout: Duration = .seconds(5)
     static let logCapacity = 5000
 
-    /// First seen, then display name, then id, so rows never move under a finger while RSSI changes.
+    /// Closest first by smoothed signal strength, then first seen, display name and id.
     @Published private(set) var peripherals: [BLEPeripheral] = []
     @Published private(set) var isScanning = false
     @Published private(set) var authorization: BLEAuthorization
@@ -102,14 +102,6 @@ final class BluetoothViewModel: ObservableObject {
         guard auth == .allowed else { return false }
         requestScan(duration: duration)
         return isScanning || requestedDuration != nil
-    }
-
-    /// Pull to refresh: only when Bluetooth already reads allowed, drops dimmed unsaved rows and starts a scan; never prompts.
-    @discardableResult
-    func refreshFromPull() -> Bool {
-        guard readAuthorization() == .allowed else { return false }
-        pruneDimmedUnsaved()
-        return startScanIfAuthorized()
     }
 
     /// Drops every unsaved row unseen for `BLELifecycle.dimAfter` and republishes.
@@ -345,6 +337,7 @@ final class BluetoothViewModel: ObservableObject {
     }
 
     nonisolated static func displayOrder(_ a: BLEPeripheral, _ b: BLEPeripheral) -> Bool {
+        if a.smoothedRSSI != b.smoothedRSSI { return a.smoothedRSSI > b.smoothedRSSI }
         if a.firstSeen != b.firstSeen { return a.firstSeen < b.firstSeen }
         let order = a.displayName.localizedStandardCompare(b.displayName)
         if order != .orderedSame { return order == .orderedAscending }

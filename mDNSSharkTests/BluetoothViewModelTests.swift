@@ -170,7 +170,7 @@ enum BLEVMHarness {
         #expect(vm.peripherals.first?.identifiers.count == 2)
     }
 
-    @Test func rssiChangesDoNotReorderAndNewcomersAppend() async throws {
+    @Test func rowsSortClosestFirstBySmoothedSignal() async throws {
         let t0 = Date(timeIntervalSince1970: 1_800_000_000)
         let (vm, factory, _) = H.makeVM(now: { t0 + 5 })
         vm.startScanIfAuthorized()
@@ -180,11 +180,12 @@ enum BLEVMHarness {
         factory.fake.subject.send(.sighting(H.sighting(name: "A", rssi: -70, at: t0 + 1)))
         try await H.settle(vm)
         #expect(vm.peripherals.map(\.displayName) == ["B", "A", "C"])
+        // Means: D -20, C -50, A -70, B -72.5.
         factory.fake.subject.send(.sighting(H.sighting(c, name: "C", rssi: -30, at: t0 + 2)))
         factory.fake.subject.send(.sighting(H.sighting(b, name: "B", rssi: -95, at: t0 + 2)))
         factory.fake.subject.send(.sighting(H.sighting(name: "D", rssi: -20, at: t0 + 3)))
         try await H.settle(vm)
-        #expect(vm.peripherals.map(\.displayName) == ["B", "A", "C", "D"])
+        #expect(vm.peripherals.map(\.displayName) == ["D", "C", "A", "B"])
     }
 
     // MARK: No duplicates
@@ -617,7 +618,7 @@ enum BLEVMHarness {
         factory.fake.subject.send(.sighting(H.sighting(name: "Blank", rssi: 127, at: base + 0.2)))
         factory.fake.subject.send(.sighting(H.sighting(name: "Far", rssi: -95, at: base + 0.3)))
         try await H.settle(vm)
-        #expect(vm.peripherals.map(\.displayName) == ["Known", "Blank", "Far"])
+        #expect(vm.peripherals.map(\.displayName) == ["Known", "Far", "Blank"])
         let known = try #require(vm.peripherals.first { $0.displayName == "Known" })
         #expect(known.rssi == -70)
         #expect(known.rssiHistory.samples == [-70])

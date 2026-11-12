@@ -56,14 +56,14 @@ struct WidgetSnapshotWriterTests {
         #expect(rec.kinds == WidgetKind.scanKinds)
     }
 
-    @Test("counts map every SecurityStatus, and not probed and pending are never secure")
+    @Test("counts map every SecurityStatus, and pending is never secure")
     func countsMap() {
-        let devices = ["192.168.1.1", "192.168.1.2", "192.168.1.3", "192.168.1.4", "192.168.1.5"].map { device($0) }
+        let devices = ["192.168.1.1", "192.168.1.2", "192.168.1.3", "192.168.1.4"].map { device($0) }
         let statuses: [String: SecurityStatus] = ["192.168.1.1": .secure, "192.168.1.2": .warning, "192.168.1.3": .critical,
-                                                  "192.168.1.4": .notProbed, "192.168.1.5": .pending]
+                                                  "192.168.1.4": .pending]
         let result = WidgetSnapshotWriter.makeSnapshot(input: input(devices, status: { statuses[$0.ipAddress]! }),
                                                        previous: nil, seen: [:], now: t0, newScan: true)
-        #expect(result.snapshot.counts == StatusCounts(total: 5, secure: 1, warning: 1, critical: 1, notProbed: 1, pending: 1))
+        #expect(result.snapshot.counts == StatusCounts(total: 4, secure: 1, warning: 1, critical: 1, pending: 1))
     }
 
     @Test("the phone's own row is counted and keyed")

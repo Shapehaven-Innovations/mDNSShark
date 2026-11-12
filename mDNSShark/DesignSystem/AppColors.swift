@@ -5,7 +5,7 @@ extension SecurityStatus {
     /// The only status-to-colour mapping; every surface that shows a device status calls this.
     var color: Color {
         switch self {
-        case .pending, .notProbed: return AppColors.pending
+        case .pending: return AppColors.pending
         case .secure:   return AppColors.secure
         case .warning:  return AppColors.warning
         case .critical: return AppColors.critical

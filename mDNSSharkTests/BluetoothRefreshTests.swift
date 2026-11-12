@@ -79,28 +79,6 @@ struct BLEPeripheralSetRefreshTests {
         #expect(vm.peripherals.count == rows)
     }
 
-    @Test func refreshWhileUndeterminedOrDeniedCreatesNoCentral() {
-        for auth in [BLEAuthorization.undetermined, .denied, .restricted] {
-            let (vm, factory, _) = H.makeVM(auth: auth)
-            #expect(vm.refreshFromPull() == false)
-            #expect(factory.created == 0)
-            #expect(vm.isScanning == false)
-            #expect(vm.lastScanSummary == nil)
-        }
-    }
-
-    @Test func refreshWhileAllowedStartsExactlyOneScan() async throws {
-        let (vm, factory, _) = H.makeVM(central: FakeBLECentral(powerState: .poweredOn))
-        #expect(vm.refreshFromPull() == true)
-        #expect(factory.created == 1)
-        #expect(factory.fake.startCalls == [true])
-        #expect(vm.isScanning)
-        // Pulling again while the scan runs does not start a second one.
-        #expect(vm.refreshFromPull() == true)
-        #expect(factory.fake.startCalls == [true])
-        #expect(factory.created == 1)
-    }
-
     @Test func refreshDropsDimUnsavedRowsAndKeepsSavedAndLive() async throws {
         let t0 = Date(timeIntervalSince1970: 1_800_000_000)
         let clock = Box(t0)
@@ -116,10 +94,10 @@ struct BLEPeripheralSetRefreshTests {
         clock.value = t0 + 70
         factory.fake.subject.send(.sighting(H.sighting(name: "Fresh", at: t0 + 70)))
         try await settle(vm, rows: 3)
-        #expect(vm.refreshFromPull())
+        vm.pruneDimmedUnsaved()
         #expect(Set(vm.peripherals.map(\.displayName)) == ["Garage", "Fresh"])
         #expect(vm.peripheral(id: old.id) == nil)
-        #expect(factory.fake.startCalls == [true, true])
+        #expect(factory.fake.startCalls == [true])
         // A read on the pruned row finds nothing and connects to nothing.
         await vm.readDeviceInfo(old.id)
         #expect(factory.fake.readCalls.isEmpty)
@@ -128,21 +106,6 @@ struct BLEPeripheralSetRefreshTests {
         let rows = plan.sections.flatMap(\.rows)
         #expect(rows.count == 2)
         #expect(Set(rows.map(\.id)).count == rows.count)
-    }
-
-    @Test func refreshWhenNoLongerAllowedPrunesNothing() async throws {
-        let t0 = Date(timeIntervalSince1970: 1_800_000_000)
-        let clock = Box(t0)
-        let (vm, factory, auth) = H.makeVM(now: { clock.value })
-        vm.startScanIfAuthorized()
-        factory.fake.subject.send(.sighting(H.sighting(name: "Old", at: t0)))
-        try await settle(vm, rows: 1)
-        vm.stopScan(reason: .user)
-        clock.value = t0 + 70
-        auth.value = .undetermined
-        #expect(vm.refreshFromPull() == false)
-        #expect(vm.peripherals.map(\.displayName) == ["Old"])
-        #expect(factory.fake.startCalls == [true])
     }
 
     @Test func pruneDimmedUnsavedKeepsTheFrozenSummary() async throws {

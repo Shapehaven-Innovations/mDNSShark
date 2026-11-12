@@ -2,18 +2,18 @@
 import Foundation
 import CoreGraphics
 
-/// The one device status every screen uses (header, Topology, Devices, legend). `pending` is a device whose probes have not settled yet; `notProbed` is one that was deliberately never probed.
+/// The one device status every screen uses (header, Topology, Devices, legend). `pending` is a device whose probes have not settled yet.
 /// Secure means no warning or critical finding about the device itself; informational and vendor-advisory findings never change it.
 enum SecurityStatus: Hashable, CaseIterable {
-    case pending, notProbed, secure, warning, critical
+    case pending, secure, warning, critical
 
-    /// Findings alone never colour a device whose probes are still running; a device that was never probed is not called secure.
-    static func of(findings: [SecurityFinding], settled: Bool, probed: Bool = true) -> SecurityStatus {
+    /// Findings alone never colour a device whose probes are still running.
+    static func of(findings: [SecurityFinding], settled: Bool) -> SecurityStatus {
         guard settled else { return .pending }
         switch findings.worstDeviceSeverity {
         case .critical: return .critical
         case .warning:  return .warning
-        default:        return probed ? .secure : .notProbed
+        default:        return .secure
         }
     }
 
@@ -23,7 +23,6 @@ enum SecurityStatus: Hashable, CaseIterable {
     var accessibilityName: String {
         switch self {
         case .pending:       return "pending"
-        case .notProbed:     return "not probed"
         case .secure:        return "secure"
         case .warning:       return "warning"
         case .critical:      return "critical"
@@ -39,10 +38,10 @@ struct TopologyNode: Identifiable {
 
     init(device: DiscoveredDevice, position: CGPoint = .zero) {
         self.id = device.id; self.device = device; self.position = position
-        self.securityStatus = Self.status(findings: device.securityFindings, settled: device.probesSettled, probed: device.wasProbed)
+        self.securityStatus = Self.status(findings: device.securityFindings, settled: device.probesSettled)
     }
 
-    static func status(findings: [SecurityFinding], settled: Bool, probed: Bool = true) -> SecurityStatus { .of(findings: findings, settled: settled, probed: probed) }
+    static func status(findings: [SecurityFinding], settled: Bool) -> SecurityStatus { .of(findings: findings, settled: settled) }
 
     /// Chip semantics: no chip shows every device, each chip shows its own status.
     static func matchesFilters(_ status: SecurityStatus, _ filters: Set<SecurityStatus>) -> Bool {

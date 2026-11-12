@@ -8,7 +8,7 @@ struct SnapshotCodingTests {
                                    symbol: "tv", status: "not probed", offNetwork: false, isGateway: false,
                                    firstSeen: Date(timeIntervalSince1970: 1_000_000.25))
     static let sample = WidgetSnapshot(version: 1, scannedAt: Date(timeIntervalSince1970: 1_000_500.5), subnet: "192.168.1.0/24",
-        counts: StatusCounts(total: 14, secure: 9, warning: 2, critical: 1, notProbed: 2, pending: 0),
+        counts: StatusCounts(total: 14, secure: 9, warning: 2, critical: 1, pending: 0),
         typeCounts: ["TV": 1, "Router": 1], history: [], newDevices: [brief], topology: [brief], topologyOverflow: 0,
         ownDeviceKey: "ip:192.168.1.20")
 

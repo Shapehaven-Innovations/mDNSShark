@@ -69,7 +69,7 @@ struct PaymentVendorSkip: Equatable {
 
     static let label = "Payment terminal"
     static let infrastructureLabel = "Roadside equipment"
-    static let detail = "identified from MAC vendor only, not probed"
+    static let detail = "identified from MAC vendor only"
 
     /// The badge text for this host's category.
     var badgeText: String { (category == .payment ? Self.label : Self.infrastructureLabel) + (inferred ? "?" : "") }
@@ -116,9 +116,6 @@ struct DiscoveredDevice: Identifiable, Equatable {
     var probeRefused: Bool = false
     /// True when the user asked for probes on this off-network host in the current scan only.
     var probeRequested = false
-    /// False for a host that got no active probes (vendor gate, off-subnet or refused), so an empty findings list means unchecked, not clean.
-    /// An off-network host counts as probed only after an explicit request, and a payment or roadside skip always wins.
-    var wasProbed: Bool { paymentVendorSkip == nil && (isOnLocalSubnet != false || probeRequested) && !probeRefused }
 
     init(id: UUID = UUID(), hostname: String, ipAddress: String,
          macAddress: String? = nil, manufacturer: String? = nil,
@@ -149,9 +146,6 @@ struct DiscoveredDevice: Identifiable, Equatable {
     /// The system's answer when there is one, otherwise the guess that the router is at x.x.x.1.
     var isGateway: Bool { isDefaultGateway ?? ipAddress.hasSuffix(".1") }
 
-    /// What to show when no open port is known: "Not probed" for a host that was never probed (payment skip, off-subnet or refused), since "None" would claim a fact.
-    var noOpenPortsText: String { wasProbed ? "None" : "Not probed" }
-
     /// Literal lines about where this device sits and how it was learned. The remote network's prefix length is unknowable, so none is claimed.
     func networkNote(ownCIDRs: [String]) -> [String] {
         var lines: [String] = []
@@ -168,12 +162,11 @@ struct DiscoveredDevice: Identifiable, Equatable {
         if isOnLocalSubnet == false, viaBonjour, ssdpServer == nil {
             lines.append("Your router may be repeating this advertisement from another network (not confirmed).")
         }
-        if paymentVendorSkip != nil { lines.append("Not probed: payment or roadside vendor") }
-        else if probeRefused { lines.append("Not probed: IPv6 only or non-local address") }
+        if paymentVendorSkip != nil { lines.append("Skipped: payment or roadside vendor") }
+        else if probeRefused { lines.append("Skipped: IPv6 only or non-local address") }
         else if isOnLocalSubnet == false {
-            lines.append(!probeRequested ? "Not probed: on another network" : (probesSettled ? "Probed on request" : "Probes pending"))
+            lines.append(!probeRequested ? "Skipped: on another network" : (probesSettled ? "Requested probes finished" : "Requested probes pending"))
         }
-        else { lines.append("Probed") }
         return lines
     }
 

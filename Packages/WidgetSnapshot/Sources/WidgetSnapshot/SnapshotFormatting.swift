@@ -4,7 +4,7 @@ extension StatusCounts {
     /// Warning plus critical.
     public var issues: Int { warning + critical }
 
-    /// Needs at least one secure device; not probed devices do not block it, but pending ones do.
+    /// Needs at least one secure device; pending ones block it.
     public var isAllClear: Bool { issues == 0 && pending == 0 && secure > 0 }
 }
 
@@ -39,10 +39,9 @@ public enum SnapshotFormatting {
         case .issues(let n): body = "\(issuePhrase(n)): \(counts.critical) critical, \(counts.warning) warning"
         case .checking(let p): body = "0 issues, \(p) still being checked"
         case .allClear: body = WidgetCopy.allClear
-        case .nothingProbed: body = "No device probed yet"
         }
         if counts.total > 0 {
-            body += ". \(counts.secure) secure, \(counts.notProbed) not probed"
+            body += ". \(counts.secure) secure"
             if counts.pending > 0 { body += ", \(counts.pending) pending" }
         }
         body += ", " + scanned
@@ -97,10 +96,9 @@ public enum SnapshotFormatting {
         return result
     }
 
-    /// Secure through not probed always, pending only when above zero.
+    /// Secure, warning and critical always, pending only when above zero.
     public static func statusPhrases(_ counts: StatusCounts) -> [String] {
-        var parts = ["\(counts.secure) secure", "\(counts.warning) warning", "\(counts.critical) critical",
-                     "\(counts.notProbed) not probed"]
+        var parts = ["\(counts.secure) secure", "\(counts.warning) warning", "\(counts.critical) critical"]
         if counts.pending > 0 { parts.append("\(counts.pending) pending") }
         return parts
     }
