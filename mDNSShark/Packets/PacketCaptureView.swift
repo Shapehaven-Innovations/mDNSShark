@@ -11,8 +11,6 @@ struct PacketCaptureView: View {
     @State private var showingBluetoothLog = false
     @ObservedObject private var purchase = PurchaseManager.shared
     @State private var showPaywall = false
-    // Dismissing hides the card until the app is relaunched.
-    @State private var paywallCardDismissed = false
     private let protocols = PacketCaptureChip.all
 
     private var filtered: [PacketModel] {
@@ -52,7 +50,7 @@ struct PacketCaptureView: View {
                     .font(.caption)
                     .padding(.horizontal, 16).padding(.bottom, 8)
                 }
-                if !purchase.hasAccess && !paywallCardDismissed {
+                if !purchase.hasAccess && !purchase.paywallCardDismissed {
                     paywallCard
                 }
                 Divider()
@@ -173,7 +171,8 @@ struct PacketCaptureView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(AppColors.info)
                 .font(.caption.weight(.semibold))
-            Button { paywallCardDismissed = true } label: {
+            // Hidden until the app is relaunched.
+            Button { purchase.paywallCardDismissed = true } label: {
                 Image(systemName: "xmark")
                     .font(.caption.weight(.semibold))
                     .foregroundColor(.secondary)

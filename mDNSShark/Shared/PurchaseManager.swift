@@ -46,6 +46,9 @@ final class PurchaseManager: ObservableObject {
     /// True while the published expiry is the lifetime purchase's far-future date.
     @Published private(set) var ownsLifetime = SharedSettings.tlsSubscriptionExpiry == .distantFuture
     @Published var lastError: String?
+    /// The Packets tab's paywall card was hidden. Held here, not in the view, because
+    /// the tab view is recreated on every tab switch; resets on relaunch.
+    @Published var paywallCardDismissed = false
 
     /// The three offers on the paywall. Yearly and monthly share one subscription group.
     enum Plan: CaseIterable {
