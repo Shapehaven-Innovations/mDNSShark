@@ -137,14 +137,15 @@ final class PurchaseManager: ObservableObject {
         return Self.freeTrialText(product(for: plan))
     }
 
-    var monthlyPrice: String? { products[TLSInspectionProduct.monthly]?.displayPrice }
+    /// Yearly only: the Store price spread over 12 months, in the Store's currency format.
+    func perMonthText(for plan: Plan) -> String? {
+        guard plan == .yearly, let yearly = product(for: .yearly) else { return nil }
+        return PaywallPricing.monthlyEquivalent(ofYearly: yearly.price).formatted(yearly.priceFormatStyle)
+    }
 
-    /// Store-provided subscription title, e.g. "TLS Inspection Monthly".
-    var productName: String? { products[TLSInspectionProduct.monthly]?.displayName }
-
-    /// Billing period from the Store, e.g. "month" or "3 months".
-    var periodText: String? {
-        guard let period = products[TLSInspectionProduct.monthly]?.subscription?.subscriptionPeriod else { return nil }
+    /// Billing period from the Store, e.g. "month" or "year"; nil for lifetime.
+    func periodText(for plan: Plan) -> String? {
+        guard let period = product(for: plan)?.subscription?.subscriptionPeriod else { return nil }
         let unit: String
         switch period.unit {
         case .day:   unit = "day"
@@ -155,6 +156,14 @@ final class PurchaseManager: ObservableObject {
         }
         return period.value == 1 ? unit : "\(period.value) \(unit)s"
     }
+
+    var monthlyPrice: String? { products[TLSInspectionProduct.monthly]?.displayPrice }
+
+    /// Store-provided subscription title, e.g. "TLS Inspection Monthly".
+    var productName: String? { products[TLSInspectionProduct.monthly]?.displayName }
+
+    /// Billing period from the Store, e.g. "month" or "3 months".
+    var periodText: String? { periodText(for: .monthly) }
 
     /// e.g. "3-day free trial"; nil unless the subscription has a free-trial introductory offer.
     var trialLengthText: String? { Self.freeTrialText(products[TLSInspectionProduct.monthly]) }

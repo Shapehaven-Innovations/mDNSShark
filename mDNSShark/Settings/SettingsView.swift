@@ -279,8 +279,8 @@ struct SettingsView: View {
             .font(.footnote)
     }
 
-    private static let termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
-    private static let privacyURL = URL(string: "https://shapehaveninnovations.com/privacy.html")!
+    static let termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
+    static let privacyURL = URL(string: "https://shapehaveninnovations.com/privacy.html")!
 
     private func run(_ operation: @escaping () async -> Void) {
         guard !purchaseInFlight else { return }
