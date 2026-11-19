@@ -47,8 +47,10 @@ struct PaywallView: View {
         .presentationDragIndicator(.visible)
         // The launch-time fetch can fail (offline, sandbox); retry so prices are never missing.
         .task { await reload(reportErrors: false) }
-        .onChange(of: purchase.hasAccess) { _, granted in
-            if granted { dismiss() }
+        // Close once a purchase lands. A current subscriber already has access, so
+        // watch the expiry (lifetime or a yearly switch changes it), not hasAccess alone.
+        .onChange(of: purchase.expiry) { _, _ in
+            if purchase.hasAccess { dismiss() }
         }
         .alert("Store Error", isPresented: Binding(
             get: { purchase.lastError != nil },

@@ -151,6 +151,10 @@ struct SettingsView: View {
 
                 lastTLSErrorRow
 
+                // Subscribers can still switch to yearly or buy lifetime.
+                if !purchase.ownsLifetime {
+                    seePlansRow
+                }
                 subscriptionStatusRows
                 restoreButton
 
@@ -175,9 +179,18 @@ struct SettingsView: View {
         }
     }
 
-    /// One row that opens the three-plan paywall sheet (the price detail lives in the sheet).
+    /// Locked state: the plans row plus status and restore.
     @ViewBuilder
     private var tlsGateView: some View {
+        seePlansRow
+        // Billing retry drops the entitlement, so the payment-issue hint and Manage
+        // button must also be reachable from the gate.
+        subscriptionStatusRows
+        restoreButton
+    }
+
+    /// One row that opens the three-plan paywall sheet (the price detail lives in the sheet).
+    private var seePlansRow: some View {
         Button { activeSheet = .paywall } label: {
             HStack {
                 Text("See plans")
@@ -195,10 +208,6 @@ struct SettingsView: View {
         .tint(AppColors.info)
         // The launch-time fetch can fail (offline, sandbox); retry so the price is never missing.
         .task { await purchase.loadProducts(reportErrors: false) }
-        // Billing retry drops the entitlement, so the payment-issue hint and Manage
-        // button must also be reachable from the gate.
-        subscriptionStatusRows
-        restoreButton
     }
 
     /// Status line and Manage Subscription, shown whenever StoreKit reports a subscription state.
