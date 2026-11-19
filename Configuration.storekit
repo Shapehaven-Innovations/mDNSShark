@@ -1,7 +1,23 @@
 {
   "identifier": "8F3A6C1E-2B4D-4E5F-9A1C-6D7E8F901234",
   "nonRenewingSubscriptions": [],
-  "products": [],
+  "products": [
+    {
+      "displayPrice": "29.99",
+      "familyShareable": false,
+      "internalID": "07182930-7777-4081-A293-041526374859",
+      "localizations": [
+        {
+          "description": "Unlocks TLS Inspection on this device with a one-time purchase.",
+          "displayName": "TLS Inspection Lifetime",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "beta.mDNSShark.tlsInspection.lifetime",
+      "referenceName": "TLS Inspection Lifetime",
+      "type": "NonConsumable"
+    }
+  ],
   "settings": {
     "_askToBuyEnabled": false,
     "_billingIssuesEnabled": false
@@ -21,9 +37,34 @@
         {
           "adHocOffers": [],
           "codeOffers": [],
-          "displayPrice": "1.99",
+          "displayPrice": "14.99",
           "familyShareable": false,
           "groupNumber": 1,
+          "internalID": "E5F60718-5555-4E6F-8071-829304152637",
+          "introductoryOffer": {
+            "internalID": "F6071829-6666-4F70-9182-930415263748",
+            "paymentMode": "free",
+            "subscriptionPeriod": "P3D"
+          },
+          "localizations": [
+            {
+              "description": "Decrypts HTTPS traffic on this device for inspection. Renews yearly.",
+              "displayName": "TLS Inspection Yearly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "beta.mDNSShark.tlsInspection.yearly",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "TLS Inspection Yearly",
+          "subscriptionGroupID": "21500000",
+          "type": "RecurringSubscription"
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "1.99",
+          "familyShareable": false,
+          "groupNumber": 2,
           "internalID": "C3D4E5F6-3333-4C4D-AE5F-607182930415",
           "introductoryOffer": {
             "internalID": "D4E5F607-4444-4D5E-BF60-718293041526",
