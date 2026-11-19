@@ -8,7 +8,12 @@ import os
 enum TLSInspectionProduct {
     /// Auto-renewable subscription with a free introductory trial configured in App Store Connect.
     static let monthly  = "beta.mDNSShark.tlsInspection.monthly"
-    static let all: [String] = [monthly]
+    /// Auto-renewable, same subscription group as monthly (ranked above it), free introductory trial.
+    static let yearly   = "beta.mDNSShark.tlsInspection.yearly"
+    /// Non-consumable one-time purchase; no trial.
+    static let lifetime = "beta.mDNSShark.tlsInspection.lifetime"
+    static let all: [String] = [monthly, yearly, lifetime]
+    static let subscriptions: [String] = [monthly, yearly]
 }
 
 // Every StoreKit outcome is logged so a "tapped the button and nothing happened"
