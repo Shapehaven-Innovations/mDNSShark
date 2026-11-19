@@ -61,4 +61,29 @@ struct TLSEntitlementTests {
     func emptyIsNil() {
         #expect(TLSEntitlement.expiry(from: []) == nil)
     }
+
+    @Test("unexpired persisted subscription expiry is kept")
+    func fallbackKeepsUnexpiredSubscription() {
+        let persisted = now.addingTimeInterval(day)
+        #expect(TLSEntitlement.persistedFallback(persisted, now: now, latestLifetimeRevoked: nil) == persisted)
+        // A revoked lifetime says nothing about a persisted subscription date.
+        #expect(TLSEntitlement.persistedFallback(persisted, now: now, latestLifetimeRevoked: true) == persisted)
+    }
+
+    @Test("expired or missing persisted expiry gives no access")
+    func fallbackDropsExpired() {
+        #expect(TLSEntitlement.persistedFallback(now.addingTimeInterval(-day), now: now, latestLifetimeRevoked: nil) == nil)
+        #expect(TLSEntitlement.persistedFallback(nil, now: now, latestLifetimeRevoked: nil) == nil)
+    }
+
+    @Test("persisted lifetime is kept offline and when not revoked")
+    func fallbackKeepsLifetimeUnlessRevoked() {
+        #expect(TLSEntitlement.persistedFallback(.distantFuture, now: now, latestLifetimeRevoked: nil) == .distantFuture)
+        #expect(TLSEntitlement.persistedFallback(.distantFuture, now: now, latestLifetimeRevoked: false) == .distantFuture)
+    }
+
+    @Test("persisted lifetime is dropped when the latest lifetime transaction is revoked")
+    func fallbackDropsRevokedLifetime() {
+        #expect(TLSEntitlement.persistedFallback(.distantFuture, now: now, latestLifetimeRevoked: true) == nil)
+    }
 }

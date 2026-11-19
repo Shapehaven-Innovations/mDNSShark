@@ -28,4 +28,16 @@ enum TLSEntitlement {
         }
         return best
     }
+
+    /// What to publish when currentEntitlements granted nothing (cold launch, offline,
+    /// cache lag): the persisted expiry while it is still in the future, so paid access
+    /// survives. A persisted lifetime (`.distantFuture`) never expires on its own, so it
+    /// is dropped when the latest verified lifetime transaction shows a refund
+    /// (`latestLifetimeRevoked == true`); `nil` means unknown (no or unverified
+    /// transaction, e.g. offline) and keeps it.
+    static func persistedFallback(_ persisted: Date?, now: Date, latestLifetimeRevoked: Bool?) -> Date? {
+        guard let persisted, persisted > now else { return nil }
+        if persisted == .distantFuture, latestLifetimeRevoked == true { return nil }
+        return persisted
+    }
 }

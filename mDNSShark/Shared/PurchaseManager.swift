@@ -338,10 +338,21 @@ final class PurchaseManager: ObservableObject {
 
         // An empty currentEntitlements (cold launch, offline) must not clear paid
         // access. Persisted state can only outlive the store by its own expiry
-        // date; explicit revocations are cleared in handle().
-        if best == nil, let persisted = SharedSettings.tlsSubscriptionExpiry, persisted > Date() {
-            logger.notice("refreshEntitlements: subscription absent from currentEntitlements; keeping persisted expiry \(persisted)")
-            best = persisted
+        // date; explicit revocations are cleared in handle(). A persisted lifetime
+        // has no expiry of its own, so a refund that never reached handle() is
+        // caught here from the latest lifetime transaction.
+        if best == nil, let persisted = SharedSettings.tlsSubscriptionExpiry {
+            var lifetimeRevoked: Bool?
+            if persisted == .distantFuture,
+               case .verified(let latest)? = await Transaction.latest(for: TLSInspectionProduct.lifetime) {
+                lifetimeRevoked = latest.revocationDate != nil
+            }
+            best = TLSEntitlement.persistedFallback(persisted, now: Date(), latestLifetimeRevoked: lifetimeRevoked)
+            if let best {
+                logger.notice("refreshEntitlements: absent from currentEntitlements; keeping persisted expiry \(best)")
+            } else if lifetimeRevoked == true {
+                logger.notice("refreshEntitlements: latest lifetime transaction is revoked; dropping persisted lifetime access")
+            }
         }
         logger.info("refreshEntitlements: currentEntitlements=\(seen) expiry=\(best.map { "\($0)" } ?? "nil")")
         publish(expiry: best)
