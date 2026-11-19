@@ -107,7 +107,8 @@ final class PurchaseManager: ObservableObject {
                 // attached to the app version.
                 logger.error("loadProducts: StoreKit returned no product for \(stillMissing); check the scheme's StoreKit Configuration is active for this run destination")
             }
-            // The paywall offers all three plans, so it is ready only when all three loaded.
+            // True only when all three loaded; the paywall gates each plan on its own
+            // product and uses this only to decide whether to fetch the missing ones again.
             productsLoaded = TLSInspectionProduct.all.allSatisfy { products[$0] != nil }
             // Eligibility is otherwise only computed in refreshEntitlements, which can
             // run before products exist and leave the gate hiding a trial Apple will offer.

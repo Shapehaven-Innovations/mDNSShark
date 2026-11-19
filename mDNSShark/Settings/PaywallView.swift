@@ -20,7 +20,7 @@ struct PaywallView: View {
                 header
                 features
                 plans
-                if !purchase.productsLoaded { loadingState }
+                if availablePlans.isEmpty { loadingState }
                 primaryButton
                 Text(disclosure)
                     .font(.caption2)
@@ -91,16 +91,19 @@ struct PaywallView: View {
 
     private var plans: some View {
         VStack(spacing: 10) {
-            ForEach(PurchaseManager.Plan.allCases, id: \.self) { plan in
+            // Only plans whose product loaded are offered, so one missing product
+            // (e.g. lifetime not yet live) does not block the others. With none
+            // loaded, all rows show as disabled placeholders above Retry.
+            ForEach(availablePlans.isEmpty ? PurchaseManager.Plan.allCases : availablePlans, id: \.self) { plan in
                 planRow(plan)
             }
         }
         .padding(.top, 6)
-        .disabled(!purchase.productsLoaded || inFlight)
+        .disabled(availablePlans.isEmpty || inFlight)
     }
 
     private func planRow(_ plan: PurchaseManager.Plan) -> some View {
-        let isSelected = selected == plan
+        let isSelected = current == plan
         return Button { selected = plan } label: {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -168,10 +171,11 @@ struct PaywallView: View {
 
     private var primaryButton: some View {
         Button {
-            run { await purchase.buy(selected) }
+            let plan = current
+            run { await purchase.buy(plan) }
         } label: {
-            Text(PaywallPricing.buttonTitle(for: selected,
-                                            trialText: purchase.trialText(for: selected),
+            Text(PaywallPricing.buttonTitle(for: current,
+                                            trialText: purchase.trialText(for: current),
                                             lifetimePrice: purchase.displayPrice(for: .lifetime)))
                 .font(.headline)
                 .frame(maxWidth: .infinity)
@@ -179,7 +183,7 @@ struct PaywallView: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(AppColors.info)
-        .disabled(!purchase.productsLoaded || inFlight)
+        .disabled(purchase.product(for: current) == nil || inFlight)
     }
 
     private var links: some View {
@@ -191,6 +195,17 @@ struct PaywallView: View {
         }
         .font(.footnote)
         .tint(AppColors.info)
+    }
+
+    // MARK: - Selection
+
+    private var availablePlans: [PurchaseManager.Plan] {
+        PurchaseManager.Plan.allCases.filter { purchase.product(for: $0) != nil }
+    }
+
+    /// The selected plan if its product loaded, else the first plan that did.
+    private var current: PurchaseManager.Plan {
+        availablePlans.contains(selected) ? selected : (availablePlans.first ?? selected)
     }
 
     // MARK: - Copy
@@ -225,18 +240,18 @@ struct PaywallView: View {
     // Guideline 3.1.2: billed amount, auto-renewal, charge timing and how to cancel, for the selected plan.
     private var disclosure: String {
         let privacy = " Traffic stays on this device; DNS lookups go to your chosen resolver."
-        let price = purchase.displayPrice(for: selected)
-        switch selected {
+        let price = purchase.displayPrice(for: current)
+        switch current {
         case .lifetime:
             var text = price.map { "Lifetime: \($0) once. " } ?? ""
             text += "One-time purchase. No subscription. Charged to your Apple Account at purchase."
             return text + privacy
         case .yearly, .monthly:
-            let hasTrial = purchase.trialText(for: selected) != nil
+            let hasTrial = purchase.trialText(for: current) != nil
             var text = ""
             if let price {
-                let period = purchase.periodText(for: selected).map { "/\($0)" } ?? ""
-                text += "\(name(of: selected)): \(price)\(period)\(hasTrial ? " after the trial" : ""). "
+                let period = purchase.periodText(for: current).map { "/\($0)" } ?? ""
+                text += "\(name(of: current)): \(price)\(period)\(hasTrial ? " after the trial" : ""). "
             }
             text += "Auto-renews until cancelled. Charged to your Apple Account"
             text += hasTrial ? " when the trial ends." : " at purchase."
