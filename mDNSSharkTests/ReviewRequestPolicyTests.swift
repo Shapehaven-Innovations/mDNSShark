@@ -105,4 +105,75 @@ struct ReviewRequestPolicyTests {
         #expect(defaults.string(forKey: ReviewRequestPolicy.Key.lastAskedVersion) == "1.1")
         #expect(defaults.object(forKey: ReviewRequestPolicy.Key.lastAskedDate) as? Date == start + 120 * day)
     }
+
+    // MARK: - Post-scan trigger
+
+    @Test("scans that find fewer than two devices do not count")
+    func scansUnderTwoDevicesDoNotCount() {
+        let defaults = freshDefaults()
+        let p = policy(defaults)
+        for _ in 0..<10 { p.noteSuccessfulScan(deviceCount: 1) }
+        p.noteSuccessfulScan(deviceCount: 0)
+        #expect(defaults.integer(forKey: ReviewRequestPolicy.Key.successfulScanCount) == 0)
+        #expect(!p.isDueAfterScan(now: start))
+    }
+
+    @Test("the third successful scan makes the post-scan ask possible")
+    func thirdSuccessfulScan() {
+        let p = policy(freshDefaults())
+        p.noteSuccessfulScan(deviceCount: 5)
+        p.noteSuccessfulScan(deviceCount: 2)
+        #expect(!p.isDueAfterScan(now: start))
+        p.noteSuccessfulScan(deviceCount: 3)
+        #expect(p.isDueAfterScan(now: start))
+    }
+
+    @Test("good scans do not skip the launch threshold")
+    func launchThresholdStillApplies() {
+        let p = policy(freshDefaults(), launches: 4)
+        for _ in 0..<3 { p.noteSuccessfulScan(deviceCount: 4) }
+        #expect(!p.isDueAfterScan(now: start))
+        p.noteLaunch()
+        #expect(p.isDueAfterScan(now: start))
+    }
+
+    @Test("a post-scan ask needs the scan count, quiet, and records once")
+    func consumeScanRequestRules() {
+        let defaults = freshDefaults()
+        let p = policy(defaults)
+        #expect(!p.consumeScanRequest(isQuiet: true, now: start)) // no scans yet
+        for _ in 0..<3 { p.noteSuccessfulScan(deviceCount: 4) }
+        #expect(!p.consumeScanRequest(isQuiet: false, now: start))
+        #expect(defaults.object(forKey: ReviewRequestPolicy.Key.lastAskedDate) == nil)
+        #expect(p.consumeScanRequest(isQuiet: true, now: start))
+        #expect(!p.consumeScanRequest(isQuiet: true, now: start + 1)) // once per version
+    }
+
+    @Test("the settings path still asks on launches alone")
+    func settingsPathUnchanged() {
+        let p = policy(freshDefaults())
+        #expect(p.consumeRequest(isQuiet: true, now: start))
+    }
+
+    @Test("the scan count survives a version bump")
+    func scanCountSurvivesVersionBump() {
+        let defaults = freshDefaults()
+        let old = policy(defaults, version: "1.0")
+        for _ in 0..<3 { old.noteSuccessfulScan(deviceCount: 4) }
+        #expect(old.consumeScanRequest(isQuiet: true, now: start))
+        let next = ReviewRequestPolicy(defaults: defaults, appVersion: "1.1")
+        #expect(next.isDueAfterScan(now: start + 120 * day))
+    }
+
+    #if DEBUG
+    @Test("debug force skips the scan threshold but not the launch or throttle rules")
+    func debugForce() {
+        let defaults = freshDefaults()
+        let p = policy(defaults)
+        defaults.set(true, forKey: ReviewRequestPolicy.Key.debugForce)
+        #expect(p.isDueAfterScan(now: start))
+        #expect(p.consumeScanRequest(isQuiet: true, now: start))
+        #expect(!p.isDueAfterScan(now: start + 1))
+    }
+    #endif
 }

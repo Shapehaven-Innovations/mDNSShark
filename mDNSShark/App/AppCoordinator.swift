@@ -102,12 +102,30 @@ final class AppCoordinator: ObservableObject {
         if ScanRequestFlag.consume(from: defaults, now: now), gateSettled { restart() }
     }
 
+    /// True when nothing the system rating alert could interrupt is running and the app is active; shared by the Settings and post-scan triggers.
+    func reviewQuietFlags() async -> Bool {
+        let capture = packetCaptureManager
+        let scan = networkScanViewModel
+        // Also sees a tunnel that is still connecting or was left running by an earlier process.
+        let tunnelActive = await capture.isTunnelActive()
+        return ReviewRequestPolicy.isQuiet(
+            scanning: scan.isScanning || scan.scanner.isScanning,
+            bluetoothScanning: bluetoothViewModel.isScanning,
+            readingDeviceInfo: bluetoothViewModel.peripherals.contains { $0.readState == .reading },
+            tunnelActive: tunnelActive || !capture.isTunnelDisconnected,
+            capturing: capture.isCapturing,
+            gateInFlight: scan.launchGateInFlight,
+            securityRefreshing: securityViewModel.isRefreshing,
+            sceneActive: UIApplication.shared.applicationState == .active)
+    }
+
     private func wire() {
         networkScanViewModel.scanFinished
             .sink { [weak self] in
                 guard let self else { return }
                 self.widgetWriter.scanDidFinish(self.widgetInput())
                 self.deepLinkRouter.scanFinished()
+                ReviewRequestPolicy().noteSuccessfulScan(deviceCount: self.networkScanViewModel.devices.count)
             }
             .store(in: &cancellables)
 

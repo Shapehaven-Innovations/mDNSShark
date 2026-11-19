@@ -587,21 +587,9 @@ struct SettingsView: View {
         let policy = ReviewRequestPolicy()
         // Checked first so the tunnel status lookup below runs only on the rare visit that could ask.
         guard policy.isDue(), scenePhase == .active else { return }
-        let capture = coordinator.packetCaptureManager
-        let scan = coordinator.networkScanViewModel
-        // Also sees a tunnel that is still connecting or was left running by an earlier process.
-        let tunnelActive = await capture.isTunnelActive()
+        let isQuiet = await coordinator.reviewQuietFlags()
         // Every flag is read after the await, and leaving Settings cancels the task.
         guard !Task.isCancelled else { return }
-        let isQuiet = ReviewRequestPolicy.isQuiet(
-            scanning: scan.isScanning || scan.scanner.isScanning,
-            bluetoothScanning: bluetoothVM.isScanning,
-            readingDeviceInfo: bluetoothVM.peripherals.contains { $0.readState == .reading },
-            tunnelActive: tunnelActive || !capture.isTunnelDisconnected,
-            capturing: capture.isCapturing,
-            gateInFlight: scan.launchGateInFlight,
-            securityRefreshing: securityVM.isRefreshing,
-            sceneActive: UIApplication.shared.applicationState == .active)
         guard policy.consumeRequest(isQuiet: isQuiet) else { return }
         requestReview()
     }
@@ -613,6 +601,9 @@ struct SettingsView: View {
             }
             Link(destination: Self.writeReviewURL) {
                 Label("Rate mDNSShark", systemImage: "star")
+            }
+            Link(destination: ReviewPrompt.feedbackURL) {
+                Label("Send feedback", systemImage: "bubble.left.and.text.bubble.right")
             }
             NavigationLink {
                 LegalAdvisoriesView(viewModel: securityVM)
