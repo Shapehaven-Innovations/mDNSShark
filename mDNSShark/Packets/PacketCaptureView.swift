@@ -9,6 +9,10 @@ struct PacketCaptureView: View {
     @State private var showExportError = false
     @State private var showDeleteConfirm = false
     @State private var showingBluetoothLog = false
+    @ObservedObject private var purchase = PurchaseManager.shared
+    @State private var showPaywall = false
+    // Dismissing hides the card until the app is relaunched.
+    @State private var paywallCardDismissed = false
     private let protocols = PacketCaptureChip.all
 
     private var filtered: [PacketModel] {
@@ -47,6 +51,9 @@ struct PacketCaptureView: View {
                     .pickerStyle(.segmented)
                     .font(.caption)
                     .padding(.horizontal, 16).padding(.bottom, 8)
+                }
+                if !purchase.hasAccess && !paywallCardDismissed {
+                    paywallCard
                 }
                 Divider()
                 if filtered.isEmpty {
@@ -145,6 +152,50 @@ struct PacketCaptureView: View {
             } message: {
                 Text("This permanently removes the captured packets, pcap file, and capture metadata from this device.")
             }
+        }
+    }
+
+    /// Compact TLS Inspection offer above the packet list; one short row so packets stay visible.
+    private var paywallCard: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "lock.open.fill")
+                .font(.title3)
+                .foregroundColor(AppColors.info)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("See what's inside HTTPS")
+                    .font(.subheadline.weight(.semibold))
+                Text("Decrypt and inspect HTTPS on this device.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            Spacer(minLength: 4)
+            Button("See plans") { showPaywall = true }
+                .buttonStyle(.borderedProminent)
+                .tint(AppColors.info)
+                .font(.caption.weight(.semibold))
+            Button { paywallCardDismissed = true } label: {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Hide")
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(AppColors.info.opacity(0.10))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(AppColors.info.opacity(0.35), lineWidth: 1)
+        )
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
+        // Attached here rather than next to the view's other sheets so each
+        // presentation has its own host view.
+        .sheet(isPresented: $showPaywall) {
+            PaywallView(purchase: purchase)
         }
     }
 

@@ -69,6 +69,7 @@ struct SettingsView: View {
                 case .pastePEM:     pastePEMSheet
                 case .generateCA:   generateCASheet
                 case .tlsWarning:   tlsWarningSheet
+                case .paywall:      PaywallView(purchase: purchase)
                 }
             }
             .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
@@ -83,7 +84,9 @@ struct SettingsView: View {
             ), actions: { Button("OK") { showImportError = nil } },
                message: { Text(showImportError ?? "") })
             .alert("Store Error", isPresented: Binding(
-                get: { purchase.lastError != nil },
+                // The paywall sheet shows its own Store Error alert; presenting this one
+                // underneath it would fail and could clear the error before it is seen.
+                get: { purchase.lastError != nil && activeSheet != .paywall },
                 set: { if !$0 { purchase.lastError = nil } }
             ), actions: { Button("OK") { purchase.lastError = nil } },
                message: { Text(purchase.lastError ?? "") })
@@ -172,63 +175,55 @@ struct SettingsView: View {
         }
     }
 
+    /// One row that opens the three-plan paywall sheet (the price detail lives in the sheet).
     @ViewBuilder
     private var tlsGateView: some View {
-        VStack(spacing: 6) {
-            if let name = purchase.productName {
-                Text(name).font(.headline)
-            }
-            if let price = purchase.monthlyPrice {
-                // Guideline 3.1.2(c): the billed amount must outrank any trial wording.
-                Text("\(price)\(purchase.periodText.map { " / \($0)" } ?? "")")
-                    .font(.largeTitle.weight(.bold))
-                if let trial = purchase.trialLengthText, purchase.trialEligible {
-                    Text("Starts with a \(trial)")
-                        .font(.caption)
+        Button { activeSheet = .paywall } label: {
+            HStack {
+                Text("See plans")
+                Spacer()
+                if let perMonth = purchase.lowestPerMonthText {
+                    Text("from \(perMonth)/month")
+                        .font(.footnote)
                         .foregroundColor(.secondary)
                 }
-            } else {
-                ProgressView()
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundColor(Color(.tertiaryLabel))
             }
-            Button("Subscribe") { run { await purchase.subscribe() } }
-                .buttonStyle(.borderedProminent)
-                .disabled(purchaseInFlight)
-                .padding(.top, 8)
-            Text(subscriptionDisclosure)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-            // Billing retry drops the entitlement, so the payment-issue hint and Manage
-            // button must also be reachable from the gate.
-            subscriptionStatusRows
-            restoreButton
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 4)
+        .tint(AppColors.info)
         // The launch-time fetch can fail (offline, sandbox); retry so the price is never missing.
         .task { await purchase.loadProducts(reportErrors: false) }
-    }
-
-    // Guideline 3.1.2: auto-renewal, charge timing and how to cancel.
-    private var subscriptionDisclosure: String {
-        var text = "Auto-renews until cancelled. Charged to your Apple Account"
-        text += purchase.trialEligible && purchase.trialLengthText != nil ? " when the trial ends." : " at purchase."
-        text += " Cancel at least 24 hours before renewal in Settings > Apple Account > Subscriptions."
-        text += " Traffic stays on this device; DNS lookups go to your chosen resolver."
-        return text
+        // Billing retry drops the entitlement, so the payment-issue hint and Manage
+        // button must also be reachable from the gate.
+        subscriptionStatusRows
+        restoreButton
     }
 
     /// Status line and Manage Subscription, shown whenever StoreKit reports a subscription state.
+    /// Lifetime owners see "Lifetime access" instead; Manage stays only while a subscription
+    /// is still auto-renewing, so they can cancel it.
     @ViewBuilder
     private var subscriptionStatusRows: some View {
-        if let status = accessStatusText {
-            Text(status)
+        if purchase.ownsLifetime {
+            Text("Lifetime access.")
                 .font(.caption)
-                .foregroundColor(purchase.subscriptionState == .billingRetry ? AppColors.warning : .secondary)
-        }
-        if purchase.subscriptionState != .none {
-            Button("Manage Subscription") { showManageSubscriptions = true }
-                .font(.footnote)
+                .foregroundColor(.secondary)
+            if case .active = purchase.subscriptionState {
+                Button("Manage Subscription") { showManageSubscriptions = true }
+                    .font(.footnote)
+            }
+        } else {
+            if let status = accessStatusText {
+                Text(status)
+                    .font(.caption)
+                    .foregroundColor(purchase.subscriptionState == .billingRetry ? AppColors.warning : .secondary)
+            }
+            if purchase.subscriptionState != .none {
+                Button("Manage Subscription") { showManageSubscriptions = true }
+                    .font(.footnote)
+            }
         }
     }
 
@@ -623,7 +618,7 @@ struct SettingsView: View {
 // MARK: - TLS sheet routing
 
 private enum TLSSheet: Identifiable, Hashable {
-    case importPicker, pastePEM, generateCA, tlsWarning
+    case importPicker, pastePEM, generateCA, tlsWarning, paywall
     var id: Self { self }
 }
 

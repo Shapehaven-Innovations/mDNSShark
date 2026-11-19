@@ -157,17 +157,20 @@ final class PurchaseManager: ObservableObject {
         return period.value == 1 ? unit : "\(period.value) \(unit)s"
     }
 
-    var monthlyPrice: String? { products[TLSInspectionProduct.monthly]?.displayPrice }
+    /// Cheapest per-month figure across yearly and monthly, for the Settings "See plans" row.
+    var lowestPerMonthText: String? {
+        var best: (amount: Decimal, text: String)?
+        if let yearly = product(for: .yearly) {
+            let amount = PaywallPricing.monthlyEquivalent(ofYearly: yearly.price)
+            best = (amount, amount.formatted(yearly.priceFormatStyle))
+        }
+        if let monthly = product(for: .monthly), monthly.price < (best?.amount ?? .greatestFiniteMagnitude) {
+            best = (monthly.price, monthly.displayPrice)
+        }
+        return best?.text
+    }
 
-    /// Store-provided subscription title, e.g. "TLS Inspection Monthly".
-    var productName: String? { products[TLSInspectionProduct.monthly]?.displayName }
-
-    /// Billing period from the Store, e.g. "month" or "3 months".
-    var periodText: String? { periodText(for: .monthly) }
-
-    /// e.g. "3-day free trial"; nil unless the subscription has a free-trial introductory offer.
-    var trialLengthText: String? { Self.freeTrialText(products[TLSInspectionProduct.monthly]) }
-
+    /// e.g. "3-day free trial"; nil unless the product has a free-trial introductory offer.
     private static func freeTrialText(_ product: Product?) -> String? {
         guard let offer = product?.subscription?.introductoryOffer,
               offer.paymentMode == .freeTrial else { return nil }
@@ -184,10 +187,6 @@ final class PurchaseManager: ObservableObject {
     }
 
     // MARK: - Actions
-
-    func subscribe() async {
-        await buy(.monthly)
-    }
 
     func buy(_ plan: Plan) async {
         await purchase(productID: plan.productID)
