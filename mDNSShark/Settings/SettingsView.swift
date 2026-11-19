@@ -195,8 +195,8 @@ struct SettingsView: View {
             HStack {
                 Text("See plans")
                 Spacer()
-                if let perMonth = purchase.lowestPerMonthText {
-                    Text("from \(perMonth)/month")
+                if let billed = purchase.cheapestPlanBilledText {
+                    Text("from \(billed)")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }

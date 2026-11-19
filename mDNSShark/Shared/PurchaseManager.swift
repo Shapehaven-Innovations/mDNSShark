@@ -161,17 +161,19 @@ final class PurchaseManager: ObservableObject {
         return period.value == 1 ? unit : "\(period.value) \(unit)s"
     }
 
-    /// Cheapest per-month figure across yearly and monthly, for the Settings "See plans" row.
-    var lowestPerMonthText: String? {
-        var best: (amount: Decimal, text: String)?
+    /// Billed amount of the cheapest-per-month subscription, e.g. "$14.99/year", for the
+    /// Settings "See plans" row. Shows the actual billed price and period (3.1.2), not a
+    /// per-month equivalent that would imply monthly billing.
+    var cheapestPlanBilledText: String? {
+        var best: (perMonth: Decimal, plan: Plan)?
         if let yearly = product(for: .yearly) {
-            let amount = PaywallPricing.monthlyEquivalent(ofYearly: yearly.price)
-            best = (amount, amount.formatted(yearly.priceFormatStyle))
+            best = (PaywallPricing.monthlyEquivalent(ofYearly: yearly.price), .yearly)
         }
-        if let monthly = product(for: .monthly), monthly.price < (best?.amount ?? .greatestFiniteMagnitude) {
-            best = (monthly.price, monthly.displayPrice)
+        if let monthly = product(for: .monthly), monthly.price < (best?.perMonth ?? .greatestFiniteMagnitude) {
+            best = (monthly.price, .monthly)
         }
-        return best?.text
+        guard let plan = best?.plan, let price = displayPrice(for: plan) else { return nil }
+        return price + (periodText(for: plan).map { "/\($0)" } ?? "")
     }
 
     /// e.g. "3-day free trial"; nil unless the product has a free-trial introductory offer.
