@@ -43,7 +43,22 @@ final class PurchaseManager: ObservableObject {
     @Published private(set) var subscriptionState: SubscriptionUIState = .none
     @Published private(set) var trialEligible = false
     @Published private(set) var productsLoaded = false
+    /// True while the published expiry is the lifetime purchase's far-future date.
+    @Published private(set) var ownsLifetime = SharedSettings.tlsSubscriptionExpiry == .distantFuture
     @Published var lastError: String?
+
+    /// The three offers on the paywall. Yearly and monthly share one subscription group.
+    enum Plan: CaseIterable {
+        case yearly, monthly, lifetime
+
+        var productID: String {
+            switch self {
+            case .yearly:   return TLSInspectionProduct.yearly
+            case .monthly:  return TLSInspectionProduct.monthly
+            case .lifetime: return TLSInspectionProduct.lifetime
+            }
+        }
+    }
 
     var hasAccess: Bool {
         expiry.map { $0 > Date() } ?? false
@@ -89,10 +104,12 @@ final class PurchaseManager: ObservableObject {
                 // attached to the app version.
                 logger.error("loadProducts: StoreKit returned no product for \(stillMissing); check the scheme's StoreKit Configuration is active for this run destination")
             }
-            productsLoaded = products[TLSInspectionProduct.monthly] != nil
+            // The paywall offers all three plans, so it is ready only when all three loaded.
+            productsLoaded = TLSInspectionProduct.all.allSatisfy { products[$0] != nil }
             // Eligibility is otherwise only computed in refreshEntitlements, which can
             // run before products exist and leave the gate hiding a trial Apple will offer.
-            if let sub = products[TLSInspectionProduct.monthly]?.subscription {
+            // Yearly and monthly share a group, so either product answers for both.
+            if let sub = groupSubscription {
                 trialEligible = await sub.isEligibleForIntroOffer
             }
         } catch {
@@ -101,7 +118,24 @@ final class PurchaseManager: ObservableObject {
         }
     }
 
+    /// Any loaded product of the monthly/yearly subscription group; eligibility and
+    /// status are per group, so it does not matter which one answers.
+    private var groupSubscription: Product.SubscriptionInfo? {
+        (products[TLSInspectionProduct.monthly] ?? products[TLSInspectionProduct.yearly])?.subscription
+    }
+
     // MARK: - Display strings (always from the Store, never hardcoded)
+
+    func product(for plan: Plan) -> Product? { products[plan.productID] }
+
+    func displayPrice(for plan: Plan) -> String? { product(for: plan)?.displayPrice }
+
+    /// e.g. "3-day free trial" from the plan's own introductory offer; nil for lifetime
+    /// (no trial) and when this Apple ID is no longer eligible for the group's intro offer.
+    func trialText(for plan: Plan) -> String? {
+        guard plan != .lifetime, trialEligible else { return nil }
+        return Self.freeTrialText(product(for: plan))
+    }
 
     var monthlyPrice: String? { products[TLSInspectionProduct.monthly]?.displayPrice }
 
@@ -123,8 +157,10 @@ final class PurchaseManager: ObservableObject {
     }
 
     /// e.g. "3-day free trial"; nil unless the subscription has a free-trial introductory offer.
-    var trialLengthText: String? {
-        guard let offer = products[TLSInspectionProduct.monthly]?.subscription?.introductoryOffer,
+    var trialLengthText: String? { Self.freeTrialText(products[TLSInspectionProduct.monthly]) }
+
+    private static func freeTrialText(_ product: Product?) -> String? {
+        guard let offer = product?.subscription?.introductoryOffer,
               offer.paymentMode == .freeTrial else { return nil }
         let n = offer.period.value * offer.periodCount
         let unit: String
@@ -141,7 +177,11 @@ final class PurchaseManager: ObservableObject {
     // MARK: - Actions
 
     func subscribe() async {
-        await purchase(productID: TLSInspectionProduct.monthly)
+        await buy(.monthly)
+    }
+
+    func buy(_ plan: Plan) async {
+        await purchase(productID: plan.productID)
     }
 
     func restore() async {
@@ -224,8 +264,10 @@ final class PurchaseManager: ObservableObject {
         // A revocation (refund) is the one positive signal that persisted access
         // must go: refreshEntitlements() deliberately keeps persisted state when
         // an entitlement is merely absent from currentEntitlements (cache lag).
-        if transaction.revocationDate != nil, transaction.productID == TLSInspectionProduct.monthly {
-            logger.notice("handle: subscription revoked; clearing persisted expiry")
+        // refreshEntitlements() then recomputes, so a remaining valid entitlement
+        // (e.g. a subscription after a refunded lifetime) restores access.
+        if transaction.revocationDate != nil, TLSInspectionProduct.all.contains(transaction.productID) {
+            logger.notice("handle: \(transaction.productID) revoked; clearing persisted expiry")
             SharedSettings.tlsSubscriptionExpiry = nil
         }
         await transaction.finish()
@@ -238,7 +280,10 @@ final class PurchaseManager: ObservableObject {
     // didn't see this transaction, apply it directly: it is already verified.
     private func applyIfMissing(_ transaction: Transaction) {
         guard transaction.revocationDate == nil else { return }
-        if transaction.productID == TLSInspectionProduct.monthly,
+        if transaction.productID == TLSInspectionProduct.lifetime, expiry != .distantFuture {
+            logger.notice("handle: currentEntitlements lagged; applying lifetime access directly")
+            publish(expiry: .distantFuture)
+        } else if TLSInspectionProduct.subscriptions.contains(transaction.productID),
            let e = transaction.expirationDate, e > (expiry ?? .distantPast) {
             logger.notice("handle: currentEntitlements lagged; applying subscription expiry directly")
             publish(expiry: e)
@@ -246,19 +291,22 @@ final class PurchaseManager: ObservableObject {
     }
 
     func refreshEntitlements() async {
-        var best: Date?
-        var seen: [String] = []
+        var entries: [TLSEntitlement.Entry] = []
 
         for await result in Transaction.currentEntitlements {
-            guard case .verified(let transaction) = result, transaction.revocationDate == nil else { continue }
-            seen.append(transaction.productID)
-            if transaction.productID == TLSInspectionProduct.monthly, let e = transaction.expirationDate {
-                best = max(best ?? .distantPast, e)
-            }
+            guard case .verified(let transaction) = result else { continue }
+            entries.append(TLSEntitlement.Entry(productID: transaction.productID,
+                                                expirationDate: transaction.expirationDate,
+                                                isRevoked: transaction.revocationDate != nil))
         }
+        let seen = entries.filter { !$0.isRevoked }.map(\.productID)
+        // Lifetime maps to .distantFuture and so wins over any subscription.
+        var best = TLSEntitlement.expiry(from: entries)
 
+        // Subscription UI state comes from the monthly/yearly group only; a
+        // lifetime-only owner stays at .none.
         var ui: SubscriptionUIState = .none
-        if let sub = products[TLSInspectionProduct.monthly]?.subscription {
+        if let sub = groupSubscription {
             trialEligible = await sub.isEligibleForIntroOffer
             if let status = try? await sub.status.first,
                case .verified(let info) = status.renewalInfo,
@@ -297,6 +345,8 @@ final class PurchaseManager: ObservableObject {
         // unconditional reassignment re-renders SettingsView at an arbitrary moment,
         // which can cancel an in-flight sheet presentation.
         if expiry != newExpiry { expiry = newExpiry }
+        let lifetime = newExpiry == .distantFuture
+        if ownsLifetime != lifetime { ownsLifetime = lifetime }
 
         // Mirrored into the shared App Group suite so the PacketTunnel extension
         // (a separate process with no StoreKit entitlement checks of its own) can
