@@ -47,8 +47,10 @@ final class PurchaseManager: ObservableObject {
     @Published private(set) var ownsLifetime = SharedSettings.tlsSubscriptionExpiry == .distantFuture
     @Published var lastError: String?
     /// The Packets tab's paywall card was hidden. Held here, not in the view, because
-    /// the tab view is recreated on every tab switch; resets on relaunch.
-    @Published var paywallCardDismissed = false
+    /// the tab view is recreated on every tab switch; persisted so it never returns.
+    @Published var paywallCardDismissed = PaywallCardDismissal().isDismissed {
+        didSet { PaywallCardDismissal().isDismissed = paywallCardDismissed }
+    }
 
     /// The three offers on the paywall. Yearly and monthly share one subscription group.
     enum Plan: CaseIterable {

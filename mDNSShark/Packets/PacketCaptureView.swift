@@ -177,7 +177,7 @@ struct PacketCaptureView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(AppColors.info)
                 .font(.caption.weight(.semibold))
-            // Hidden until the app is relaunched.
+            // Hidden for good, including after relaunches.
             Button { purchase.paywallCardDismissed = true } label: {
                 Image(systemName: "xmark")
                     .font(.caption.weight(.semibold))
