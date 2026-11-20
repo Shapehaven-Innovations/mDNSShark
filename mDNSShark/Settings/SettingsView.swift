@@ -29,7 +29,6 @@ struct SettingsView: View {
     // on iOS (SwiftUI only reliably tracks one presentation per view identity).
     @State private var activeSheet: TLSSheet?
     @AppStorage("hasSeenTLSWarning") private var hasSeenTLSWarning = false
-    @State private var purchaseInFlight = false
 
     // Bypass list
     @State private var bypassList: [String] = SharedSettings.tlsBypassList
@@ -156,7 +155,6 @@ struct SettingsView: View {
                     seePlansRow
                 }
                 subscriptionStatusRows
-                restoreButton
 
                 // "N connection(s) dropped" / "Last: ..." UI disabled
                 // Drop counters are hidden because tlsInterceptorDropCount has no reset path.
@@ -179,14 +177,13 @@ struct SettingsView: View {
         }
     }
 
-    /// Locked state: the plans row plus status and restore.
+    /// Locked state: the plans row plus status. Restore lives on the paywall sheet.
     @ViewBuilder
     private var tlsGateView: some View {
         seePlansRow
         // Billing retry drops the entitlement, so the payment-issue hint and Manage
         // button must also be reachable from the gate.
         subscriptionStatusRows
-        restoreButton
     }
 
     /// One row that opens the three-plan paywall sheet (the price detail lives in the sheet).
@@ -268,12 +265,6 @@ struct SettingsView: View {
         }
     }
 
-    private var restoreButton: some View {
-        Button("Restore Purchases") { run { await purchase.restore() } }
-            .font(.footnote)
-            .disabled(purchaseInFlight)
-    }
-
     /// Two rows, so each link has a full-width tap target.
     @ViewBuilder
     private var legalLinks: some View {
@@ -285,15 +276,6 @@ struct SettingsView: View {
 
     static let termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
     static let privacyURL = URL(string: "https://shapehaveninnovations.com/privacy.html")!
-
-    private func run(_ operation: @escaping () async -> Void) {
-        guard !purchaseInFlight else { return }
-        purchaseInFlight = true
-        Task {
-            await operation()
-            purchaseInFlight = false
-        }
-    }
 
     // MARK: - Sheets
 
