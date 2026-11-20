@@ -231,7 +231,8 @@ struct PaywallView: View {
 
     private func priceDetail(of plan: PurchaseManager.Plan) -> String? {
         switch plan {
-        case .yearly:   return purchase.perMonthText(for: .yearly).map { "\($0) / month" }
+        // Approximate: the yearly price is billed once, this is only its per-month equivalent.
+        case .yearly:   return purchase.perMonthText(for: .yearly).map { "≈ \($0) / month" }
         case .monthly:  return purchase.displayPrice(for: .monthly) == nil ? nil : "per month"
         case .lifetime: return purchase.displayPrice(for: .lifetime) == nil ? nil : "pay once"
         }
