@@ -151,6 +151,12 @@ struct PacketCaptureView: View {
                 Text("This permanently removes the captured packets, pcap file, and capture metadata from this device.")
             }
         }
+        // On the stable NavigationView, not the card: the card disappears once access is
+        // granted, which would tear the sheet down mid-presentation. Kept off the VStack
+        // that hosts the other sheets so each presentation has its own host view.
+        .sheet(isPresented: $showPaywall) {
+            PaywallView(purchase: purchase)
+        }
     }
 
     /// Compact TLS Inspection offer above the packet list; one short row so packets stay visible.
@@ -191,11 +197,6 @@ struct PacketCaptureView: View {
         )
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
-        // Attached here rather than next to the view's other sheets so each
-        // presentation has its own host view.
-        .sheet(isPresented: $showPaywall) {
-            PaywallView(purchase: purchase)
-        }
     }
 
     private func exportPCAP() {
