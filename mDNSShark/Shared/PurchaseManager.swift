@@ -45,6 +45,11 @@ final class PurchaseManager: ObservableObject {
     @Published private(set) var productsLoaded = false
     /// True while the published expiry is the lifetime purchase's far-future date.
     @Published private(set) var ownsLifetime = SharedSettings.tlsSubscriptionExpiry == .distantFuture
+    /// The plan the user is on, for the paywall's "Current plan" marker: lifetime when
+    /// owned, else the subscribed (or cancelled but still paid) group product. Nil while
+    /// in billing retry, expired, or never subscribed. Seeded with lifetime from the
+    /// persisted expiry so a relaunch marks it before StoreKit answers.
+    @Published private(set) var activePlan: Plan? = SharedSettings.tlsSubscriptionExpiry == .distantFuture ? .lifetime : nil
     @Published var lastError: String?
     /// The Packets tab's paywall card was hidden. Held here, not in the view, because
     /// the tab view is recreated on every tab switch; persisted so it never returns.
@@ -62,6 +67,12 @@ final class PurchaseManager: ObservableObject {
             case .monthly:  return TLSInspectionProduct.monthly
             case .lifetime: return TLSInspectionProduct.lifetime
             }
+        }
+
+        /// The plan selling this product; nil for an unknown product id.
+        init?(productID: String) {
+            guard let plan = Plan.allCases.first(where: { $0.productID == productID }) else { return nil }
+            self = plan
         }
     }
 
@@ -210,6 +221,12 @@ final class PurchaseManager: ObservableObject {
         }
     }
 
+    #if DEBUG
+    /// Previews and screenshot tests only: show the paywall as if the user were on
+    /// `plan`. The next refreshEntitlements() overwrites it with the real answer.
+    func debugSetActivePlan(_ plan: Plan?) { activePlan = plan }
+    #endif
+
     // MARK: - Internals
 
     // SharedSettings is an App Group UserDefaults suite, not scoped to any
@@ -322,12 +339,14 @@ final class PurchaseManager: ObservableObject {
         // Subscription UI state comes from the monthly/yearly group only; a
         // lifetime-only owner stays at .none.
         var ui: SubscriptionUIState = .none
+        var subscribedProductID: String?
         if let sub = groupSubscription {
             trialEligible = await sub.isEligibleForIntroOffer
             if let status = try? await sub.status.first,
                case .verified(let info) = status.renewalInfo,
                case .verified(let tx) = status.transaction {
                 let exp = tx.expirationDate ?? .now
+                subscribedProductID = tx.productID
                 switch status.state {
                 case .subscribed:
                     ui = info.willAutoRenew ? .active(renews: exp) : .cancelled(expires: exp)
@@ -364,6 +383,10 @@ final class PurchaseManager: ObservableObject {
         }
         logger.info("refreshEntitlements: currentEntitlements=\(seen) expiry=\(best.map { "\($0)" } ?? "nil")")
         publish(expiry: best)
+        let plan = PaywallPricing.currentPlan(ownsLifetime: ownsLifetime,
+                                              subscriptionState: ui,
+                                              subscriptionProductID: subscribedProductID)
+        if activePlan != plan { activePlan = plan }
     }
 
     private func publish(expiry newExpiry: Date?) {
@@ -374,6 +397,9 @@ final class PurchaseManager: ObservableObject {
         if expiry != newExpiry { expiry = newExpiry }
         let lifetime = newExpiry == .distantFuture
         if ownsLifetime != lifetime { ownsLifetime = lifetime }
+        // A lifetime purchase applied directly (applyIfMissing) must mark the paywall
+        // too; refreshEntitlements recomputes the subscription case right after.
+        if lifetime, activePlan != .lifetime { activePlan = .lifetime }
 
         // Mirrored into the shared App Group suite so the PacketTunnel extension
         // (a separate process with no StoreKit entitlement checks of its own) can

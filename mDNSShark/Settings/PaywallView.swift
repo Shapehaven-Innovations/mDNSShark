@@ -6,32 +6,68 @@ import SwiftUI
 struct PaywallView: View {
     @ObservedObject var purchase: PurchaseManager
     @Environment(\.dismiss) private var dismiss
-    @State private var selected: PurchaseManager.Plan = PaywallPricing.defaultPlan
+    /// The user's explicit pick; nil until they tap a row, so the preselection can
+    /// follow the current plan once StoreKit reports it.
+    @State private var selected: PurchaseManager.Plan?
     @State private var inFlight = false
     @State private var loading = false
+
+    // Vertical rhythm, scaled with Dynamic Type so the gaps grow with the text.
+    /// Clears the grab handle and the close button (12pt inset + ~28pt glyph).
+    @ScaledMetric(relativeTo: .title2) private var topInset: CGFloat = 56
+    /// Minimum gap between the sheet's sections: header, features, plans, button.
+    @ScaledMetric(relativeTo: .body) private var sectionGap: CGFloat = 24
+    /// Most a section gap grows to when the sheet is taller than the content; the
+    /// header keeps its feature list closer than the plans and the button.
+    @ScaledMetric(relativeTo: .body) private var sectionGapMax: CGFloat = 64
+    @ScaledMetric(relativeTo: .body) private var headerGapMax: CGFloat = 40
+    /// Gap inside a section: between plan rows, button and disclosure, disclosure and links.
+    @ScaledMetric(relativeTo: .body) private var itemGap: CGFloat = 12
+    @ScaledMetric(relativeTo: .body) private var bottomInset: CGFloat = 20
+    /// Plan row insets and the badge that overhangs the row's top edge, scaled so the
+    /// badge keeps clearing the plan name at accessibility sizes.
+    @ScaledMetric(relativeTo: .body) private var rowVerticalPadding: CGFloat = 12
+    @ScaledMetric(relativeTo: .caption2) private var badgeOverhang: CGFloat = 9
 
     init(purchase: PurchaseManager) {
         self.purchase = purchase
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                header
-                features
-                plans
-                if availablePlans.isEmpty { loadingState }
-                primaryButton
-                Text(disclosure)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                links
+        // The sheet height drives the layout: when the content is shorter than the
+        // sheet, the section gaps grow (up to sectionGapMax) so the content spreads
+        // over the sheet instead of bunching up under the grab handle; whatever is
+        // left after that is split above and below. When the content is taller
+        // (iPhone SE, accessibility text sizes) the gaps stay at their minimum and
+        // the content scrolls.
+        GeometryReader { proxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    header
+                    sectionSpacer(max: headerGapMax)
+                    features
+                    sectionSpacer(max: sectionGapMax)
+                    plans
+                    if availablePlans.isEmpty {
+                        loadingState
+                            .padding(.top, itemGap)
+                    }
+                    sectionSpacer(max: sectionGapMax)
+                    primaryButton
+                    Text(disclosure)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, itemGap)
+                    links
+                        .padding(.top, itemGap)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, topInset)
+                .padding(.bottom, bottomInset)
+                .frame(minHeight: proxy.size.height)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 28)
-            .padding(.bottom, 16)
         }
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .overlay(alignment: .topTrailing) {
@@ -61,8 +97,14 @@ struct PaywallView: View {
 
     // MARK: - Sections
 
+    /// A gap that grows with spare sheet height, between sectionGap and `max`.
+    private func sectionSpacer(max: CGFloat) -> some View {
+        Spacer(minLength: sectionGap)
+            .frame(maxHeight: max)
+    }
+
     private var header: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 6) {
             Text("TLS Inspection")
                 .font(.title2.weight(.bold))
             Text("Decrypt and inspect HTTPS on this device.")
@@ -70,10 +112,11 @@ struct PaywallView: View {
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
         }
+        .frame(maxWidth: .infinity)
     }
 
     private var features: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             feature("Read HTTPS requests and responses")
             feature("Works with your own trusted CA certificate")
             feature("Cancel anytime, or buy once")
@@ -90,67 +133,100 @@ struct PaywallView: View {
     }
 
     private var plans: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: itemGap) {
             // Only plans whose product loaded are offered, so one missing product
             // (e.g. lifetime not yet live) does not block the others. With none
             // loaded, all rows show as disabled placeholders above Retry.
             ForEach(availablePlans.isEmpty ? PurchaseManager.Plan.allCases : availablePlans, id: \.self) { plan in
-                planRow(plan)
+                if plan == currentPlan {
+                    currentPlanRow(plan)
+                } else {
+                    planRow(plan)
+                }
             }
         }
-        .padding(.top, 6)
+        // Room for the badge that overhangs the first row's top edge.
+        .padding(.top, badgeOverhang)
         .disabled(availablePlans.isEmpty || inFlight)
     }
 
     private func planRow(_ plan: PurchaseManager.Plan) -> some View {
         let isSelected = current == plan
         return Button { selected = plan } label: {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(name(of: plan)).font(.headline)
-                    Text(subtitle(of: plan))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                Spacer(minLength: 8)
-                VStack(alignment: .trailing, spacing: 2) {
-                    // Guideline 3.1.2(c): the billed amount outranks any trial wording.
-                    if let price = purchase.displayPrice(for: plan) {
-                        Text(price).font(.title3.weight(.bold))
-                    }
-                    if let detail = priceDetail(of: plan) {
-                        Text(detail)
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+            planRowContent(plan, subtitle: subtitle(of: plan))
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(isSelected ? AppColors.info.opacity(0.12) : Color(.secondarySystemGroupedBackground))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(isSelected ? AppColors.info : Color(.separator), lineWidth: isSelected ? 2 : 1)
+                )
+                .overlay(alignment: .topLeading) {
+                    if plan == PaywallPricing.defaultPlan {
+                        badge("BEST VALUE", fill: AppColors.secure, text: .black)
                     }
                 }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isSelected ? AppColors.info.opacity(0.12) : Color(.secondarySystemGroupedBackground))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(isSelected ? AppColors.info : Color(.separator), lineWidth: isSelected ? 2 : 1)
-            )
-            .overlay(alignment: .topLeading) {
-                if plan == PaywallPricing.defaultPlan {
-                    Text("BEST VALUE")
-                        .font(.caption2.weight(.heavy))
-                        .foregroundColor(.black)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 2)
-                        .background(Capsule().fill(AppColors.secure))
-                        .offset(x: 12, y: -9)
-                }
-            }
-            .contentShape(Rectangle())
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    /// The plan the user is already on: not a button, muted fill, marked so it still
+    /// reads as one of the three offers.
+    private func currentPlanRow(_ plan: PurchaseManager.Plan) -> some View {
+        planRowContent(plan, subtitle: "Your current plan")
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color(.tertiarySystemGroupedBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+                    .foregroundColor(Color(.separator))
+            )
+            .overlay(alignment: .topLeading) {
+                badge("CURRENT PLAN", fill: Color(.systemGray2), text: .white)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityValue("Current plan")
+    }
+
+    private func planRowContent(_ plan: PurchaseManager.Plan, subtitle: String) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name(of: plan)).font(.headline)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 2) {
+                // Guideline 3.1.2(c): the billed amount outranks any trial wording.
+                if let price = purchase.displayPrice(for: plan) {
+                    Text(price).font(.title3.weight(.bold))
+                }
+                if let detail = priceDetail(of: plan) {
+                    Text(detail)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, rowVerticalPadding)
+        .frame(maxWidth: .infinity)
+    }
+
+    private func badge(_ title: String, fill: Color, text: Color) -> some View {
+        Text(title)
+            .font(.caption2.weight(.heavy))
+            .foregroundColor(text)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(fill))
+            .offset(x: 12, y: -badgeOverhang)
     }
 
     @ViewBuilder
@@ -174,16 +250,21 @@ struct PaywallView: View {
             let plan = current
             run { await purchase.buy(plan) }
         } label: {
-            Text(PaywallPricing.buttonTitle(for: current,
-                                            trialText: purchase.trialText(for: current),
-                                            lifetimePrice: purchase.displayPrice(for: .lifetime)))
+            Text(primaryButtonTitle)
                 .font(.headline)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
         }
         .buttonStyle(.borderedProminent)
         .tint(AppColors.info)
-        .disabled(purchase.product(for: current) == nil || inFlight)
+        .disabled(purchasingDisabled || purchase.product(for: current) == nil || inFlight)
+    }
+
+    private var primaryButtonTitle: String {
+        if purchasingDisabled { return "You have Lifetime access" }
+        return PaywallPricing.buttonTitle(for: current,
+                                          trialText: purchase.trialText(for: current),
+                                          lifetimePrice: purchase.displayPrice(for: .lifetime))
     }
 
     /// One row when it fits; stacked at large Dynamic Type sizes so nothing truncates.
@@ -213,9 +294,13 @@ struct PaywallView: View {
         PurchaseManager.Plan.allCases.filter { purchase.product(for: $0) != nil }
     }
 
-    /// The selected plan if its product loaded, else the first plan that did.
+    private var currentPlan: PurchaseManager.Plan? { purchase.activePlan }
+
+    private var purchasingDisabled: Bool { PaywallPricing.purchasingDisabled(currentPlan: currentPlan) }
+
+    /// The plan the button acts on: never the current plan, see PaywallPricing.
     private var current: PurchaseManager.Plan {
-        availablePlans.contains(selected) ? selected : (availablePlans.first ?? selected)
+        PaywallPricing.effectiveSelection(selected: selected, currentPlan: currentPlan, available: availablePlans)
     }
 
     // MARK: - Copy
@@ -251,6 +336,8 @@ struct PaywallView: View {
     // Guideline 3.1.2: billed amount, auto-renewal, charge timing and how to cancel, for the selected plan.
     private var disclosure: String {
         let privacy = " Traffic stays on this device; DNS lookups go to your chosen resolver."
+        // Nothing is for sale to a lifetime owner, so no billing terms to disclose.
+        if purchasingDisabled { return "Lifetime access is already on this Apple Account." + privacy }
         let price = purchase.displayPrice(for: current)
         switch current {
         case .lifetime:
