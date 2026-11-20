@@ -186,15 +186,25 @@ struct PaywallView: View {
         .disabled(purchase.product(for: current) == nil || inFlight)
     }
 
+    /// One row when it fits; stacked at large Dynamic Type sizes so nothing truncates.
     private var links: some View {
-        HStack(spacing: 18) {
-            Button("Restore purchases") { run { await purchase.restore() } }
-                .disabled(inFlight)
-            Link("Terms", destination: SettingsView.termsURL)
-            Link("Privacy", destination: SettingsView.privacyURL)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 18) { linkItems }
+            VStack(spacing: 10) { linkItems }
         }
         .font(.footnote)
         .tint(AppColors.info)
+    }
+
+    @ViewBuilder
+    private var linkItems: some View {
+        Button("Restore purchases") { run { await purchase.restore() } }
+            .disabled(inFlight)
+            .fixedSize()
+        Link("Terms", destination: SettingsView.termsURL)
+            .fixedSize()
+        Link("Privacy", destination: SettingsView.privacyURL)
+            .fixedSize()
     }
 
     // MARK: - Selection
