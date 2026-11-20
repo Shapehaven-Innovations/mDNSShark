@@ -88,7 +88,16 @@ struct ContentView: View {
     }
 
     private var canAskForReview: Bool {
-        scenePhase == .active && !showSplash && !showBanner && !scanVM.isLocalNetworkDenied
+        scenePhase == .active && !showSplash && !showBanner && !scanVM.isLocalNetworkDenied && !isPresentingModal
+    }
+
+    /// True while any sheet, alert or other modal is up (e.g. the paywall or a Settings sheet).
+    /// The pre-prompt alert can't present over it, so the ask must not be recorded then.
+    private var isPresentingModal: Bool {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .contains { $0.isKeyWindow && $0.rootViewController?.presentedViewController != nil }
     }
 
     /// Asks right after a scan that found devices, once enough good scans have passed; `ReviewRequestPolicy` holds the rules.
