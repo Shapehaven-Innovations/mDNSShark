@@ -306,6 +306,43 @@ final class PurchaseManager: ObservableObject {
         await transaction.finish()
         await refreshEntitlements()
         applyIfMissing(transaction)
+        if transaction.revocationDate == nil, let plan = Plan(productID: transaction.productID), plan != .lifetime {
+            scheduleStatusCatchUp(for: plan)
+        }
+    }
+
+    // A group's subscription status can lag a new or changed plan by a few
+    // seconds (and can list the old plan's status too), so the status line and
+    // the paywall's current plan would stay stale until the next foreground.
+    // Re-read the real StoreKit answer a few times; stop as soon as it matches.
+    private var catchUpTask: Task<Void, Never>?
+
+    private func scheduleStatusCatchUp(for plan: Plan) {
+        catchUpTask?.cancel()
+        catchUpTask = Task { [weak self] in
+            for seconds in [1.0, 2.0, 4.0] {
+                try? await Task.sleep(for: .seconds(seconds))
+                if Task.isCancelled { return }
+                await self?.refreshEntitlements()
+                if self?.activePlan == plan { return }
+            }
+        }
+    }
+
+    /// The status that describes the plan the user is on now: live states beat
+    /// expired ones, then the latest expiry wins (after a plan change the group
+    /// can report both the old and the new plan).
+    static func preferredStatus(_ statuses: [Product.SubscriptionInfo.Status]) -> Product.SubscriptionInfo.Status? {
+        func rank(_ status: Product.SubscriptionInfo.Status) -> (live: Int, expiry: Date) {
+            guard case .verified(let tx) = status.transaction else { return (-1, .distantPast) }
+            let live = (status.state == .subscribed || status.state == .inGracePeriod
+                        || status.state == .inBillingRetryPeriod) ? 1 : 0
+            return (live, tx.expirationDate ?? .distantPast)
+        }
+        return statuses.max { a, b in
+            let (ra, rb) = (rank(a), rank(b))
+            return ra.live != rb.live ? ra.live < rb.live : ra.expiry < rb.expiry
+        }
     }
 
     // Transaction.currentEntitlements is a local cache that can lag the transaction
@@ -342,7 +379,7 @@ final class PurchaseManager: ObservableObject {
         var subscribedProductID: String?
         if let sub = groupSubscription {
             trialEligible = await sub.isEligibleForIntroOffer
-            if let status = try? await sub.status.first,
+            if let status = Self.preferredStatus((try? await sub.status) ?? []),
                case .verified(let info) = status.renewalInfo,
                case .verified(let tx) = status.transaction {
                 let exp = tx.expirationDate ?? .now
