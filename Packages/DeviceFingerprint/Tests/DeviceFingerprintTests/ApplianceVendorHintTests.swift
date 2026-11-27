@@ -12,8 +12,8 @@ final class ApplianceVendorHintTests: XCTestCase {
 
     func test_everyListedName_isARealTableString_andMatches() throws {
         let vendors = Set(try bundledTable().values)
-        XCTAssertEqual(ApplianceVendorHint.vendorNames.count, 60)
-        XCTAssertEqual(try bundledTable().filter { ApplianceVendorHint.vendorNames.contains($0.value) }.count, 147)
+        XCTAssertEqual(ApplianceVendorHint.vendorNames.count, 59)
+        XCTAssertEqual(try bundledTable().filter { ApplianceVendorHint.vendorNames.contains($0.value) }.count, 146)
         for name in ApplianceVendorHint.vendorNames {
             XCTAssertTrue(vendors.contains(name), "\(name) is not spelled this way in oui-database.txt")
             XCTAssertTrue(ApplianceVendorHint.isApplianceVendor(name), name)

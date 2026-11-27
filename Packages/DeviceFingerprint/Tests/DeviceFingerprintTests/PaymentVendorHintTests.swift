@@ -33,10 +33,10 @@ final class PaymentVendorHintTests: XCTestCase {
 
     func test_nearMissTableNames_doNotMatch() throws {
         let vendors = Set(try bundledTable().values)
-        let nearMisses = ["Square D Company", "Kendall Square Research Corp.", "IP SQUARE Co, Ltd.", "Pax AB", "PAXCOMM, Inc.",
-                          "Paxton Access Ltd", "Clovertech, Inc.", "Blue Clover Devices", "Clover Electronics Co.,Ltd.",
+        let nearMisses = ["SQUARE D COMPANY", "KENDALL SQUARE RESEARCH CORP.", "IP SQUARE Co, Ltd.", "Pax AB", "PAXCOMM, Inc.",
+                          "Paxton Access Ltd", "Clovertech, Inc.", "Blue Clover Devices", "CLOVER ELECTRONICS CO.,LTD.",
                           "Newland Design + Assoc. Inc.", "Fujian Newland Auto-ID Tech Co.,Ltd.",
-                          "Star Micronics Co.,Ltd.", "Seiko Epson Corporation", "Apple, Inc.", "Google, Inc."]
+                          "STAR MICRONICS CO.,LTD.", "Seiko Epson Corporation", "Apple, Inc.", "Google, Inc."]
         for name in nearMisses {
             XCTAssertTrue(vendors.contains(name), "fixture \(name) should be a real table string")
             XCTAssertFalse(PaymentVendorHint.isPaymentVendor(name), name)

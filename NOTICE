@@ -10,3 +10,9 @@ Copyright (c) 2019 - 2020, Nordic Semiconductor ASA
 BSD 3-Clause License. Full text in
 Packages/DeviceFingerprint/Sources/DeviceFingerprint/Resources/bluetooth-numbers-database-LICENSE.txt
 and in the app under Settings > About > Acknowledgements.
+
+IEEE Registration Authority MA-L assignments
+mDNSShark/Resources/oui-database.txt lists MAC address prefixes and organization
+names from the IEEE Registration Authority's public MA-L list,
+https://standards-oui.ieee.org/oui/oui.csv, retrieved 2026-11-27 and converted
+by scripts/convert_ieee_oui.py.

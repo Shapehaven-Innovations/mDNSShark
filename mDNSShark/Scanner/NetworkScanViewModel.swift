@@ -701,7 +701,7 @@ final class NetworkScanViewModel: ObservableObject {
                 }
                 if mfr == nil { mfr = appleManufacturer(serviceType: device.serviceType, txtRecords: device.txtRecords) }
                 if mfr == nil { mfr = Self.catalogVendor(serviceType: device.serviceType, txtRecords: device.txtRecords) }
-                let os = inferOS(serviceType: device.serviceType, manufacturer: mfr, txtRecords: device.txtRecords)
+                let os = Self.inferOS(serviceType: device.serviceType, manufacturer: mfr, txtRecords: device.txtRecords)
                 let identity = identityByEffectiveIP[ip] ?? ip
                 let group = addressesByEffectiveIP[ip] ?? [ip]
                 let onLocalSubnet = LocalInterfaces.isOnLocalSubnet(addresses: Array(group), subnets: own.ipv4Subnets)
@@ -843,7 +843,7 @@ final class NetworkScanViewModel: ObservableObject {
         return applePrefixes.contains(where: { model.hasPrefix($0) }) ? "Apple" : nil
     }
 
-    private func inferOS(serviceType: String, manufacturer: String?, txtRecords: [String: String]? = nil) -> String? {
+    nonisolated static func inferOS(serviceType: String, manufacturer: String?, txtRecords: [String: String]? = nil) -> String? {
         // Only Apple-exclusive types: AirPlay, RAOP, DAAP and device-info are also used by Sonos, Samsung TVs and NAS boxes.
         let appleServices: Set<String> = ["_apple-mobdev2._tcp", "_airdrop._tcp"]
         if appleServices.contains(serviceType) { return "Apple" }
@@ -859,7 +859,8 @@ final class NetworkScanViewModel: ObservableObject {
         }
         if let mfr = manufacturer {
             if mfr.contains("Apple")     { return "Apple" }
-            if mfr.contains("Microsoft") { return "Windows" }
+            // IEEE lists one Microsoft block in capitals.
+            if mfr.localizedCaseInsensitiveContains("Microsoft") { return "Windows" }
             if mfr.contains("Raspberry") { return "Linux" }
         }
         return nil

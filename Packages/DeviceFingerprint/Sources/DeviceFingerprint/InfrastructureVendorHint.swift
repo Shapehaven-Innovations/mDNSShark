@@ -2,7 +2,7 @@ import Foundation
 
 /// Traffic-control, roadside, tolling, detection and licence plate equipment vendors as the bundled OUI table spells them. A host whose MAC vendor is one of these gets no active probes.
 public enum InfrastructureVendorHint {
-    /// Exact vendor strings from `oui-database.txt`, matched whole, so ambiguous names such as `Kapsch Ag` or `FLIR Systems` are left out on purpose.
+    /// Exact vendor strings from `oui-database.txt`, matched whole, so ambiguous names such as `KAPSCH AG` or `FLIR Systems` are left out on purpose.
     public static let vendorNames: Set<String> = [
         "Econolite Control Products, Inc.",
         "Peek Traffic B.V.",
@@ -12,7 +12,7 @@ public enum InfrastructureVendorHint {
         "Q-Free ASA",
         "Q-Free America, Inc.",
         "Swarco LEA d.o.o.",
-        "Lacroix Traffic S.A.U",
+        "LACROIX TRAFFIC S.A.U",
         "Northwest Signal Supply, Inc",
         "Global Traffic Technologies, LLC",
         "NoTraffic",

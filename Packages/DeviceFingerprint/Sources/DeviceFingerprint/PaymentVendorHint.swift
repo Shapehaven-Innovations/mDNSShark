@@ -2,13 +2,13 @@ import Foundation
 
 /// Payment and point-of-sale vendors as the bundled OUI table spells them. A host whose MAC vendor is one of these gets no active probes.
 public enum PaymentVendorHint {
-    /// Exact vendor strings from `oui-database.txt`, matched whole; a substring match would also hit `Square D Company`, `Pax AB` or `Clovertech, Inc.`.
+    /// Exact vendor strings from `oui-database.txt`, matched whole; a substring match would also hit `SQUARE D COMPANY`, `Pax AB` or `Clovertech, Inc.`.
     public static let vendorNames: Set<String> = [
         "PAX Computer Technology(Shenzhen) Ltd.",
         "Verifone, Inc.",
-        "Ingenico",
+        "INGENICO",
         "Ingenico International",
-        "Ingenico Terminals Sas",
+        "INGENICO TERMINALS SAS",
         "Clover Network, Inc.",
         "Square Inc.",
         "Toast, Inc.",
@@ -20,7 +20,7 @@ public enum PaymentVendorHint {
         "Fujian LANDI Commercial Equipment Co.,Ltd",
         "Fujian Landi Commercial Technology Co., Ltd.",
         "Spire Payments",
-        "Hypercom, Inc.",
+        "HYPERCOM, INC.",
         "Poynt Co.",
     ]
 
