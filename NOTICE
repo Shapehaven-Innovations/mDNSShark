@@ -11,6 +11,33 @@ BSD 3-Clause License. Full text in
 Packages/DeviceFingerprint/Sources/DeviceFingerprint/Resources/bluetooth-numbers-database-LICENSE.txt
 and in the app under Settings > About > Acknowledgements.
 
+AppleDB, https://github.com/littlebyteorg/appledb
+Apple model identifiers and names.
+Copyright (c) 2022 emiyl
+MIT License. Full text in
+Packages/DeviceFingerprint/Sources/DeviceFingerprint/Resources/appledb-LICENSE.txt
+and in the app under Settings > About > Acknowledgements.
+
+Home Assistant, https://github.com/home-assistant/core
+Bluetooth advertisement matchers from homeassistant/generated/bluetooth.py.
+Apache License 2.0. Full text in
+Packages/DeviceFingerprint/Sources/DeviceFingerprint/Resources/home-assistant-LICENSE.txt
+and in the app under Settings > About > Acknowledgements.
+
+xiaomi-ble, https://github.com/Bluetooth-Devices/xiaomi-ble
+Xiaomi MiBeacon product IDs and names from src/xiaomi_ble/devices.py.
+Copyright 2022 J. Nick Koston
+Apache License 2.0. Full text in
+Packages/DeviceFingerprint/Sources/DeviceFingerprint/Resources/xiaomi-ble-LICENSE.txt
+and in the app under Settings > About > Acknowledgements.
+
+Bluetooth SIG assigned numbers (company identifiers, member service UUIDs),
+https://bitbucket.org/bluetooth-SIG/public. Bluetooth is a trademark of
+Bluetooth SIG, Inc.
+
+See Packages/DeviceFingerprint/Sources/DeviceFingerprint/Resources/ble-data-NOTICE.txt
+and ble-data-SOURCE.txt for the upstream files and commits.
+
 IEEE Registration Authority MA-L assignments
 mDNSShark/Resources/oui-database.txt lists MAC address prefixes and organization
 names from the IEEE Registration Authority's public MA-L list,
