@@ -11,6 +11,7 @@
 #   curl -A "oui-table-generator/1.0" -o oui.csv https://standards-oui.ieee.org/oui/oui.csv
 #   python3 scripts/convert_ieee_oui.py oui.csv mDNSShark/Resources/oui-database.txt
 import csv
+import html
 import re
 import sys
 
@@ -27,7 +28,7 @@ def convert(src_path: str, dst_path: str) -> None:
             prefix = row[1].strip().lower()
             if len(prefix) != 6 or not all(c in "0123456789abcdef" for c in prefix):
                 continue
-            vendor = re.sub(r"\s+", " ", row[2]).strip()
+            vendor = re.sub(r"\s+", " ", html.unescape(row[2])).strip()
             if vendor and prefix not in table:
                 table[prefix] = vendor
     if len(table) < 30000:

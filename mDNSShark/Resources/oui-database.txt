@@ -9879,7 +9879,7 @@
 0026ba	Commscope
 0026bb	Apple, Inc.
 0026bc	General Jack Technology Ltd.
-0026bd	JTEC Card &amp; Communication Co., Ltd
+0026bd	JTEC Card & Communication Co., Ltd
 0026be	Schoonderbeek Elektronica Systemen B.V.
 0026bf	ShenZhen Temobi Science&Tech Development Co.,Ltd
 0026c0	EnergyHub
@@ -18502,7 +18502,7 @@
 344e2f	LEAR
 344ee2	Huawei Device Co., Ltd.
 344f3f	IO-Power Technology Co., Ltd.
-344f5c	R&amp;M AG
+344f5c	R&M AG
 344f69	EKINOPS SAS
 34516f	Skychers Creations ShenZhen Limited
 345180	TCL King Electrical Appliances (Huizhou) Co., Ltd
@@ -20684,7 +20684,7 @@
 483a02	Fortinet, Inc.
 483b38	Apple, Inc.
 483c0c	HUAWEI TECHNOLOGIES CO.,LTD
-483d32	Syscor Controls &amp; Automation
+483d32	Syscor Controls & Automation
 483e5e	SERNET (SUZHOU) TECHNOLOGIES CORPORATION
 483f72	Samsung Electronics Co.,Ltd
 483fda	Espressif Inc.
@@ -24285,7 +24285,7 @@
 68966a	OHSUNG
 68967b	Apple, Inc.
 68974b	Shenzhen Costar Electronics Co. Ltd.
-6897e8	Society of Motion Picture &amp; Television Engineers
+6897e8	Society of Motion Picture & Television Engineers
 689861	Beacon Inc
 6899cd	Cisco Systems, Inc
 689a21	Fiberhome Telecommunication Technologies Co.,LTD
@@ -28765,7 +28765,7 @@
 9097d5	Espressif Inc.
 9097f3	Samsung Electronics Co.,Ltd
 909838	Huawei Device Co., Ltd.
-909864	Impex-Sat GmbH&amp;Co KG
+909864	Impex-Sat GmbH&Co KG
 909877	Vestel Elektronik San ve Tic. A.S.
 909916	ELVEES NeoTek OJSC
 909a4a	TP-LINK TECHNOLOGIES CO.,LTD.
@@ -29044,7 +29044,7 @@
 94350a	Samsung Electronics Co.,Ltd
 943589	HUAWEI TECHNOLOGIES CO.,LTD
 94368b	GD Midea Air-Conditioning Equipment Co.,Ltd.
-9436e0	Sichuan Bihong Broadcast &amp; Television New Technologies Co.,Ltd
+9436e0	Sichuan Bihong Broadcast & Television New Technologies Co.,Ltd
 94376c	IoTronix Technologies Sdn. Bhd.
 9437f7	Huawei Device Co., Ltd.
 9438aa	Technology Innovation Institute
@@ -30708,7 +30708,7 @@ a408ea	Murata Manufacturing Co., Ltd.
 a408f5	Sagemcom Broadband SAS
 a40987	Apple, Inc.
 a409b3	HUAWEI TECHNOLOGIES CO.,LTD
-a409cb	Alfred Kaercher GmbH &amp; Co KG
+a409cb	Alfred Kaercher GmbH & Co KG
 a40b78	FAST PHOTONICS HK CO., LIMITED
 a40bed	Carry Technology Co.,Ltd
 a40c66	Shenzhen Colorful Yugong Technology and Development Co., Ltd.
@@ -35578,7 +35578,7 @@ d0608c	zte corporation
 d06158	HUAWEI TECHNOLOGIES CO.,LTD
 d0622c	Xi'an Yipu Telecom Technology Co.,Ltd.
 d062a0	China Essence Technology (Zhumadian) Co., Ltd.
-d0634d	Meiko Maschinenbau GmbH &amp; Co. KG
+d0634d	Meiko Maschinenbau GmbH & Co. KG
 d063b4	SolidRun Ltd.
 d06544	Apple, Inc.
 d06578	Intel Corporate
@@ -36354,7 +36354,7 @@ d824ec	Plenom A/S
 d82522	Commscope
 d825b0	Rockeetech Systems Co.,Ltd.
 d825df	CAME UK
-d826b9	Guangdong Coagent Electronics S&amp;T Co.,Ltd.
+d826b9	Guangdong Coagent Electronics S&T Co.,Ltd.
 d826d3	eero inc.
 d826fa	Jiangxi Zhentian Technology CO.,LTD
 d8270c	MaxTronic International Co., Ltd.
@@ -37419,7 +37419,7 @@ e0acf1	Cisco Systems, Inc
 e0ad9b	HUAWEI TECHNOLOGIES CO.,LTD
 e0ae5e	ALPSALPINE CO,.LTD
 e0aea2	HUAWEI TECHNOLOGIES CO.,LTD
-e0aeb2	Bender GmbH &amp; Co.KG
+e0aeb2	Bender GmbH & Co.KG
 e0aeed	LOENK
 e0af4b	Pluribus Networks, Inc.
 e0af4f	Deutsche Telekom AG
@@ -39965,7 +39965,7 @@ f8a03d	Dinstar Technologies Co., Ltd.
 f8a097	Commscope
 f8a188	LED Roadway Lighting
 f8a26d	CANON INC.
-f8a2b4	RHEWA-WAAGENFABRIK August Freudewald GmbH &amp;Co. KG
+f8a2b4	RHEWA-WAAGENFABRIK August Freudewald GmbH &Co. KG
 f8a2d6	Liteon Technology Corporation
 f8a34f	zte corporation
 f8a45f	Xiaomi Communications Co Ltd
