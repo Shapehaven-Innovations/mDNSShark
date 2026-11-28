@@ -100,6 +100,15 @@ struct DeviceKindClassificationTests {
         #expect(NetworkScanViewModel.catalogVendor(serviceType: "_http._tcp", txtRecords: [:]) == nil)
     }
 
+    @Test("the OS guess from the OUI vendor reads the IEEE spellings, including the all caps Microsoft entry")
+    func vendorOSGuess() {
+        #expect(NetworkScanViewModel.inferOS(serviceType: "_http._tcp", manufacturer: "Apple, Inc.") == "Apple")
+        #expect(NetworkScanViewModel.inferOS(serviceType: "_http._tcp", manufacturer: "Microsoft Corporation") == "Windows")
+        #expect(NetworkScanViewModel.inferOS(serviceType: "_http._tcp", manufacturer: "MICROSOFT CORP.") == "Windows")
+        #expect(NetworkScanViewModel.inferOS(serviceType: "_http._tcp", manufacturer: "Raspberry Pi Trading Ltd") == "Linux")
+        #expect(NetworkScanViewModel.inferOS(serviceType: "_http._tcp", manufacturer: "Dell Inc.") == nil)
+    }
+
     @Test("Network MIDI does not make a Mac or an iPad audio")
     func midiIsNotAudio() {
         #expect(device(services: [service("_apple-midi._udp"), service("_smb._tcp")]).deviceType == .computer)

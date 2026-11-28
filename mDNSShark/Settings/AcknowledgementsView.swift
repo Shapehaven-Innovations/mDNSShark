@@ -10,23 +10,25 @@ struct AcknowledgementsView: View {
                     Label("Licensed under the Apache License 2.0", systemImage: "arrow.up.right.square")
                 }
             }
-            Section("Bluetooth names") {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(BluetoothDataNotice.title).font(.headline)
-                    Text("Bluetooth company and service names. Copyright \(BluetoothDataNotice.source). \(BluetoothDataNotice.licenseName) License.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+            ForEach(DataNotice.all) { notice in
+                Section {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(notice.title).font(.headline)
+                        Text("\(notice.summary) \(notice.licenseName).")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                    Link(destination: notice.sourceURL) {
+                        Label("Source on GitHub", systemImage: "arrow.up.right.square")
+                    }
+                    DisclosureGroup("License text") {
+                        Text(notice.licenseText)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
                 }
-                .accessibilityElement(children: .combine)
-                Link(destination: BluetoothDataNotice.sourceURL) {
-                    Label("Source on GitHub", systemImage: "arrow.up.right.square")
-                }
-            }
-            Section("License text") {
-                Text(BluetoothDataNotice.licenseText)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
             }
         }
         .listStyle(.insetGrouped)

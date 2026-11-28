@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		3173238BF83DA8A145886A53 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F0ABF2194E516D286205B0E3 /* NetworkExtension.framework */; };
 		6F66EB2AE45E51C94930BC24 /* WidgetSnapshot in Frameworks */ = {isa = PBXBuildFile; productRef = B355E033E63FAB8144FFE3DB /* WidgetSnapshot */; };
-		9A40CE772D5EC623000379E7 /* MIT.license in Resources */ = {isa = PBXBuildFile; fileRef = 9A40CE762D5EC61A000379E7 /* MIT.license */; };
 		9A5CC49930609B7900425B38 /* DeviceFingerprint in Frameworks */ = {isa = PBXBuildFile; productRef = 2C183D20A8B0785BAA01DD06 /* DeviceFingerprint */; };
 		9A8F66FF2D4F069100A033B5 /* ScanX-Bridging-Header.m in Sources */ = {isa = PBXBuildFile; fileRef = 9A8F66FE2D4F069100A033B5 /* ScanX-Bridging-Header.m */; };
 		9AC2AB6C2D4F1F3B004A9F66 /* libmdns.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 9AC2AB6B2D4F1F3B004A9F66 /* libmdns.tbd */; };
@@ -62,7 +61,6 @@
 
 /* Begin PBXFileReference section */
 		9A1C9E892D443D5300643122 /* mDNSShark.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = mDNSShark.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		9A40CE762D5EC61A000379E7 /* MIT.license */ = {isa = PBXFileReference; lastKnownFileType = text; path = MIT.license; sourceTree = "<group>"; };
 		9A8785873069EB2300082E7A /* mDNSSharkTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = mDNSSharkTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9A8F66CE2D4EEF4B00A033B5 /* libdns_services.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libdns_services.tbd; path = usr/lib/libdns_services.tbd; sourceTree = SDKROOT; };
 		9A8F66FE2D4F069100A033B5 /* ScanX-Bridging-Header.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "ScanX-Bridging-Header.m"; sourceTree = "<group>"; };
@@ -215,7 +213,6 @@
 			isa = PBXGroup;
 			children = (
 				9AAE4AF33058B7B30047E703 /* Configuration.storekit */,
-				9A40CE762D5EC61A000379E7 /* MIT.license */,
 				9A1C9E8B2D443D5300643122 /* mDNSShark */,
 				9AEA1A2E2FABF80F00D8F38C /* PacketTunnel */,
 				F2C49336196DFE6B549C2F75 /* mDNSSharkTests */,
@@ -405,7 +402,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9A40CE772D5EC623000379E7 /* MIT.license in Resources */,
 				9AFD8F6F2D5E89C80034B804 /* readme.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

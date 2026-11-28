@@ -30,7 +30,7 @@ final class InfrastructureVendorHintTests: XCTestCase {
 
     func test_ambiguousAndNearMissNames_doNotMatch() throws {
         let vendors = Set(try bundledTable().values)
-        for name in ["FLIR Systems", "Daktronics, Inc.", "Kapsch Ag", "GENETEC Corporation", "Pelcombe Group Ltd.", "Genetec Inc.", "Tattile SRL"] {
+        for name in ["FLIR Systems", "Daktronics, Inc.", "KAPSCH AG", "GENETEC Corporation", "PELCOMBE GROUP LTD.", "Genetec Inc.", "Tattile SRL"] {
             XCTAssertTrue(vendors.contains(name), "fixture \(name) should be a real table string")
             XCTAssertFalse(InfrastructureVendorHint.isInfrastructureVendor(name), name)
         }
